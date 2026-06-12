@@ -38,7 +38,7 @@ const PaymentSuccessPage: NextPageWithLayout = () => {
   };
 
   const handleViewOrders = () => {
-    window.location.href = 'https://sancan.ru/purchases';
+    window.location.href = 'https://treabo.md/purchases';
   };
 
   if (loading) {

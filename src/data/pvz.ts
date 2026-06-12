@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.sancan.ru';
+const API_BASE_URL = process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.treabo.md';
 
 export async function fetchPvz(city: string, service: string = 'sdek') {
   const { data } = await axios.get(`${API_BASE_URL}/pvz?service=${service}&city=${encodeURIComponent(city)}`);

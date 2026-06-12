@@ -80,7 +80,7 @@ export const LocationWithModal: React.FC<SimpleLocationProps> = ({
   const loadSavedAddress = useCallback(async (): Promise<{ address?: Address; city?: City } | null> => {
     try {
       // Сначала пробуем загрузить сохраненный адрес
-      const addressResponse = await fetch('https://api.sancan.ru/api/geoip/address/saved', {
+      const addressResponse = await fetch('https://api.treabo.md/api/geoip/address/saved', {
         credentials: 'include'
       });
       
@@ -118,7 +118,7 @@ export const LocationWithModal: React.FC<SimpleLocationProps> = ({
       }
       
       // Если адрес не найден, пробуем загрузить сохраненный город (для обратной совместимости)
-      const cityResponse = await fetch('https://api.sancan.ru/api/geoip/city/saved', {
+      const cityResponse = await fetch('https://api.treabo.md/api/geoip/city/saved', {
         credentials: 'include'
       });
       
@@ -262,7 +262,7 @@ export const LocationWithModal: React.FC<SimpleLocationProps> = ({
       
       // Отправляем POST запрос с координатами (если есть) к API геолокации
       // API использует гибридную систему: DaData (основной) -> MaxMind (fallback)
-      const response = await fetch('https://api.sancan.ru/api/geoip/location', {
+      const response = await fetch('https://api.treabo.md/api/geoip/location', {
         method: Object.keys(requestBody).length > 0 ? 'POST' : 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -330,7 +330,7 @@ export const LocationWithModal: React.FC<SimpleLocationProps> = ({
   const searchAddresses = async (query: string) => {
     try {
       setIsSearching(true);
-      const url = `https://api.sancan.ru/api/geoip/addresses/search?q=${encodeURIComponent(query)}&count=10`;
+      const url = `https://api.treabo.md/api/geoip/addresses/search?q=${encodeURIComponent(query)}&count=10`;
       console.log('🔍 Поиск адресов через DaData:', query, url);
       
       // API использует DaData для поиска полных адресов
@@ -405,7 +405,7 @@ export const LocationWithModal: React.FC<SimpleLocationProps> = ({
       
       console.log('🔑 Токен авторизации:', token ? 'есть' : 'нет');
       
-      const response = await fetch('https://api.sancan.ru/api/geoip/address/save', {
+      const response = await fetch('https://api.treabo.md/api/geoip/address/save', {
         method: 'POST',
         headers: headers,
         credentials: 'include',
@@ -465,7 +465,7 @@ export const LocationWithModal: React.FC<SimpleLocationProps> = ({
   // Сохранение города (для обратной совместимости)
   const saveCity = async (city: City) => {
     try {
-      const response = await fetch('https://api.sancan.ru/api/geoip/city/save', {
+      const response = await fetch('https://api.treabo.md/api/geoip/city/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

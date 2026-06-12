@@ -34,7 +34,7 @@ export const getServerSideProps: GetServerSideProps<
   
   try {
     // ВАЖНО: На сервере используем прямой fetch, а не client (который работает только в браузере)
-    const apiUrl = process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.sancan.ru';
+    const apiUrl = process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.treabo.md';
     
     // Загружаем плейсы с фильтром по хэштегу
     const placesUrl = new URL(`${apiUrl}${API_ENDPOINTS.PLACES}`);
@@ -155,7 +155,7 @@ const HashtagPage: NextPageWithLayout<
   };
 
   // Формируем canonical URL для страницы хештега плейсов
-  const baseUrl = 'https://sancan.ru';
+  const baseUrl = 'https://treabo.md';
   const canonicalUrl = `${baseUrl}/places/element/${hashtag.slug}`;
 
   return (

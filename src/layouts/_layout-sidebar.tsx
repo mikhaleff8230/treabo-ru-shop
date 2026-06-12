@@ -214,7 +214,7 @@ export function Sidebar({
       >
         <nav className="flex items-center justify-center gap-5 pb-1.5 text-13px font-medium tracking-[0.2px]">
           <ActiveLink
-            href="https://sancan.ru/help"
+            href="https://treabo.md/help"
             className="block py-2 text-dark-700 hover:text-dark-100 dark:hover:text-brand text-[12px]"
           >Частые вопросы и поддержка
           </ActiveLink>

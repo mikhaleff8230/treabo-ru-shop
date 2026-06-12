@@ -27,7 +27,7 @@ const UserAddress: React.FC = () => {
   const loadAddress = useCallback(async () => {
     try {
       setIsLoading(true);
-      const response = await fetch('https://api.sancan.ru/api/geoip/address/saved', {
+      const response = await fetch('https://api.treabo.md/api/geoip/address/saved', {
         credentials: 'include',
         headers: {
           'Accept': 'application/json',

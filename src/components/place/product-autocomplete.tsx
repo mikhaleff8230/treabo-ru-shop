@@ -73,7 +73,7 @@ export default function ProductAutocomplete({
           onBlur={() => setTimeout(() => setShowList(false), 150)}
         />
         <a
-          href="http://seller.sancan.ru/"
+          href="https://seller.treabo.md/"
           target="_blank"
           rel="noopener noreferrer"
           className="sm:ml-2 px-3 py-2 bg-brand hover:bg-brand-dark text-white rounded hover:bg-brand-700 transition whitespace-nowrap text-center sm:text-left"

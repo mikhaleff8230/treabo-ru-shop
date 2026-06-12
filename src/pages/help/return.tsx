@@ -69,7 +69,7 @@ const ReturnPage: NextPageWithLayout = () => {
               Для оформления возврата свяжитесь с нашей службой поддержки:
             </p>
             <ul>
-              <li>Email: support@sancan.ru</li>
+              <li>Email: support@treabo.md</li>
               <li>Телефон: +7 (800) 123-45-67</li>
               <li>Время работы: Пн-Пт с 9:00 до 18:00</li>
             </ul>

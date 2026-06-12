@@ -33,7 +33,7 @@ export default function ProductAttributes({
     async () => {
       if (!product?.id) return null;
       try {
-        const apiUrl = `${process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.sancan.ru'}/api/products/${product.id}/attributes`;
+        const apiUrl = `${process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.treabo.md'}/api/products/${product.id}/attributes`;
         console.log('[ProductAttributes] Fetching attributes from:', apiUrl);
         
         const controller = new AbortController();

@@ -1,6 +1,6 @@
 /** @type {import('next-sitemap').IConfig} */
 module.exports = {
-    siteUrl: 'https://sancan.ru',
+    siteUrl: 'https://treabo.md',
     changefreq: 'daily',
     priority: 0.7,
     sitemapSize: 1000, // Максимум 1000 URL на файл
@@ -12,7 +12,7 @@ module.exports = {
         const result = [];
         
         try {
-            const apiUrl = 'https://api.sancan.ru';
+            const apiUrl = process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.treabo.md';
             console.log(`Fetching products from: ${apiUrl}/api/products`);
             
             // Получаем товары из API

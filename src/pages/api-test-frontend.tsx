@@ -38,7 +38,7 @@ export default function ApiTestFrontend({ apiTest, error }: ApiTestProps) {
 
 export const getServerSideProps: GetServerSideProps = async (context) => {
   const locale = context.locale || context.defaultLocale || 'ru';
-  const apiUrl = process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.sancan.ru';
+  const apiUrl = process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.treabo.md';
 
   try {
     console.log('API Test: Начинаем тест API');

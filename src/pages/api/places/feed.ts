@@ -6,7 +6,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.sancan.ru';
+    const apiUrl = process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.treabo.md';
     const url = new URL(`${apiUrl}/places/feed`);
 
     // Копируем все query параметры

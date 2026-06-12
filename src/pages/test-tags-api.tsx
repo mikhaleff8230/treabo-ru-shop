@@ -125,7 +125,7 @@ export default function TestTagsApi() {
       <div className="mb-8">
         <h2 className="text-xl font-semibold mb-4">Информация о API</h2>
         <div className="bg-gray-100 p-4 rounded">
-          <p><strong>API Endpoint:</strong> {process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.sancan.ru'}</p>
+          <p><strong>API Endpoint:</strong> {process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.treabo.md'}</p>
           <p><strong>Текущая страница:</strong> /test-tags-api</p>
           <p><strong>Маршрут тегов:</strong> /products/tags/[tagSlug]</p>
         </div>

@@ -21,9 +21,9 @@ const PromoPage: NextPageWithLayout = () => {
                 SANCAN <span className="font-light">seller</span>
               </h2>
               <nav className="hidden md:flex items-center gap-6">
-			    <a href="https://sancan.ru" className="text-sm text-light/80 hover:text-light transition-colors">Маркетплейс SANCAN.RU</a>
-                <a href="https://sancan.ru/marketplace" className="text-sm text-light/80 hover:text-light transition-colors">О проекте</a>
-                <a href="https://sancan.ru/earn" className="text-sm text-light/80 hover:text-light transition-colors">Зарабатывать с Sancan</a>
+			    <a href="https://treabo.md" className="text-sm text-light/80 hover:text-light transition-colors">Маркетплейс SANCAN.RU</a>
+                <a href="https://treabo.md/marketplace" className="text-sm text-light/80 hover:text-light transition-colors">О проекте</a>
+                <a href="https://treabo.md/earn" className="text-sm text-light/80 hover:text-light transition-colors">Зарабатывать с Sancan</a>
                 <a href="#" className="text-sm text-light/80 hover:text-light transition-colors">Что продавать</a>
               </nav>
             </div>
@@ -31,7 +31,7 @@ const PromoPage: NextPageWithLayout = () => {
               <Button
                 variant="outline"
                 className="inline-flex border-promo-primary text-promo-primary hover:bg-promo-primary hover:text-promo-primary-foreground"
-                onClick={() => window.open('https://seller.sancan.ru/register', '_blank')}
+                onClick={() => window.open('https://seller.treabo.md/register', '_blank')}
                 style={{ backgroundColor: 'rgba(224, 243, 22, 1)' }}
               >
                 Войти в кабинет
@@ -55,7 +55,7 @@ const PromoPage: NextPageWithLayout = () => {
                 <Button
                 variant="outline"
                 className="hidden md:inline-flex border-promo-primary text-promo-primary hover:bg-promo-primary hover:text-promo-primary-foreground"
-                onClick={() => window.open('https://seller.sancan.ru/register', '_blank')}
+                onClick={() => window.open('https://seller.treabo.md/register', '_blank')}
                 style={{ backgroundColor: 'rgba(224, 243, 22, 1)' }}
               >
                 Стать продавцом
@@ -142,7 +142,7 @@ const PromoPage: NextPageWithLayout = () => {
                 <div className="space-y-2">
                   <div className="text-sm text-dark/60 dark:text-light/60">Шаг 1</div>
                   <h3 className="text-xl font-bold text-dark dark:text-light">Регистрация</h3>
-				  <a href="https://seller.sancan.ru/register" className="text-sm text-light/80 hover:text-light transition-colors">пройти регистрацию</a>
+				  <a href="https://seller.treabo.md/register" className="text-sm text-light/80 hover:text-light transition-colors">пройти регистрацию</a>
                 </div>
               </Card>
               

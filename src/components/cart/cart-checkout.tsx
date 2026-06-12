@@ -185,7 +185,7 @@ export default function CartCheckout({ name, email, phone, address, note, clearC
 
     try {
       // Всегда используем YooKassa endpoint
-      const endpoint = 'https://api.sancan.ru/api/custom-yookassa-order';
+      const endpoint = 'https://api.treabo.md/api/custom-yookassa-order';
       
       console.log('=== CHECKOUT DEBUG ===');
       console.log('Creating order with YooKassa');

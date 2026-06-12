@@ -337,10 +337,10 @@ const ProductPage: NextPageWithLayout<InferGetServerSidePropsType<typeof getServ
   // Товары не имеют языковых версий
   let canonicalUrl = meta?.canonical;
   
-  const baseUrl = 'https://sancan.ru';
+  const baseUrl = 'https://treabo.md';
   
   // Если canonical нет в meta или он неправильный (только домен), формируем сами
-  if (!canonicalUrl || canonicalUrl === 'https://sancan.ru' || canonicalUrl === 'https://sancan.rv' || !canonicalUrl.includes('/element/')) {
+  if (!canonicalUrl || canonicalUrl === 'https://treabo.md' || canonicalUrl === 'https://sancan.rv' || !canonicalUrl.includes('/element/')) {
     if (slug && id) {
       // Всегда без языкового префикса: /element/{slug}-{id}
       canonicalUrl = `${baseUrl}/element/${slug}-${id}`;

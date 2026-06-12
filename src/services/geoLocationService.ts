@@ -44,7 +44,7 @@ class GeoLocationService {
   private apiBaseUrl: string;
 
   constructor() {
-    this.apiBaseUrl = (typeof window !== 'undefined' && (window as any).process?.env?.NEXT_PUBLIC_API_URL) || 'https://api.sancan.ru';
+    this.apiBaseUrl = (typeof window !== 'undefined' && (window as any).process?.env?.NEXT_PUBLIC_API_URL) || 'https://api.treabo.md';
   }
 
   /**

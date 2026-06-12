@@ -42,7 +42,7 @@ const CategoryPage: NextPageWithLayout<CategoryPageProps> = ({ categorySlug }) =
   }, [filters, attributeFilters]);
 
   // Формируем canonical URL для страницы категории
-  const baseUrl = 'https://sancan.ru';
+  const baseUrl = 'https://treabo.md';
   const canonicalUrl = category 
     ? `${baseUrl}/categories/${category.slug}` 
     : `${baseUrl}/categories/${categorySlug}`;

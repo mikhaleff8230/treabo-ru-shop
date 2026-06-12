@@ -15,7 +15,7 @@ interface SearchInputProps {
     
     try {
       console.log('🔍 Загружаем подсказки для:', query);
-      const response = await fetch(`https://api.sancan.ru/search/suggestions?q=${encodeURIComponent(query)}`);
+      const response = await fetch(`https://api.treabo.md/search/suggestions?q=${encodeURIComponent(query)}`);
       console.log('📡 Ответ API suggestions:', response.status);
       
       if (!response.ok) {
@@ -47,7 +47,7 @@ const getHorizontalSuggestions = async (query: string) => {
   
   try {
     console.log('🔍 Загружаем горизонтальные подсказки для:', query);
-    const response = await fetch(`https://api.sancan.ru/search/autocomplete?q=${encodeURIComponent(query)}`);
+    const response = await fetch(`https://api.treabo.md/search/autocomplete?q=${encodeURIComponent(query)}`);
     console.log('📡 Ответ API autocomplete:', response.status);
     
     if (!response.ok) {

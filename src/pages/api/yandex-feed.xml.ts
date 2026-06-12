@@ -18,9 +18,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 <!DOCTYPE yml_catalog SYSTEM "shops.dtd">
 <yml_catalog date="${now}">
   <shop>
-    <name>Магазин sancan.ru</name>
+    <name>Магазин treabo.md</name>
     <company>ООО \"Компания\"</company>
-    <url>https://sancan.ru/</url>
+    <url>https://treabo.md/</url>
     <currencies>
       <currency id="RUR" rate="1"/>
     </currencies>
@@ -37,7 +37,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         .map(
           (p) => `
       <offer id="${p.id}" available="${p.in_stock > 0 ? 'true' : 'false'}">
-        <url>https://sancan.ru/product/${p.slug}</url>
+        <url>https://treabo.md/product/${p.slug}</url>
         <price>${p.sale_price || p.price}</price>
         <currencyId>RUR</currencyId>
         <categoryId>${p.type?.id || ''}</categoryId>

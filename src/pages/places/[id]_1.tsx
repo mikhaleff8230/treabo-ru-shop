@@ -216,7 +216,7 @@ const PlaceDetailPage = ({ place: initialPlace, meta: initialMeta, error: initia
 
   // Формируем canonical URL
   // Плейсы не имеют языковых версий, поэтому canonical URL всегда без языкового префикса
-  const baseUrl = 'https://sancan.ru';
+  const baseUrl = 'https://treabo.md';
   
   let canonicalUrl = initialMeta?.canonical;
   if (!canonicalUrl || !canonicalUrl.includes('/places/')) {
@@ -887,7 +887,7 @@ PlaceDetailPage.getLayout = function getLayout(page) {
 export const getServerSideProps: GetServerSideProps = async (context) => {
   const { id } = context.params!;
   const locale = context.locale || context.defaultLocale || 'ru';
-  const apiUrl = process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.sancan.ru';
+  const apiUrl = process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.treabo.md';
   
   try {
     // Добавляем timeout для fetch

@@ -33,7 +33,7 @@ module.exports = withPWA({
       },
       {
         source: '/api/:path*',
-        destination: `${process.env.NEXT_PUBLIC_REST_API_ENDPOINT || process.env.NEXT_PUBLIC_API_URL || 'https://api.sancan.ru'}/:path*`,
+        destination: `${process.env.NEXT_PUBLIC_REST_API_ENDPOINT || process.env.NEXT_PUBLIC_API_URL || 'https://api.treabo.md'}/:path*`,
       },
     ];
   },
@@ -53,8 +53,8 @@ module.exports = withPWA({
       '127.0.0.1:8000',
       'maps.googleapis.com',
       's3.amazonaws.com',
-      'sancan.ru',
-      'api.sancan.ru', // добавлен API домен для изображений
+      'treabo.md',
+      'api.treabo.md',
       'pixarlaravel.s3.ap-southeast-1.amazonaws.com',
       'pickbazarlaravel.s3.ap-southeast-1.amazonaws.com',
       '45.10.41.84', // добавлен API-домен
@@ -70,12 +70,12 @@ module.exports = withPWA({
       },
       {
         protocol: 'https',
-        hostname: 'sancan.ru',
+        hostname: 'treabo.md',
         pathname: '/storage/**',
       },
       {
         protocol: 'https',
-        hostname: 'api.sancan.ru',
+        hostname: 'api.treabo.md',
         pathname: '/storage/**',
       },
       {

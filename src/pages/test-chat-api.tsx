@@ -159,7 +159,7 @@ const TestChatAPI: NextPageWithLayout = () => {
         if (!shopId) throw new Error('Не указан shop_id');
         // Прямой вызов через fetch для проверки
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.sancan.ru'}/conversations`,
+          `${process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.treabo.md'}/conversations`,
           {
             method: 'POST',
             headers: {
@@ -184,7 +184,7 @@ const TestChatAPI: NextPageWithLayout = () => {
         if (!shopId) throw new Error('Не указан shop_id');
         // Прямой вызов через fetch для проверки
         const response = await fetch(
-          `${process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.sancan.ru'}/api/conversations`,
+          `${process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.treabo.md'}/api/conversations`,
           {
             method: 'POST',
             headers: {
@@ -370,7 +370,7 @@ const TestChatAPI: NextPageWithLayout = () => {
           <div className="text-sm text-blue-700 space-y-1">
             <p>
               <strong>API Endpoint:</strong>{' '}
-              {process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.sancan.ru'}
+              {process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.treabo.md'}
             </p>
             <p>
               <strong>Токен:</strong>{' '}

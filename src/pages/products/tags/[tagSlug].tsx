@@ -56,7 +56,7 @@ const TagPage: NextPageWithLayout<
   };
 
   // Формируем canonical URL для страницы тега товара
-  const baseUrl = 'https://sancan.ru';
+  const baseUrl = 'https://treabo.md';
   const canonicalUrl = `${baseUrl}/products/tags/${tag.slug}`;
 
   return (

@@ -48,7 +48,7 @@ const routes = {
   handmade: '/?category=handmade',
   hobbi: '/?category=hobbi-i-tvorchestvo',
   ukrasheniya: '/?category=ukrasheniya',
-  seller: 'https://seller.sancan.ru/register',
+  seller: 'https://seller.treabo.md/register',
 
 
 };

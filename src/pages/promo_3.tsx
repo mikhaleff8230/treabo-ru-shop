@@ -21,8 +21,8 @@ const PromoPage: NextPageWithLayout = () => {
                 SANCAN <span className="font-light">seller</span>
               </h1>
               <nav className="hidden md:flex items-center gap-6">
-                <a href="https://sancan.ru/marketplace" className="text-sm text-light/80 hover:text-light transition-colors">О проекте</a>
-                <a href="https://sancan.ru/earn" className="text-sm text-light/80 hover:text-light transition-colors">Зарабатывать с Sancan</a>
+                <a href="https://treabo.md/marketplace" className="text-sm text-light/80 hover:text-light transition-colors">О проекте</a>
+                <a href="https://treabo.md/earn" className="text-sm text-light/80 hover:text-light transition-colors">Зарабатывать с Sancan</a>
                 <a href="#" className="text-sm text-light/80 hover:text-light transition-colors">Что продавать</a>
               </nav>
             </div>
@@ -30,7 +30,7 @@ const PromoPage: NextPageWithLayout = () => {
               <Button
                 variant="outline"
                 className="inline-flex border-promo-primary text-promo-primary hover:bg-promo-primary hover:text-promo-primary-foreground"
-                onClick={() => window.open('https://seller.sancan.ru/login', '_blank')}
+                onClick={() => window.open('https://seller.treabo.md/login', '_blank')}
                 style={{ backgroundColor: 'rgba(224, 243, 22, 1)' }}
               >
                 Войти в кабинет
@@ -54,7 +54,7 @@ const PromoPage: NextPageWithLayout = () => {
                 <Button
                 variant="outline"
                 className="hidden md:inline-flex border-promo-primary text-promo-primary hover:bg-promo-primary hover:text-promo-primary-foreground"
-                onClick={() => window.open('https://seller.sancan.ru/login', '_blank')}
+                onClick={() => window.open('https://seller.treabo.md/login', '_blank')}
                 style={{ backgroundColor: 'rgba(224, 243, 22, 1)' }}
               >
                 Стать продавцом

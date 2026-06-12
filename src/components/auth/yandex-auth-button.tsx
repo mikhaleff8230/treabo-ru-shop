@@ -62,9 +62,9 @@ export default function YandexAuthButton({
     const currentUrl = window.location.href;
     localStorage.setItem('yandex_redirect_uri', currentUrl);
 
-    // Маршрут /auth/yandex находится в web.php на api.sancan.ru
+    // Маршрут /auth/yandex находится на API (api.treabo.md или прокси /api)
     // Используем полный URL бэкенда, так как window.location.href не работает с Next.js rewrites
-    const backendUrl = process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.sancan.ru';
+    const backendUrl = process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.treabo.md';
     const authUrl = `${backendUrl}/auth/yandex?mode=${mode}&redirect_uri=${encodeURIComponent(currentUrl)}`;
 
     // Перенаправляем на страницу авторизации Яндекса с параметром режима
@@ -79,7 +79,7 @@ export default function YandexAuthButton({
     try {
       // Запрашиваем данные пользователя с бэкенда
       // Используем полный URL бэкенда
-      const backendUrl = process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.sancan.ru';
+      const backendUrl = process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.treabo.md';
       const response = await fetch(`${backendUrl}/auth/yandex/user-data`, {
         method: 'GET',
         credentials: 'include', // Важно для передачи cookies/session

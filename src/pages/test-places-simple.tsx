@@ -12,7 +12,7 @@ const TestPlacesSimple: NextPageWithLayout = () => {
       try {
         console.log('Testing Places API...');
 
-        const apiUrl = process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.sancan.ru';
+        const apiUrl = process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.treabo.md';
         const response = await fetch(`${apiUrl}/places/feed?limit=5`, {
           headers: {
             'Accept': 'application/json',

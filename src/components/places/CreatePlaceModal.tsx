@@ -820,7 +820,7 @@ const CreatePlaceModal: React.FC<CreatePlaceModalProps> = ({
             ) : shops.length === 0 ? (
               <div className="p-3 border rounded bg-blue-50 text-blue-700">
                 У вас нет магазинов.{' '}
-                <a href="http://seller.sancan.ru/" target="_blank" rel="noopener noreferrer" className="underline">
+                <a href="https://seller.treabo.md/" target="_blank" rel="noopener noreferrer" className="underline">
                   Создать магазин
                 </a>
               </div>

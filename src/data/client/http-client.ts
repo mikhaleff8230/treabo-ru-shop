@@ -4,7 +4,7 @@ import { getAuthToken, removeAuthToken } from './token.utils';
 
 // Разумный таймаут для API запросов
 const Axios = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.sancan.ru',
+  baseURL: process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'https://api.treabo.md',
   timeout: 30000, // 30 секунд
   headers: {
     'Content-Type': 'application/json',
