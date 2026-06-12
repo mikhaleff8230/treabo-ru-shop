@@ -22,11 +22,66 @@ export type TreaboTask = {
   status?: string | null;
   photos?: Array<string | TreaboUpload>;
   applications_count?: number;
+  response_price_mdl?: number | null;
   photos_count?: number;
   lat?: number | null;
   lng?: number | null;
   created_at?: string | null;
   updated_at?: string | null;
+};
+
+export type TreaboApplication = {
+  id: string;
+  task_id: string;
+  task_title?: string;
+  message?: string | null;
+  price?: number | null;
+  response_fee_mdl?: number | null;
+  status?: string | null;
+  chat_id?: string | null;
+  created_at?: string | null;
+};
+
+export type TreaboChat = {
+  id: string;
+  task_id: string;
+  task_title?: string | null;
+  customer_id?: string | null;
+  customer_name?: string | null;
+  specialist_id?: string | null;
+  specialist_name?: string | null;
+  last_message?: string | null;
+  last_message_at?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+};
+
+export type TreaboMessage = {
+  id: string;
+  chat_id: string;
+  sender_id: string;
+  user_id?: string;
+  text: string;
+  type?: string;
+  created_at?: string | null;
+};
+
+export type TreaboBalance = {
+  balance: number;
+  total_deposited: number;
+  total_spent: number;
+};
+
+export type TreaboManualDeposit = {
+  success: boolean;
+  message?: string;
+  payment_method?: 'manual';
+  payment_url?: string;
+  payment_id?: string;
+  deposit_id?: number;
+  amount?: number;
+  currency?: string;
+  expires_at?: string;
 };
 
 export type TreaboUpload = {
@@ -95,6 +150,39 @@ async function fetchJson<T>(path: string): Promise<T | null> {
   return null;
 }
 
+export function getTreaboPublicApiBase(): string {
+  if (typeof window !== 'undefined') {
+    return trimSlash(process.env.NEXT_PUBLIC_TREABO_API_ENDPOINT || '/api/treabo');
+  }
+
+  return trimSlash(apiCandidates()[0] || 'http://127.0.0.1:8001/api');
+}
+
+export async function treaboApiRequest<T>(
+  path: string,
+  options: RequestInit & { token?: string | null } = {},
+): Promise<T> {
+  const { token, headers, ...init } = options;
+  const response = await fetch(`${getTreaboPublicApiBase()}${path}`, {
+    ...init,
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(headers || {}),
+    },
+  });
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const detail = payload?.detail || payload?.message || 'Treabo API request failed';
+    throw new Error(typeof detail === 'string' ? detail : 'Treabo API request failed');
+  }
+
+  return payload as T;
+}
+
 export function taskPublicSlug(task: Pick<TreaboTask, 'id' | 'title'>) {
   return taskSlugFromTitle(task.title, task.id);
 }
@@ -109,6 +197,51 @@ export async function fetchTreaboTasks(filters?: TreaboTaskFilters) {
 
 export async function fetchTreaboTask(id: string) {
   return await fetchJson<TreaboTask>(`/tasks/${encodeURIComponent(id)}`);
+}
+
+export async function createTreaboTaskApplication(
+  taskId: string,
+  token: string,
+  input: { message: string; price?: number | null },
+) {
+  return treaboApiRequest<TreaboApplication>(`/tasks/${encodeURIComponent(taskId)}/applications`, {
+    method: 'POST',
+    token,
+    body: JSON.stringify(input),
+  });
+}
+
+export async function fetchTreaboChats(token: string) {
+  return treaboApiRequest<TreaboChat[]>('/chats', { token });
+}
+
+export async function fetchTreaboChat(chatId: string, token: string) {
+  return treaboApiRequest<TreaboChat>(`/chats/${encodeURIComponent(chatId)}`, { token });
+}
+
+export async function fetchTreaboChatMessages(chatId: string, token: string) {
+  return treaboApiRequest<TreaboMessage[]>(`/chats/${encodeURIComponent(chatId)}/messages`, { token });
+}
+
+export async function sendTreaboChatMessage(chatId: string, token: string, text: string) {
+  return treaboApiRequest<TreaboMessage>(`/chats/${encodeURIComponent(chatId)}/messages`, {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ text }),
+  });
+}
+
+export async function fetchTreaboBalance(token: string) {
+  const payload = await treaboApiRequest<{ success: boolean; data: TreaboBalance }>('/balance', { token });
+  return payload.data;
+}
+
+export async function createTreaboManualBalanceDeposit(token: string, amount: number) {
+  return treaboApiRequest<TreaboManualDeposit>('/balance/deposit', {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ amount, payment_method: 'manual' }),
+  });
 }
 
 export async function fetchTreaboLandingData(filters?: TreaboTaskFilters) {

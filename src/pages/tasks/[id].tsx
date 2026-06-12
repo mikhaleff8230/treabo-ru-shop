@@ -1,5 +1,6 @@
-import { fetchTreaboTask, type TreaboTask } from '@/data/treabo';
+import { createTreaboTaskApplication, fetchTreaboTask, type TreaboTask } from '@/data/treabo';
 import TreaboAuthModal from '@/components/auth/treabo-auth-modal';
+import TreaboApplyConfirmModal from '@/components/treabo/TreaboApplyConfirmModal';
 import TreaboTaskMap from '@/components/treabo/TreaboTaskMap';
 import { TitleSeo } from '@/components/seo/title-seo';
 import routes from '@/config/routes';
@@ -7,6 +8,7 @@ import { useTreaboAuth } from '@/hooks/use-treabo-auth';
 import { parseTaskIdFromSlug, taskSlugFromTitle } from '@/lib/treabo/slug';
 import type { NextPageWithLayout } from '@/types';
 import type { GetServerSideProps } from 'next';
+import { useRouter } from 'next/router';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
@@ -28,6 +30,7 @@ type TaskDetailProps = {
 };
 
 const money = new Intl.NumberFormat('ru-RU');
+const DEFAULT_RESPONSE_PRICE_MDL = 15;
 const siteUrl = (process.env.NEXT_PUBLIC_WEBSITE_URL || 'https://treabo.md').replace(/\/+$/, '');
 
 const mockTask: TreaboTask = {
@@ -223,12 +226,47 @@ function PhotoGallery({ photos, title }: { photos: string[]; title: string }) {
 
 const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
   const auth = useTreaboAuth();
+  const router = useRouter();
   const [authOpen, setAuthOpen] = useState(false);
+  const [applyOpen, setApplyOpen] = useState(false);
+  const [applyLoading, setApplyLoading] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
   const data = task || mockTask;
   const budget = Number(data.budget || 0);
+  const responsePrice = Number(data.response_price_mdl || DEFAULT_RESPONSE_PRICE_MDL);
   const photos = (data.photos || []).map(photoUrl).filter(Boolean);
   const seo = buildTaskSeo(data, photos);
   const jsonLd = buildTaskJsonLd(data, seo);
+
+  async function handleConfirmApply() {
+    if (!auth.isSpecialist) {
+      setApplyOpen(false);
+      setAuthOpen(true);
+      return;
+    }
+
+    const token = typeof window !== 'undefined' ? window.localStorage.getItem('treabo_token') : null;
+    if (!token) {
+      setApplyOpen(false);
+      setAuthOpen(true);
+      return;
+    }
+
+    setApplyLoading(true);
+    setApplyError(null);
+
+    try {
+      const application = await createTreaboTaskApplication(String(data.id), token, {
+        message: `Здравствуйте. Готов обсудить задание "${data.title}".`,
+      });
+      setApplyOpen(false);
+      router.push(application.chat_id ? `/treabo/chats?id=${application.chat_id}` : '/treabo/chats');
+    } catch (error) {
+      setApplyError(error instanceof Error ? error.message : 'Не удалось создать чат');
+    } finally {
+      setApplyLoading(false);
+    }
+  }
 
   const facts = useMemo(() => [
     { icon: Wallet, label: 'Бюджет', value: budget > 0 ? `${money.format(budget)} MDL` : 'Цена договорная' },
@@ -320,13 +358,14 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
 
       {auth.isSpecialist ? (
         <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur">
-          <div className="mx-auto flex max-w-5xl gap-3">
-            <button type="button" className="flex min-h-[52px] flex-1 items-center justify-center gap-2 rounded-2xl bg-[#232323] px-5 text-sm font-black text-white">
+          <div className="mx-auto flex max-w-2xl justify-center">
+            <button
+              type="button"
+              onClick={() => setApplyOpen(true)}
+              className="flex min-h-[52px] w-full max-w-xl items-center justify-center gap-2 rounded-2xl bg-[#232323] px-5 text-sm font-black text-white"
+            >
               <MessageCircle className="h-5 w-5" />
               Написать клиенту
-            </button>
-            <button type="button" className="hidden min-h-[52px] flex-1 items-center justify-center rounded-2xl bg-[#d9f36b] px-5 text-sm font-black text-[#232323] sm:flex">
-              Откликнуться
             </button>
           </div>
         </div>
@@ -350,6 +389,17 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
         login={auth.login}
         register={auth.register}
         onSuccess={auth.refresh}
+      />
+      <TreaboApplyConfirmModal
+        open={applyOpen}
+        price={responsePrice}
+        loading={applyLoading}
+        error={applyError}
+        onClose={() => {
+          setApplyOpen(false);
+          setApplyError(null);
+        }}
+        onConfirm={handleConfirmApply}
       />
       </div>
     </>
