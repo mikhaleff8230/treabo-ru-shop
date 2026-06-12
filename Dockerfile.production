@@ -1,4 +1,4 @@
-FROM node:18-alpine
+FROM node:20-alpine
 
 WORKDIR /app
 
@@ -25,5 +25,5 @@ RUN chmod +x /usr/local/bin/docker-start.sh
 
 EXPOSE 3000
 
-# node:18-alpine ENTRYPOINT runs CMD via `node` unless invoked through sh
+# node:20-alpine ENTRYPOINT runs CMD via `node` unless invoked through sh
 CMD ["/bin/sh", "/usr/local/bin/docker-start.sh"]
