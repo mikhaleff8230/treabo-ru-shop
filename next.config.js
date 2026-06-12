@@ -3,7 +3,7 @@ const runtimeCaching = require('./pwa-runtime-caching');
 const { i18n } = require('./next-i18next.config');
 
 const withPWA = require('next-pwa')({
-  disable: process.env.NODE_ENV === 'development',
+  disable: process.env.DISABLE_PWA === 'true' || process.env.NODE_ENV === 'development',
   dest: 'public',
   runtimeCaching,
   // Не вешать отдельный NetworkFirst на document "/" — иначе те же no-response при сбое сети
