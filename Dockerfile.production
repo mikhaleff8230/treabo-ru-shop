@@ -4,6 +4,7 @@ WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV HUSKY=0
+ENV APPLICATION_MODE=production
 
 COPY package.json package-lock.json ./
 RUN npm ci --legacy-peer-deps
