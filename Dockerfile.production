@@ -1,9 +1,22 @@
 FROM node:20-alpine
 
+# sharp + native modules on Alpine
+RUN apk add --no-cache libc6-compat python3 make g++
+
 WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV CI=true
 ENV HUSKY=0
+ENV DISABLE_PWA=true
+# devDependencies (tailwind, typescript, …) are required for `next build`
+ENV NODE_ENV=development
+
+COPY package.json package-lock.json ./
+RUN npm install --legacy-peer-deps --ignore-scripts --no-audit --no-fund
+
+COPY . .
+
 ENV NODE_ENV=production
 ENV APPLICATION_MODE=production
 ENV HOSTNAME=0.0.0.0
@@ -11,12 +24,7 @@ ENV PORT=3000
 ENV NEXT_PUBLIC_DEFAULT_LANGUAGE=ro
 ENV NEXT_PUBLIC_ENABLE_MULTI_LANG=true
 ENV NEXT_PUBLIC_AVAILABLE_LANGUAGES=ro,ru
-ENV DISABLE_PWA=true
 
-COPY package.json package-lock.json ./
-RUN npm ci --legacy-peer-deps
-
-COPY . .
 RUN npm run build
 RUN test -f .next/BUILD_ID
 
@@ -25,5 +33,4 @@ RUN chmod +x /usr/local/bin/docker-start.sh
 
 EXPOSE 3000
 
-# node:20-alpine ENTRYPOINT runs CMD via `node` unless invoked through sh
 CMD ["/bin/sh", "/usr/local/bin/docker-start.sh"]
