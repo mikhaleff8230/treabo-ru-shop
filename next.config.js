@@ -37,6 +37,12 @@ module.exports = withPWA({
       },
     ];
   },
+  async redirects() {
+    return [
+      { source: '/explore', destination: '/', permanent: true, locale: false },
+      { source: '/explore/:path*', destination: '/', permanent: true, locale: false },
+    ];
+  },
   images: {
     // Allow displaying images from any external host by disabling optimization
     // This avoids Next.js host checks for remote images from imports
