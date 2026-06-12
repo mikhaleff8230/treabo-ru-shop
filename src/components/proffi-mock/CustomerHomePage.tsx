@@ -1,6 +1,7 @@
 import { FormEvent, useState } from 'react';
 import Image from 'next/image';
 import Link from 'next/link';
+import routes from '@/config/routes';
 import { useRouter } from 'next/router';
 import { useTranslation } from 'next-i18next';
 import {
@@ -195,7 +196,7 @@ export default function CustomerHomePage({ categories = [], tasks = [] }: Custom
               <h2 className="text-3xl font-black tracking-tight sm:text-4xl">{t('treabo.home.popularTitle')}</h2>
               <p className="mt-2 text-[#232323]">{t('treabo.home.popularText')}</p>
             </div>
-            <Link href="/podrabotka" className="hidden items-center gap-2 text-sm font-black md:flex">
+            <Link href={routes.works} className="hidden items-center gap-2 text-sm font-black md:flex">
               {t('treabo.home.allTasks')} <ArrowRight className="h-4 w-4" />
             </Link>
           </div>

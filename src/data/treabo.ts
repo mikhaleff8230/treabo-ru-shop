@@ -1,3 +1,5 @@
+import { taskSlugFromTitle } from '@/lib/treabo/slug';
+
 export type TreaboCategory = {
   id: string;
   slug?: string | null;
@@ -35,6 +37,15 @@ export type TreaboUpload = {
   size?: number | null;
 };
 
+export type TreaboTaskFilters = {
+  category?: string | null;
+  category_id?: string | null;
+  city?: string | null;
+  q?: string | null;
+  budget_min?: number | null;
+  budget_max?: number | null;
+};
+
 const trimSlash = (value: string) => value.replace(/\/+$/, '');
 
 const apiCandidates = () => {
@@ -47,10 +58,23 @@ const apiCandidates = () => {
   ].filter(Boolean) as string[];
 };
 
+function buildQuery(filters?: TreaboTaskFilters) {
+  if (!filters) return '';
+
+  const params = new URLSearchParams();
+
+  if (filters.category) params.set('category', filters.category);
+  if (filters.category_id) params.set('category_id', filters.category_id);
+  if (filters.city) params.set('city', filters.city);
+  if (filters.q) params.set('q', filters.q);
+  const query = params.toString();
+  return query ? `?${query}` : '';
+}
+
 async function fetchJson<T>(path: string): Promise<T | null> {
   for (const baseUrl of apiCandidates()) {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
+    const timeout = setTimeout(() => controller.abort(), 5000);
 
     try {
       const response = await fetch(`${trimSlash(baseUrl)}${path}`, {
@@ -71,23 +95,39 @@ async function fetchJson<T>(path: string): Promise<T | null> {
   return null;
 }
 
+export function taskPublicSlug(task: Pick<TreaboTask, 'id' | 'title'>) {
+  return taskSlugFromTitle(task.title, task.id);
+}
+
 export async function fetchTreaboCategories() {
   return (await fetchJson<TreaboCategory[]>('/categories')) ?? [];
 }
 
-export async function fetchTreaboTasks() {
-  return (await fetchJson<TreaboTask[]>('/tasks')) ?? [];
+export async function fetchTreaboTasks(filters?: TreaboTaskFilters) {
+  return (await fetchJson<TreaboTask[]>(`/tasks${buildQuery(filters)}`)) ?? [];
 }
 
 export async function fetchTreaboTask(id: string) {
   return await fetchJson<TreaboTask>(`/tasks/${encodeURIComponent(id)}`);
 }
 
-export async function fetchTreaboLandingData() {
+export async function fetchTreaboLandingData(filters?: TreaboTaskFilters) {
   const [categories, tasks] = await Promise.all([
     fetchTreaboCategories(),
-    fetchTreaboTasks(),
+    fetchTreaboTasks(filters),
   ]);
 
   return { categories, tasks };
+}
+
+export function filterTasksClientSide(tasks: TreaboTask[], filters: TreaboTaskFilters) {
+  return tasks.filter((task) => {
+    if (filters.budget_min != null && Number(task.budget || 0) < filters.budget_min) {
+      return false;
+    }
+    if (filters.budget_max != null && Number(task.budget || 0) > filters.budget_max) {
+      return false;
+    }
+    return true;
+  });
 }

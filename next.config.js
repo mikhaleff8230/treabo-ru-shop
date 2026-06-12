@@ -41,6 +41,7 @@ module.exports = withPWA({
     return [
       { source: '/explore', destination: '/', permanent: true, locale: false },
       { source: '/explore/:path*', destination: '/', permanent: true, locale: false },
+      { source: '/podrabotka', destination: '/works', permanent: true },
     ];
   },
   images: {

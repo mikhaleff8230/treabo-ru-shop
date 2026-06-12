@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'next-i18next';
 import { TreaboLanguageSwitcher } from '@/components/proffi-mock/TreaboLanguageSwitcher';
+import routes from '@/config/routes';
 
 type Draft = Record<string, any> & {
   id?: string;
@@ -484,7 +485,7 @@ export default function RequestWizard() {
         <Link href="/" className="text-3xl font-black tracking-tight text-[#232323]">Treabo</Link>
         <div className="flex items-center gap-3 text-sm font-medium md:gap-8">
           <span className="hidden md:inline">{t('treabo.common.city')}</span>
-          <Link href="/podrabotka" className="hidden md:inline">{t('treabo.request.specialistSite')}</Link>
+          <Link href={routes.works} className="hidden md:inline">{t('treabo.request.specialistSite')}</Link>
           <span className="hidden md:inline">{t('treabo.request.login')}</span>
           <TreaboLanguageSwitcher />
         </div>
@@ -522,7 +523,7 @@ export default function RequestWizard() {
               </button>
             )}
             {draft.saved && (
-              <Link href="/podrabotka" className="inline-flex h-12 items-center gap-3 rounded-xl bg-[#d9f36b] px-6 text-base font-black text-[#232323]">
+              <Link href={routes.works} className="inline-flex h-12 items-center gap-3 rounded-xl bg-[#d9f36b] px-6 text-base font-black text-[#232323]">
                 Смотреть задания <ArrowRight className="h-5 w-5" />
               </Link>
             )}

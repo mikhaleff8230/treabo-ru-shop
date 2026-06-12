@@ -7,8 +7,26 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     process.env.TREABO_API_ENDPOINT ||
     process.env.NEXT_PUBLIC_TREABO_API_ENDPOINT ||
     'http://127.0.0.1:8001/api';
-  const path = Array.isArray(req.query.path) ? req.query.path.join('/') : String(req.query.path || '');
-  const targetUrl = `${trimSlash(baseUrl)}/${path}`;
+
+  const pathParts = Array.isArray(req.query.path)
+    ? req.query.path
+    : req.query.path
+      ? [String(req.query.path)]
+      : [];
+  const path = pathParts.filter(Boolean).join('/');
+
+  const query = new URLSearchParams();
+  Object.entries(req.query).forEach(([key, value]) => {
+    if (key === 'path' || value == null) return;
+    if (Array.isArray(value)) {
+      value.forEach((item) => query.append(key, String(item)));
+      return;
+    }
+    query.append(key, String(value));
+  });
+
+  const queryString = query.toString();
+  const targetUrl = `${trimSlash(baseUrl)}/${path}${queryString ? `?${queryString}` : ''}`;
 
   try {
     const response = await fetch(targetUrl, {
@@ -29,7 +47,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     } catch {
       res.send(text);
     }
-  } catch (error) {
+  } catch {
     res.status(502).json({
       success: false,
       message: 'Laravel API недоступен',

@@ -1,11 +1,15 @@
 import { fetchTreaboTask, type TreaboTask } from '@/data/treabo';
+import TreaboAuthModal from '@/components/auth/treabo-auth-modal';
+import TreaboTaskMap from '@/components/treabo/TreaboTaskMap';
 import { TitleSeo } from '@/components/seo/title-seo';
 import routes from '@/config/routes';
+import { useTreaboAuth } from '@/hooks/use-treabo-auth';
+import { parseTaskIdFromSlug, taskSlugFromTitle } from '@/lib/treabo/slug';
 import type { NextPageWithLayout } from '@/types';
 import type { GetServerSideProps } from 'next';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 import Link from 'next/link';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ArrowLeft,
   CalendarClock,
@@ -15,7 +19,6 @@ import {
   MapPin,
   MessageCircle,
   MoreHorizontal,
-  Navigation,
   Ruler,
   Wallet,
 } from 'lucide-react';
@@ -25,7 +28,7 @@ type TaskDetailProps = {
 };
 
 const money = new Intl.NumberFormat('ru-RU');
-const siteUrl = (process.env.NEXT_PUBLIC_WEBSITE_URL || 'https://sancan.ru').replace(/\/+$/, '');
+const siteUrl = (process.env.NEXT_PUBLIC_WEBSITE_URL || 'https://treabo.md').replace(/\/+$/, '');
 
 const mockTask: TreaboTask = {
   id: 'mock-1',
@@ -33,8 +36,8 @@ const mockTask: TreaboTask = {
   description:
     'Стены: каркас, брус. Строительного проекта нет. Подведение коммуникаций: электричество. Материалов нет. Пожелания и особенности: ориентировочно хочется построить такую баню из бруса, с отдельной внешней отделкой.',
   category: 'construction',
-  city: 'Москва',
-  address: 'Московская область, Рузский муниципальный округ, деревня Ястребово, 5',
+  city: 'Кишинёв',
+  address: 'Кишинёв, сектор Centru',
   budget: 150000,
   deadline: 'Срок по договоренности',
   status: 'open',
@@ -69,7 +72,8 @@ function photoUrl(value: string | { path?: string | null; url?: string | null } 
 }
 
 function buildTaskCanonicalUrl(task: TreaboTask) {
-  return `${siteUrl}${routes.taskUrl(task.id)}`;
+  const slug = taskSlugFromTitle(task.title, task.id);
+  return `${siteUrl}${routes.taskUrl(slug)}`;
 }
 
 function buildTaskSeo(task: TreaboTask, photos: string[]) {
@@ -80,7 +84,7 @@ function buildTaskSeo(task: TreaboTask, photos: string[]) {
   const fallbackDescription = [
     `Задание Treabo: ${task.title}.`,
     location ? `Локация: ${location}.` : '',
-    budget > 0 ? `Бюджет: ${money.format(budget)} ₽.` : 'Бюджет уточняется.',
+    budget > 0 ? `Бюджет: ${money.format(budget)} MDL.` : 'Бюджет уточняется.',
   ].filter(Boolean).join(' ');
 
   return {
@@ -130,7 +134,7 @@ function buildTaskJsonLd(task: TreaboTask, seo: ReturnType<typeof buildTaskSeo>)
   if (budget > 0) {
     jobPosting.baseSalary = {
       '@type': 'MonetaryAmount',
-      currency: 'RUB',
+      currency: 'MDL',
       value: {
         '@type': 'QuantitativeValue',
         value: budget,
@@ -153,7 +157,7 @@ function buildTaskJsonLd(task: TreaboTask, seo: ReturnType<typeof buildTaskSeo>)
         '@type': 'ListItem',
         position: 2,
         name: 'Задания',
-        item: `${siteUrl}/podrabotka`,
+        item: `${siteUrl}${routes.works}`,
       },
       {
         '@type': 'ListItem',
@@ -167,37 +171,6 @@ function buildTaskJsonLd(task: TreaboTask, seo: ReturnType<typeof buildTaskSeo>)
   return [jobPosting, breadcrumbs];
 }
 
-function readSpecialistRole() {
-  if (typeof window === 'undefined') return false;
-
-  const directRole = [
-    window.localStorage.getItem('treabo_role'),
-    window.localStorage.getItem('proffi_role'),
-    window.localStorage.getItem('user_role'),
-  ].find(Boolean);
-
-  if (directRole && ['specialist', 'store_owner', 'master'].includes(directRole)) {
-    return true;
-  }
-
-  for (const key of ['treabo_user', 'proffi_user', 'user', 'auth_user']) {
-    const raw = window.localStorage.getItem(key);
-    if (!raw) continue;
-
-    try {
-      const value = JSON.parse(raw);
-      const role = value?.role || value?.user?.role || value?.permissions?.[0];
-      if (['specialist', 'store_owner', 'master'].includes(role)) {
-        return true;
-      }
-    } catch {
-      // Ignore legacy non-json values.
-    }
-  }
-
-  return false;
-}
-
 function formatDate(value?: string | null) {
   if (!value) return 'Дата не указана';
 
@@ -207,22 +180,6 @@ function formatDate(value?: string | null) {
     hour: '2-digit',
     minute: '2-digit',
   });
-}
-
-function TaskMap({ task }: { task: TreaboTask }) {
-  return (
-    <div className="relative mt-4 h-[270px] overflow-hidden rounded-[26px] border border-zinc-200 bg-[#eaf0e3] sm:h-[360px]">
-      <div className="absolute inset-0 opacity-90 [background-image:linear-gradient(32deg,transparent_45%,#d3dac7_46%,#d3dac7_53%,transparent_54%),linear-gradient(120deg,transparent_46%,#c8d7e4_47%,#c8d7e4_53%,transparent_54%),linear-gradient(#f8faf5_1px,transparent_1px),linear-gradient(90deg,#f8faf5_1px,transparent_1px)] [background-size:180px_180px,240px_240px,54px_54px,54px_54px]" />
-      <div className="absolute left-[49%] top-[43%] h-4 w-4 rounded-full bg-[#232323] shadow-[0_0_0_10px_rgba(35,35,35,0.12)]" />
-      <div className="absolute right-4 top-4 rounded-2xl bg-white/90 px-3 py-2 text-sm font-black text-[#232323] shadow-sm">Яндекс Карты</div>
-      <div className="absolute bottom-4 left-4 max-w-[80%] rounded-2xl bg-white/95 px-4 py-3 text-sm font-semibold text-[#232323] shadow-sm">
-        {task.city || 'Город не указан'}
-      </div>
-      <div className="absolute bottom-4 right-4 flex h-12 w-12 items-center justify-center rounded-full bg-white text-[#232323] shadow-lg">
-        <Navigation className="h-5 w-5" />
-      </div>
-    </div>
-  );
 }
 
 function PhotoGallery({ photos, title }: { photos: string[]; title: string }) {
@@ -265,19 +222,16 @@ function PhotoGallery({ photos, title }: { photos: string[]; title: string }) {
 }
 
 const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
-  const [isSpecialist, setIsSpecialist] = useState(false);
+  const auth = useTreaboAuth();
+  const [authOpen, setAuthOpen] = useState(false);
   const data = task || mockTask;
   const budget = Number(data.budget || 0);
   const photos = (data.photos || []).map(photoUrl).filter(Boolean);
   const seo = buildTaskSeo(data, photos);
   const jsonLd = buildTaskJsonLd(data, seo);
 
-  useEffect(() => {
-    setIsSpecialist(readSpecialistRole());
-  }, []);
-
   const facts = useMemo(() => [
-    { icon: Wallet, label: 'Бюджет', value: budget > 0 ? `${money.format(budget)} ₽` : 'Цена договорная' },
+    { icon: Wallet, label: 'Бюджет', value: budget > 0 ? `${money.format(budget)} MDL` : 'Цена договорная' },
     { icon: CalendarClock, label: 'Срок', value: data.deadline || 'По договоренности' },
     { icon: CheckCircle2, label: 'Статус', value: data.status === 'open' ? 'Открыт' : data.status || 'Новый' },
     { icon: Ruler, label: 'Параметры', value: 'Можно уточнить детали' },
@@ -299,7 +253,7 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
       <div className="min-h-screen bg-[#f5f6f1] text-[#232323]">
       <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-          <Link href="/podrabotka" className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-zinc-100">
+          <Link href={routes.works} className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-zinc-100">
             <ArrowLeft className="h-5 w-5" />
           </Link>
           <div className="min-w-0 flex-1 truncate px-2 text-center text-base font-black sm:text-lg">{data.title}</div>
@@ -352,7 +306,7 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
           </h2>
           <p className="mt-3 text-base leading-7">{data.address || 'Точный адрес будет доступен после согласования с клиентом.'}</p>
           {data.city ? <div className="mt-2 inline-flex rounded-full bg-[#f3f5fa] px-3 py-1.5 text-sm font-bold">{data.city}</div> : null}
-          <TaskMap task={data} />
+          <TreaboTaskMap task={data} />
         </section>
 
         <section className="mt-4 rounded-[30px] bg-white p-5 shadow-sm sm:p-6">
@@ -364,19 +318,39 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
         </section>
       </main>
 
-      {isSpecialist ? (
+      {auth.isSpecialist ? (
         <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur">
           <div className="mx-auto flex max-w-5xl gap-3">
-            <button className="flex min-h-[52px] flex-1 items-center justify-center gap-2 rounded-2xl bg-[#232323] px-5 text-sm font-black text-white">
+            <button type="button" className="flex min-h-[52px] flex-1 items-center justify-center gap-2 rounded-2xl bg-[#232323] px-5 text-sm font-black text-white">
               <MessageCircle className="h-5 w-5" />
               Написать клиенту
             </button>
-            <button className="hidden min-h-[52px] flex-1 items-center justify-center rounded-2xl bg-[#d9f36b] px-5 text-sm font-black text-[#232323] sm:flex">
+            <button type="button" className="hidden min-h-[52px] flex-1 items-center justify-center rounded-2xl bg-[#d9f36b] px-5 text-sm font-black text-[#232323] sm:flex">
               Откликнуться
             </button>
           </div>
         </div>
+      ) : !auth.isAuthenticated ? (
+        <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur">
+          <div className="mx-auto flex max-w-5xl gap-3">
+            <button
+              type="button"
+              onClick={() => setAuthOpen(true)}
+              className="flex min-h-[52px] flex-1 items-center justify-center rounded-2xl bg-[#d9f36b] px-5 text-sm font-black text-[#232323]"
+            >
+              Войти или зарегистрироваться
+            </button>
+          </div>
+        </div>
       ) : null}
+      <TreaboAuthModal
+        open={authOpen}
+        onClose={() => setAuthOpen(false)}
+        initialTab="login"
+        login={auth.login}
+        register={auth.register}
+        onSuccess={auth.refresh}
+      />
       </div>
     </>
   );
@@ -385,8 +359,18 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
 TaskDetailPage.hideCookieConsent = true;
 
 export const getServerSideProps: GetServerSideProps<TaskDetailProps> = async ({ locale, params }) => {
-  const id = String(params?.id || '');
-  const task = id.startsWith('mock-') ? null : await fetchTreaboTask(id);
+  const raw = String(params?.id || '');
+  const taskId = parseTaskIdFromSlug(raw);
+  const task = taskId.startsWith('mock-') ? null : await fetchTreaboTask(taskId);
+
+  if (task && taskSlugFromTitle(task.title, task.id) !== raw && /^\d+$/.test(raw) === false) {
+    return {
+      redirect: {
+        destination: routes.taskUrl(task),
+        permanent: true,
+      },
+    };
+  }
 
   return {
     props: {

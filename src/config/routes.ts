@@ -1,3 +1,5 @@
+import { taskSlugFromTitle } from '@/lib/treabo/slug';
+
 const routes = {
   home: '/',
   authors: '/authors',
@@ -45,8 +47,16 @@ const routes = {
     // Для старых товаров без кода используем ID (обратная совместимость)
     return id ? `/element/${slugOrUrl}-${id}` : `/element/${slugOrUrl}`;
   },
-  taskUrl: (idOrSlug: string | number) =>
-    `/tasks/${encodeURIComponent(String(idOrSlug))}`,
+  works: '/works',
+  taskUrl: (
+    taskOrSlug: string | number | { id: string | number; title?: string | null },
+  ) => {
+    if (typeof taskOrSlug === 'object') {
+      const slug = taskSlugFromTitle(taskOrSlug.title || 'task', taskOrSlug.id);
+      return `/tasks/${encodeURIComponent(slug)}`;
+    }
+    return `/tasks/${encodeURIComponent(String(taskOrSlug))}`;
+  },
   categoryUrl: (slug: string) => `/categories/${slug}`,
   tagUrl: (slug: string) => `/products/tags/${slug}`,
   placeHashtagUrl: (slug: string) => `/places/element/${slug}`,

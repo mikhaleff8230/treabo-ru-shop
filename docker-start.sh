@@ -9,5 +9,15 @@ if [ ! -f .next/BUILD_ID ]; then
   exit 1
 fi
 
-echo "Starting Next.js on 0.0.0.0:${PORT:-3000} (BUILD_ID=$(cat .next/BUILD_ID))"
-exec npx next start -H 0.0.0.0 -p "${PORT:-3000}"
+if [ ! -x ./node_modules/.bin/next ]; then
+  echo "FATAL: ./node_modules/.bin/next not found" >&2
+  ls -la ./node_modules/.bin 2>&1 | head -20 || true
+  exit 1
+fi
+
+export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=768}"
+export HOSTNAME="${HOSTNAME:-0.0.0.0}"
+export PORT="${PORT:-3000}"
+
+echo "Starting Next.js on ${HOSTNAME}:${PORT} (BUILD_ID=$(cat .next/BUILD_ID), NODE_ENV=${NODE_ENV:-unset})"
+exec ./node_modules/.bin/next start -H "$HOSTNAME" -p "$PORT"
