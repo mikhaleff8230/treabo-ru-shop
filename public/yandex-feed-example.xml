@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE yml_catalog SYSTEM "shops.dtd">
+<yml_catalog date="2024-06-07 12:00">
+  <shop>
+    <name>Магазин sancan.ru</name>
+    <company>ООО "Компания"</company>
+    <url>https://sancan.ru/</url>
+    <currencies>
+      <currency id="RUR" rate="1"/>
+    </currencies>
+    <categories>
+      <category id="1">Категория 1</category>
+      <category id="2" parentId="1">Категория 2</category>
+    </categories>
+    <offers>
+      <offer id="1" available="true">
+        <url>https://sancan.ru/product/1</url>
+        <price>1000</price>
+        <currencyId>RUR</currencyId>
+        <categoryId>2</categoryId>
+        <picture>https://sancan.ru/images/1.jpg</picture>
+        <name>Товар 1</name>
+        <description>Описание товара 1</description>
+      </offer>
+      <offer id="2" available="false">
+        <url>https://sancan.ru/product/2</url>
+        <price>2000</price>
+        <currencyId>RUR</currencyId>
+        <categoryId>2</categoryId>
+        <picture>https://sancan.ru/images/2.jpg</picture>
+        <name>Товар 2</name>
+        <description>Описание товара 2</description>
+      </offer>
+    </offers>
+  </shop>
+</yml_catalog> 

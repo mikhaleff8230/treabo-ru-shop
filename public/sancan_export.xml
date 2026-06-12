@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<yml_catalog date="2024-07-06T20:30:49+03:00">
+<shop>
+<name>САНКЭН</name>
+<url>sancan.ru</url>
+<platform>next</platform>
+<categories>
+  <category id="1">Все товары</category>
+</categories>
+  <offers>
+      <offer id="5">
+        <name>Сумка на фермуаре Коричневая с жемчугом</name>
+        <description>Коричневый цвет в тренде в этом сезоне! Сумочка получилась универсальная- и в театр, и в кафе, и на прогулку. Внутри кармашек на молнии и открытый карман. В комплекте сумка для хранения и цепочка длиной 120 см. Размер сумочки - высота 17см, ширина 25 см, глубина 7 см.</description>
+        <url>https://sancan.ru/products/sumka-na-fermuare-korichnevaya-s-zhemchugom-aYX</url>
+        <price>3500</price>
+        <currencyId>RUR</currencyId>
+        <categoryId>1</categoryId>
+        <picture>https://sancan.ru/_next/image?url=https%3A%2F%2Fsancan.ru%2Fapi%2Fstorage%2F3781%2F1000038109.jpg&w=1920&q=100</picture>
+      </offer>
+      <offer id="6">
+        <name>Сумка с фермуаром Светло-бежевая</name>
+        <description>Когда хочется романтики и нежности- возьмите эту сумочку! Молочно-бежевый велюр с узором и бантик на фермуаре - отличный вариант для особого случая, для свадьбы, помолвки, выпускного. Внутри у сумочки карман на молнии и открытый кармашек. Дополнит сумочку необычная "квадратная" цепочка. Размер сумочки - высота 16 см, ширина 26см, глубина 7,5 см</description>
+        <url>https://sancan.ru/products/sumka-s-fermuarom-svetlo-bezhevaya-RkL</url>
+        <price>3500</price>
+        <currencyId>RUR</currencyId>
+        <categoryId>1</categoryId>
+        <picture>https://sancan.ru/_next/image?url=https%3A%2F%2Fsancan.ru%2Fapi%2Fstorage%2F3788%2F1000033522.jpg&w=1920&q=100</picture>
+      </offer>
+      <offer id="7">
+        <name>Сумка с фермуаром Мексиканка карамель</name>
+        <description>Лето на дворе! И сумочку хочется летнюю. Не только носить, но и шить. Вот и сшились у меня две солнечные, радостные сумки в серии Мексиканка. Одна побольше, другая поменьше. Чтобы всем угодить - и тем, кто любит сумочки побольше, и тем, кто предпочитает поменьше. Вот эта сумочка "поменьше".Хотя она тоже не маленькая. Все необходимое в нее поместится. Разве что, зонт не войдет)). У сумочки ручка из натурального бамбука. Внутри карман на молнии и открытый кармашек. Дно не провисает, форму не теряет. Размер сумки- высота 21 см, ширина 28 см, дно 23×9см. Хотите такую? Берите!</description>
+        <url>https://sancan.ru/products/sumka-s-fermuarom-meksikanka-karamel-6NM</url>
+        <price>3500</price>
+        <currencyId>RUR</currencyId>
+        <categoryId>1</categoryId>
+        <picture>https://sancan.ru/_next/image?url=https%3A%2F%2Fsancan.ru%2Fapi%2Fstorage%2F3788%2F1000033522.jpg&w=1920&q=100</picture>
+      </offer>
+      <offer id="8">
+        <name>Сумка с фермуаром Желтые листья</name>
+        <description>Ну, никак не получается сфотографировать так, чтобы попасть в цвет! И фильтрами не выводится! Сумка сшита из плотной атласной ткани серо-бежевого цвета, а листья лимонно-желтые. Почему-то на фото они почти оранжевые). Внутри, карман на молнии и открытый кармашек. В комплекте цепочка 120 см и сумка для хранения. Хотите такую? Берите!</description>
+        <url>https://sancan.ru/products/sumka-s-fermuarom-zheltye-listya-GWz</url>
+        <price>3500</price>
+        <currencyId>RUR</currencyId>
+        <categoryId>1</categoryId>
+        <picture>https://sancan.ru/_next/image?url=https%3A%2F%2Fsancan.ru%2Fapi%2Fstorage%2F3641%2F09446b104da1c7be6273fd0ca73m--sumki-i-aksessuary-sumka-s-fermuarom-zheltye-listya.jpg&w=1920&q=100</picture>
+      </offer>
+  </offers>
+</shop>
+</yml_catalog>

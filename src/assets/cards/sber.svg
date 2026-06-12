@@ -1,0 +1,10 @@
+<svg width="48" height="16" viewBox="0 0 48 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="48" height="16" rx="4" fill="url(#sber-gradient)"/>
+  <text x="4" y="12" font-family="Arial" font-size="12" fill="white" font-weight="bold">СБЕР</text>
+  <defs>
+    <linearGradient id="sber-gradient" x1="0" y1="0" x2="48" y2="16" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#21A038"/>
+      <stop offset="1" stop-color="#60D669"/>
+    </linearGradient>
+  </defs>
+</svg> 

@@ -1,0 +1,9 @@
+# *
+User-agent: *
+Allow: /
+
+# Host
+Host: https://sancan.ru
+
+# Sitemaps
+Sitemap: https://sancan.ru/sitemap.xml

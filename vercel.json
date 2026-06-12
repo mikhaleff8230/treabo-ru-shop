@@ -1,0 +1,38 @@
+{
+  "env": {
+    "NEXT_PUBLIC_REST_API_ENDPOINT": "https://api.sancan.ru",
+    "NEXT_PUBLIC_API_URL": "https://api.sancan.ru",
+    "NEXT_PUBLIC_WEBSITE_URL": "https://sancan.ru",
+    "NEXT_PUBLIC_ADMIN_URL": "https://seller.sancan.ru",
+    "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_12345",
+    "NEXT_PUBLIC_PAYPAL_CLIENT_TOKEN": "",
+    "NEXT_PUBLIC_PAYSTACK_KEY": "",
+    "NEXT_PUBLIC_RAZORPAY_KEY": "",
+    "NEXT_PUBLIC_SHOP_URL": "https://sancan.ru",
+    "NEXT_PUBLIC_GOOGLE_MAP_API_KEY": "",
+    "NEXT_PUBLIC_AUTH_TOKEN_KEY": "AUTH_CRED",
+    "APPLICATION_MODE": "production",
+    "NEXT_PUBLIC_DEFAULT_LANGUAGE": "ru",
+    "NEXT_PUBLIC_ENABLE_MULTI_LANG": "false",
+    "NEXT_PUBLIC_AVAILABLE_LANGUAGES": "ru,en"
+  },
+  "build": {
+    "env": {
+      "NEXT_PUBLIC_REST_API_ENDPOINT": "https://api.sancan.ru",
+      "NEXT_PUBLIC_API_URL": "https://api.sancan.ru",
+      "NEXT_PUBLIC_WEBSITE_URL": "https://sancan.ru",
+      "NEXT_PUBLIC_ADMIN_URL": "https://seller.sancan.ru",
+      "NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY": "pk_12345",
+      "NEXT_PUBLIC_PAYPAL_CLIENT_TOKEN": "",
+      "NEXT_PUBLIC_PAYSTACK_KEY": "",
+      "NEXT_PUBLIC_RAZORPAY_KEY": "",
+      "NEXT_PUBLIC_SHOP_URL": "https://sancan.ru",
+      "NEXT_PUBLIC_GOOGLE_MAP_API_KEY": "",
+      "NEXT_PUBLIC_AUTH_TOKEN_KEY": "AUTH_CRED",
+      "APPLICATION_MODE": "production",
+      "NEXT_PUBLIC_DEFAULT_LANGUAGE": "ru",
+      "NEXT_PUBLIC_ENABLE_MULTI_LANG": "false",
+      "NEXT_PUBLIC_AVAILABLE_LANGUAGES": "ru,en"
+    }
+  }
+}
