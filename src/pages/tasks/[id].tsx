@@ -62,6 +62,12 @@ function absoluteUrl(value?: string | null) {
   return `${siteUrl}/${value}`;
 }
 
+function photoUrl(value: string | { path?: string | null; url?: string | null } | null | undefined) {
+  if (!value) return '';
+  if (typeof value === 'string') return value;
+  return value.url || value.path || '';
+}
+
 function buildTaskCanonicalUrl(task: TreaboTask) {
   return `${siteUrl}${routes.taskUrl(task.id)}`;
 }
@@ -262,7 +268,7 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
   const [isSpecialist, setIsSpecialist] = useState(false);
   const data = task || mockTask;
   const budget = Number(data.budget || 0);
-  const photos = data.photos || [];
+  const photos = (data.photos || []).map(photoUrl).filter(Boolean);
   const seo = buildTaskSeo(data, photos);
   const jsonLd = buildTaskJsonLd(data, seo);
 

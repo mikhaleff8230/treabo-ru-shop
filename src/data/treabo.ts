@@ -18,13 +18,21 @@ export type TreaboTask = {
   budget?: number | null;
   deadline?: string | null;
   status?: string | null;
-  photos?: string[];
+  photos?: Array<string | TreaboUpload>;
   applications_count?: number;
   photos_count?: number;
   lat?: number | null;
   lng?: number | null;
   created_at?: string | null;
   updated_at?: string | null;
+};
+
+export type TreaboUpload = {
+  disk?: string;
+  path?: string;
+  url?: string;
+  mime?: string | null;
+  size?: number | null;
 };
 
 const trimSlash = (value: string) => value.replace(/\/+$/, '');
