@@ -1,4 +1,10 @@
-import { createTreaboTaskApplication, fetchTreaboTask, type TreaboTask } from '@/data/treabo';
+import {
+  createTreaboTaskApplication,
+  fetchTreaboTask,
+  fetchTreaboTaskApplicationPreview,
+  type TreaboApplicationPreview,
+  type TreaboTask,
+} from '@/data/treabo';
 import TreaboAuthModal from '@/components/auth/treabo-auth-modal';
 import TreaboApplyConfirmModal from '@/components/treabo/TreaboApplyConfirmModal';
 import TreaboTaskMap from '@/components/treabo/TreaboTaskMap';
@@ -229,6 +235,7 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
   const router = useRouter();
   const [authOpen, setAuthOpen] = useState(false);
   const [applyOpen, setApplyOpen] = useState(false);
+  const [applyPreview, setApplyPreview] = useState<TreaboApplicationPreview | null>(null);
   const [applyLoading, setApplyLoading] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
   const data = task || mockTask;
@@ -237,6 +244,32 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
   const photos = (data.photos || []).map(photoUrl).filter(Boolean);
   const seo = buildTaskSeo(data, photos);
   const jsonLd = buildTaskJsonLd(data, seo);
+
+  async function openApplyModal() {
+    if (!auth.isSpecialist) {
+      setAuthOpen(true);
+      return;
+    }
+
+    const token = typeof window !== 'undefined' ? window.localStorage.getItem('treabo_token') : null;
+    if (!token) {
+      setAuthOpen(true);
+      return;
+    }
+
+    setApplyLoading(true);
+    setApplyError(null);
+    try {
+      const preview = await fetchTreaboTaskApplicationPreview(String(data.id), token);
+      setApplyPreview(preview);
+      setApplyOpen(true);
+    } catch (error) {
+      setApplyError(error instanceof Error ? error.message : 'Не удалось проверить условия отклика');
+      setApplyOpen(true);
+    } finally {
+      setApplyLoading(false);
+    }
+  }
 
   async function handleConfirmApply() {
     if (!auth.isSpecialist) {
@@ -361,7 +394,8 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
           <div className="mx-auto flex max-w-2xl justify-center">
             <button
               type="button"
-              onClick={() => setApplyOpen(true)}
+              onClick={openApplyModal}
+              disabled={applyLoading}
               className="flex min-h-[52px] w-full max-w-xl items-center justify-center gap-2 rounded-2xl bg-[#232323] px-5 text-sm font-black text-white"
             >
               <MessageCircle className="h-5 w-5" />
@@ -393,10 +427,12 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
       <TreaboApplyConfirmModal
         open={applyOpen}
         price={responsePrice}
+        preview={applyPreview}
         loading={applyLoading}
         error={applyError}
         onClose={() => {
           setApplyOpen(false);
+          setApplyPreview(null);
           setApplyError(null);
         }}
         onConfirm={handleConfirmApply}

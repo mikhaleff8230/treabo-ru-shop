@@ -1,8 +1,10 @@
+import type { TreaboApplicationPreview } from '@/data/treabo';
 import { Loader2, MessageCircle, X } from 'lucide-react';
 
 type Props = {
   open: boolean;
   price: number;
+  preview?: TreaboApplicationPreview | null;
   loading?: boolean;
   error?: string | null;
   onClose: () => void;
@@ -12,12 +14,18 @@ type Props = {
 export default function TreaboApplyConfirmModal({
   open,
   price,
+  preview,
   loading,
   error,
   onClose,
   onConfirm,
 }: Props) {
   if (!open) return null;
+
+  const isPaid = Boolean(preview?.charge_required);
+  const fee = Number(preview?.response_fee_mdl ?? price);
+  const freeLimit = Number(preview?.free_daily_limit ?? 5);
+  const remainingAfter = Number(preview?.free_remaining_after ?? Math.max(0, freeLimit - 1));
 
   return (
     <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/82 px-4">
@@ -28,7 +36,7 @@ export default function TreaboApplyConfirmModal({
               <MessageCircle className="h-5 w-5" />
             </span>
             <div>
-              <div className="text-lg font-black">Написать клиенту</div>
+              <div className="text-lg font-black">Вы делаете отклик</div>
               <div className="text-sm font-semibold text-[#7d849b]">Отклик откроет чат по заданию</div>
             </div>
           </div>
@@ -44,12 +52,24 @@ export default function TreaboApplyConfirmModal({
 
         <div className="px-6 py-6">
           <div className="rounded-[22px] bg-[#f5f6f1] p-5">
-            <div className="text-sm font-bold text-[#7d849b]">Будет списано</div>
-            <div className="mt-1 text-4xl font-black">{price} MDL</div>
-            <p className="mt-3 text-sm leading-6 text-[#232323]">
-              После подтверждения будет создан отклик и открыт чат с клиентом. Стоимость отклика
-              по умолчанию сейчас 15 MDL, позже подключим расчет по категории и параметрам задания.
-            </p>
+            {isPaid ? (
+              <>
+                <div className="text-sm font-bold text-[#7d849b]">Будет списано</div>
+                <div className="mt-1 text-4xl font-black">{fee} MDL</div>
+                <p className="mt-3 text-sm leading-6 text-[#232323]">
+                  Бесплатные отклики на сегодня закончились. После подтверждения будет создан отклик,
+                  открыт чат с клиентом и сумма спишется с баланса мастера.
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="text-sm font-bold text-[#7d849b]">Бесплатный отклик</div>
+                <div className="mt-1 text-2xl font-black">Останется {remainingAfter} бесплатных отклика на сегодня</div>
+                <p className="mt-3 text-sm leading-6 text-[#7d849b]">
+                  В сутки не более {freeLimit} бесплатных откликов.
+                </p>
+              </>
+            )}
           </div>
 
           {error ? (

@@ -42,6 +42,19 @@ export type TreaboApplication = {
   created_at?: string | null;
 };
 
+export type TreaboApplicationPreview = {
+  has_applied: boolean;
+  free_daily_limit: number;
+  free_used_today: number;
+  free_remaining_before: number;
+  free_remaining_after: number;
+  charge_required: boolean;
+  is_free: boolean;
+  response_fee_mdl: number;
+  default_response_price_mdl: number;
+  currency: 'MDL';
+};
+
 export type TreaboChat = {
   id: string;
   task_id: string;
@@ -209,6 +222,13 @@ export async function createTreaboTaskApplication(
     token,
     body: JSON.stringify(input),
   });
+}
+
+export async function fetchTreaboTaskApplicationPreview(taskId: string, token: string) {
+  return treaboApiRequest<TreaboApplicationPreview>(
+    `/tasks/${encodeURIComponent(taskId)}/applications/preview`,
+    { token },
+  );
 }
 
 export async function fetchTreaboChats(token: string) {
