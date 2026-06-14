@@ -97,6 +97,17 @@ export type TreaboManualDeposit = {
   expires_at?: string;
 };
 
+export type TreaboManualDepositReport = {
+  success: boolean;
+  message?: string;
+  data?: {
+    deposit_id: number;
+    amount: number;
+    currency: 'MDL';
+    reported_at?: string | null;
+  };
+};
+
 export type TreaboUpload = {
   disk?: string;
   path?: string;
@@ -261,6 +272,14 @@ export async function createTreaboManualBalanceDeposit(token: string, amount: nu
     method: 'POST',
     token,
     body: JSON.stringify({ amount, payment_method: 'manual' }),
+  });
+}
+
+export async function reportTreaboManualBalancePayment(token: string, depositId?: number | null) {
+  return treaboApiRequest<TreaboManualDepositReport>('/balance/deposit/report', {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ deposit_id: depositId || undefined }),
   });
 }
 
