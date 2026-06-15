@@ -20,6 +20,7 @@ import team3 from '@/assets/images/team/3.png';
 import team4 from '@/assets/images/team/4.png';
 import team5 from '@/assets/images/team/5.png';
 import team6 from '@/assets/images/team/6.png';
+import type { TreaboSpecialist } from '@/data/treabo';
 import { getTreaboText } from '@/lib/treabo/i18n';
 import { ProffiFooter, ProffiHeader } from './ProffiShell';
 
@@ -34,12 +35,38 @@ type Specialist = {
   qualification: string;
   location: string;
   services: string[];
-  photos: StaticImageData[];
-  avatar: StaticImageData;
+  photos: Array<StaticImageData | string>;
+  avatar: StaticImageData | string;
 };
 
-function buildSpecialists(locale?: string): Specialist[] {
+function buildSpecialists(locale?: string, apiSpecialists: TreaboSpecialist[] = []): Specialist[] {
   const ru = locale === 'ru';
+  if (apiSpecialists.length) {
+    const fallbackAvatars = [team1, team2, team3];
+    const fallbackPhotos = [
+      [team2, team3, team4],
+      [team5, team6, team3],
+      [team4, team1, team6],
+    ];
+
+    return apiSpecialists.map((item, index) => ({
+      name: item.name || (ru ? 'Специалист Treabo' : 'Specialist Treabo'),
+      online: item.last_seen ? (ru ? 'Был в сети недавно' : 'A fost online recent') : (ru ? 'Онлайн' : 'Online'),
+      rating: String(item.rating || '5,0').replace('.', ','),
+      reviews: ru ? `${item.reviews_count || 0} отзывов` : `${item.reviews_count || 0} recenzii`,
+      praise: ru ? 'Профиль Treabo' : 'Profil Treabo',
+      team: ru ? 'Выезд к клиенту' : 'Deplasare la client',
+      verified: item.email ? (ru ? 'Профиль проверен' : 'Profil verificat') : (ru ? 'Анкета заполнена' : 'Profil completat'),
+      qualification: item.bio || (ru
+        ? 'Специалист принимает заявки Treabo. Портфолио и услуги можно заполнить в анкете мастера.'
+        : 'Specialistul accepta cereri Treabo. Portofoliul si serviciile pot fi completate in profil.'),
+      location: item.city || (ru ? 'Кишинёв' : 'Chisinau'),
+      services: item.services?.length ? item.services : (ru ? ['Ремонт', 'Сантехника', 'Плитка'] : ['Reparatii', 'Sanitare', 'Gresie/faiana']),
+      photos: item.portfolio?.length ? item.portfolio.slice(0, 3) : fallbackPhotos[index % fallbackPhotos.length],
+      avatar: item.avatar || fallbackAvatars[index % fallbackAvatars.length],
+    }));
+  }
+
   return [
     {
       name: ru ? 'Дмитрий Е.' : 'Dumitru E.',
@@ -96,6 +123,26 @@ function interpolate(template: string, values: Record<string, string | number>) 
   return Object.entries(values).reduce((result, [key, value]) => result.replaceAll(`{{${key}}}`, String(value)), template);
 }
 
+function SmartImage({
+  src,
+  alt,
+  className,
+  width,
+  height,
+}: {
+  src: StaticImageData | string;
+  alt: string;
+  className: string;
+  width: number;
+  height: number;
+}) {
+  if (typeof src === 'string') {
+    return <img src={src} alt={alt} width={width} height={height} className={className} loading="lazy" />;
+  }
+
+  return <Image src={src} alt={alt} width={width} height={height} className={className} />;
+}
+
 function SpecialistCard({ specialist }: { specialist: Specialist }) {
   const router = useRouter();
   const text = getTreaboText(router.locale);
@@ -105,7 +152,7 @@ function SpecialistCard({ specialist }: { specialist: Specialist }) {
       <div className="grid gap-5 lg:grid-cols-[1fr_230px]">
         <div className="min-w-0">
           <div className="flex gap-4">
-            <Image src={specialist.avatar} alt={specialist.name} width={96} height={116} className="h-[116px] w-24 shrink-0 rounded-2xl object-cover" />
+            <SmartImage src={specialist.avatar} alt={specialist.name} width={96} height={116} className="h-[116px] w-24 shrink-0 rounded-2xl object-cover" />
             <div className="min-w-0">
               <h2 className="text-2xl font-black text-[#232323]">{specialist.name}</h2>
               <p className="mt-1 text-sm font-medium text-[#7d849b]">{specialist.online}</p>
@@ -137,7 +184,7 @@ function SpecialistCard({ specialist }: { specialist: Specialist }) {
 
           <div className="mt-5 grid grid-cols-3 gap-2 sm:max-w-lg">
             {specialist.photos.map((photo, index) => (
-              <Image key={`${specialist.name}-${index}`} src={photo} alt={`${specialist.name} portfolio ${index + 1}`} width={180} height={120} className="h-24 w-full rounded-2xl object-cover" />
+              <SmartImage key={`${specialist.name}-${index}`} src={photo} alt={`${specialist.name} portfolio ${index + 1}`} width={180} height={120} className="h-24 w-full rounded-2xl object-cover" />
             ))}
           </div>
         </div>
@@ -159,10 +206,10 @@ function SpecialistCard({ specialist }: { specialist: Specialist }) {
   );
 }
 
-export default function SpecialistsMarketplacePage() {
+export default function SpecialistsMarketplacePage({ specialists: apiSpecialists = [] }: { specialists?: TreaboSpecialist[] }) {
   const router = useRouter();
   const text = getTreaboText(router.locale);
-  const specialists = buildSpecialists(router.locale);
+  const specialists = buildSpecialists(router.locale, apiSpecialists);
 
   return (
     <div className="min-h-screen bg-[#f5f6f1] text-[#232323]">

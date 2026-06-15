@@ -10,6 +10,7 @@ export type TreaboUser = {
   city?: string | null;
   email?: string | null;
   avatar?: string | null;
+  portfolio?: string[];
 };
 
 export type TreaboAuthResponse = {
@@ -80,6 +81,13 @@ export function persistTreaboSession(data: TreaboAuthResponse) {
   window.localStorage.setItem('treabo_role', data.user.role);
 }
 
+export function persistTreaboUser(user: TreaboUser) {
+  if (typeof window === 'undefined') return;
+
+  window.localStorage.setItem(USER_KEY, JSON.stringify(user));
+  window.localStorage.setItem('treabo_role', user.role);
+}
+
 export function clearTreaboSession() {
   if (typeof window === 'undefined') return;
 
@@ -135,8 +143,7 @@ export async function treaboMe(token = getStoredTreaboToken()): Promise<TreaboUs
     });
 
     if (typeof window !== 'undefined') {
-      window.localStorage.setItem(USER_KEY, JSON.stringify(user));
-      window.localStorage.setItem('treabo_role', user.role);
+      persistTreaboUser(user);
     }
 
     return user;
@@ -144,6 +151,30 @@ export async function treaboMe(token = getStoredTreaboToken()): Promise<TreaboUs
     clearTreaboSession();
     return null;
   }
+}
+
+export async function treaboUpdateProfile(
+  input: {
+    bio?: string;
+    services?: string[];
+    avatar?: string;
+    portfolio?: string[];
+    city?: string;
+    lat?: number;
+    lng?: number;
+  },
+  token = getStoredTreaboToken(),
+): Promise<TreaboUser> {
+  if (!token) throw new Error('Authentication required');
+
+  const user = await authFetch<TreaboUser>('/auth/profile', {
+    method: 'PATCH',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify(input),
+  });
+
+  persistTreaboUser(user);
+  return user;
 }
 
 export function isTreaboSpecialist(user?: TreaboUser | null) {

@@ -38,6 +38,7 @@ type UiJobCard = {
   duration: string;
   tags: string[];
   icon: typeof Wrench;
+  photos: string[];
   task?: TreaboTask;
 };
 
@@ -76,13 +77,17 @@ function mapTaskToCard(task: TreaboTask, categories: TreaboCategory[], locale: s
       task.updated_at ? text.works.updatedRecently : text.works.new,
     ],
     icon: category?.icon === 'Wrench' ? Wrench : Paintbrush,
+    photos: (task.photos || [])
+      .map((photo) => (typeof photo === 'string' ? photo : photo.url || photo.path || ''))
+      .filter(Boolean)
+      .slice(0, 3),
     task,
   };
 }
 
 function buildJobCards(tasks: TreaboTask[], categories: TreaboCategory[], locale: string) {
   if (!tasks.length) {
-    return jobCards.map((card, index) => ({ ...card, id: `mock-${index + 1}` }));
+    return jobCards.map((card, index) => ({ ...card, id: `mock-${index + 1}`, photos: [] }));
   }
 
   return tasks.slice(0, 100).map((task) => mapTaskToCard(task, categories, locale));
@@ -322,6 +327,19 @@ export default function JobsMarketplacePage({
                               <span key={tag} className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-bold text-[#232323]">{tag}</span>
                             ))}
                           </div>
+                          {job.photos.length ? (
+                            <div className="mt-4 grid max-w-md grid-cols-3 gap-2">
+                              {job.photos.map((photo, index) => (
+                                <img
+                                  key={`${job.id}-photo-${index}`}
+                                  src={photo}
+                                  alt={`${job.title} ${index + 1}`}
+                                  className="h-20 w-full rounded-2xl object-cover"
+                                  loading="lazy"
+                                />
+                              ))}
+                            </div>
+                          ) : null}
                         </div>
                       </div>
                       <div className="flex flex-row items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm md:flex-col md:items-stretch">

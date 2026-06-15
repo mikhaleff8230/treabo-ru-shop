@@ -116,6 +116,24 @@ export type TreaboUpload = {
   size?: number | null;
 };
 
+export type TreaboSpecialist = {
+  id: string;
+  phone?: string;
+  name: string;
+  role: 'specialist' | 'customer' | 'admin';
+  city?: string | null;
+  email?: string | null;
+  rating?: number;
+  reviews_count?: number;
+  bio?: string | null;
+  services?: string[];
+  avatar?: string | null;
+  portfolio?: string[];
+  lat?: number | null;
+  lng?: number | null;
+  last_seen?: string | null;
+};
+
 export type TreaboTaskFilters = {
   category?: string | null;
   category_id?: string | null;
@@ -176,10 +194,41 @@ async function fetchJson<T>(path: string): Promise<T | null> {
 
 export function getTreaboPublicApiBase(): string {
   if (typeof window !== 'undefined') {
-    return trimSlash(process.env.NEXT_PUBLIC_TREABO_API_ENDPOINT || '/api/treabo');
+    const explicit = process.env.NEXT_PUBLIC_TREABO_API_ENDPOINT;
+    if (explicit) return trimSlash(explicit);
+    if (window.location.hostname === 'treabo.md' || window.location.hostname.endsWith('.treabo.md')) {
+      return 'https://api.treabo.md/api';
+    }
+    return '/api/treabo';
   }
 
   return trimSlash(apiCandidates()[0] || 'http://127.0.0.1:8001/api');
+}
+
+export async function uploadTreaboFile(
+  file: File,
+  input: { token?: string | null; folder?: string } = {},
+): Promise<TreaboUpload> {
+  const formData = new FormData();
+  formData.append('file', file);
+  if (input.folder) formData.append('folder', input.folder);
+
+  const response = await fetch(`${getTreaboPublicApiBase()}/uploads`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      ...(input.token ? { Authorization: `Bearer ${input.token}` } : {}),
+    },
+    body: formData,
+  });
+
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const detail = payload?.detail || payload?.message || 'Upload failed';
+    throw new Error(typeof detail === 'string' ? detail : 'Upload failed');
+  }
+
+  return payload as TreaboUpload;
 }
 
 export async function treaboApiRequest<T>(
@@ -217,6 +266,21 @@ export async function fetchTreaboCategories() {
 
 export async function fetchTreaboTasks(filters?: TreaboTaskFilters) {
   return (await fetchJson<TreaboTask[]>(`/tasks${buildQuery(filters)}`)) ?? [];
+}
+
+export async function fetchTreaboSpecialists(filters?: { city?: string | null }) {
+  const params = new URLSearchParams();
+  if (filters?.city) params.set('city', filters.city);
+  const query = params.toString();
+  return (await fetchJson<TreaboSpecialist[]>(`/specialists${query ? `?${query}` : ''}`)) ?? [];
+}
+
+export async function createTreaboTask(token: string, input: Partial<TreaboTask>) {
+  return treaboApiRequest<TreaboTask>('/tasks', {
+    method: 'POST',
+    token,
+    body: JSON.stringify(input),
+  });
 }
 
 export async function fetchTreaboTask(id: string) {

@@ -16,6 +16,8 @@ import {
 } from 'lucide-react';
 import { TreaboLanguageSwitcher } from '@/components/proffi-mock/TreaboLanguageSwitcher';
 import routes from '@/config/routes';
+import { createTreaboTask, uploadTreaboFile, type TreaboUpload } from '@/data/treabo';
+import { getStoredTreaboToken } from '@/data/treabo-auth';
 import { getTreaboText } from '@/lib/treabo/i18n';
 
 type Draft = Record<string, any> & {
@@ -23,6 +25,8 @@ type Draft = Record<string, any> & {
   prompt?: string;
   category?: string;
   saved?: boolean;
+  photos?: TreaboUpload[];
+  taskId?: string;
 };
 
 type AiDraft = {
@@ -140,6 +144,9 @@ export default function RequestWizard() {
   const [aiDraft, setAiDraft] = useState<AiDraft | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
+  const [savingTask, setSavingTask] = useState(false);
 
   const step = steps[stepIndex];
   const taskName = draft.category || draft.prompt || text.request.newRequest;
@@ -169,13 +176,68 @@ export default function RequestWizard() {
     return id;
   }
 
-  function next() {
+  async function saveTaskIfPossible(nextDraft: Draft) {
+    const token = getStoredTreaboToken();
+    if (!token || nextDraft.taskId) return nextDraft;
+
+    setSavingTask(true);
+    try {
+      const task = await createTreaboTask(token, {
+        title: nextDraft.category || nextDraft.aiDraft?.title || nextDraft.prompt || text.request.newRequest,
+        description: nextDraft.details || nextDraft.aiDraft?.description || nextDraft.prompt || text.request.newRequest,
+        category: nextDraft.aiDraft?.category_slug || 'other',
+        city: nextDraft.city || nextDraft.aiDraft?.city || text.city,
+        address: nextDraft.address || '',
+        budget: nextDraft.budget ? Number(String(nextDraft.budget).replace(/\D/g, '')) : null,
+        deadline: nextDraft.deadline || null,
+        photos: nextDraft.photos || [],
+      });
+      return { ...nextDraft, taskId: task.id };
+    } catch {
+      return nextDraft;
+    } finally {
+      setSavingTask(false);
+    }
+  }
+
+  async function next() {
     ensureDraftId();
     if (stepIndex >= steps.length - 1) {
-      setDraft((current) => ({ ...current, saved: true, savedAt: new Date().toISOString() }));
+      const nextDraft = await saveTaskIfPossible({ ...draft, saved: true, savedAt: new Date().toISOString() });
+      setDraft(nextDraft);
       return;
     }
     setStepIndex((value) => value + 1);
+  }
+
+  async function uploadPhotos(files: FileList | null) {
+    if (!files?.length) return;
+    const token = getStoredTreaboToken();
+    if (!token) {
+      setUploadError(text.request.login || 'Login required');
+      return;
+    }
+
+    setUploading(true);
+    setUploadError('');
+    try {
+      const currentPhotos = draft.photos || [];
+      const slots = Math.max(0, 10 - currentPhotos.length);
+      const selected = Array.from(files).slice(0, slots);
+      const uploaded = await Promise.all(selected.map((file) => uploadTreaboFile(file, { token, folder: 'tasks' })));
+      setDraft((current) => ({ ...current, photos: [...(current.photos || []), ...uploaded].slice(0, 10) }));
+    } catch (error) {
+      setUploadError(error instanceof Error ? error.message : 'Upload failed');
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function removePhoto(pathOrUrl?: string | null) {
+    setDraft((current) => ({
+      ...current,
+      photos: (current.photos || []).filter((photo: TreaboUpload) => (photo.url || photo.path) !== pathOrUrl),
+    }));
   }
 
   function back() {
@@ -361,10 +423,41 @@ export default function RequestWizard() {
           <>
             <h1 className="text-4xl font-black leading-tight text-[#232323] md:text-5xl">{step.title}</h1>
             <textarea value={draft.details || ''} onChange={(event) => update('details', event.target.value)} placeholder={text.request.detailsPlaceholder} className={`${inputClass} mt-10 min-h-[136px] resize-none`} />
-            <button className="mt-5 flex w-full items-center justify-between rounded-2xl border border-dashed border-[#d3d9e8] bg-white px-5 py-5 text-left text-[#232323]">
-              <span>{text.request.addFile}</span>
+            <label className="mt-5 flex w-full cursor-pointer items-center justify-between rounded-2xl border border-dashed border-[#d3d9e8] bg-white px-5 py-5 text-left text-[#232323]">
+              <span>{uploading ? 'Загрузка...' : text.request.addFile}</span>
               <Plus className="h-5 w-5 text-[#7d849b]" />
-            </button>
+              <input
+                type="file"
+                accept="image/*,.pdf"
+                multiple
+                className="hidden"
+                disabled={uploading}
+                onChange={(event) => {
+                  uploadPhotos(event.target.files);
+                  event.currentTarget.value = '';
+                }}
+              />
+            </label>
+            {uploadError && <div className="mt-3 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{uploadError}</div>}
+            {draft.photos?.length ? (
+              <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-5">
+                {draft.photos.map((photo) => {
+                  const url = photo.url || '';
+                  return (
+                    <div key={photo.path || photo.url} className="group relative overflow-hidden rounded-2xl bg-[#eef1f7]">
+                      {url ? <img src={url} alt="" className="h-24 w-full object-cover" /> : <div className="h-24" />}
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(photo.url || photo.path)}
+                        className="absolute right-2 top-2 hidden h-7 w-7 items-center justify-center rounded-full bg-white text-sm font-black shadow group-hover:flex"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
           </>
         );
       case 'choice':

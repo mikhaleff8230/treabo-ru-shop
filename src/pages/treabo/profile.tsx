@@ -1,13 +1,73 @@
-import { Camera, Pencil, Star } from 'lucide-react';
+import { useState } from 'react';
+import { Camera, ImagePlus, Pencil, Star, Trash2 } from 'lucide-react';
 import TreaboAccountShell from '@/components/treabo/TreaboAccountShell';
+import { uploadTreaboFile } from '@/data/treabo';
+import { getStoredTreaboToken } from '@/data/treabo-auth';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
 
 export default function TreaboProfilePage() {
   const auth = useTreaboAuth();
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadingPortfolio, setUploadingPortfolio] = useState(false);
+  const [error, setError] = useState('');
+  const portfolio = auth.user?.portfolio || [];
+
+  async function uploadAvatar(file?: File | null) {
+    if (!file) return;
+    const token = getStoredTreaboToken();
+    if (!token) {
+      setError('Войдите как мастер, чтобы загрузить фото.');
+      return;
+    }
+
+    setUploadingAvatar(true);
+    setError('');
+    try {
+      const uploaded = await uploadTreaboFile(file, { token, folder: 'avatars' });
+      if (uploaded.url) {
+        await auth.updateProfile({ avatar: uploaded.url });
+      }
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : 'Не удалось загрузить аватар');
+    } finally {
+      setUploadingAvatar(false);
+    }
+  }
+
+  async function uploadPortfolio(files: FileList | null) {
+    if (!files?.length) return;
+    const token = getStoredTreaboToken();
+    if (!token) {
+      setError('Войдите как мастер, чтобы загрузить портфолио.');
+      return;
+    }
+
+    setUploadingPortfolio(true);
+    setError('');
+    try {
+      const slots = Math.max(0, 10 - portfolio.length);
+      const selected = Array.from(files).slice(0, slots);
+      const uploaded = await Promise.all(
+        selected.map((file) => uploadTreaboFile(file, { token, folder: 'portfolio' })),
+      );
+      const urls = uploaded.map((item) => item.url).filter(Boolean) as string[];
+      await auth.updateProfile({ portfolio: [...portfolio, ...urls].slice(0, 10) });
+    } catch (uploadError) {
+      setError(uploadError instanceof Error ? uploadError.message : 'Не удалось загрузить портфолио');
+    } finally {
+      setUploadingPortfolio(false);
+    }
+  }
+
+  async function removePortfolioPhoto(url: string) {
+    await auth.updateProfile({ portfolio: portfolio.filter((item) => item !== url) });
+  }
 
   return (
     <TreaboAccountShell title="Анкета">
       <div className="space-y-4">
+        {error ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</div> : null}
+
         <section className="rounded-[30px] bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
             <div className="relative h-28 w-28 overflow-hidden rounded-2xl bg-[#edf1f7]">
@@ -18,9 +78,19 @@ export default function TreaboProfilePage() {
                   {auth.user?.name?.charAt(0)?.toUpperCase() || 'T'}
                 </div>
               )}
-              <button className="absolute bottom-2 right-2 flex h-9 w-9 items-center justify-center rounded-full bg-white shadow">
+              <label className="absolute bottom-2 right-2 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full bg-white shadow">
                 <Camera className="h-4 w-4" />
-              </button>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={uploadingAvatar}
+                  onChange={(event) => {
+                    uploadAvatar(event.target.files?.[0]);
+                    event.currentTarget.value = '';
+                  }}
+                />
+              </label>
             </div>
             <div className="min-w-0 flex-1">
               <div className="flex items-start justify-between gap-3">
@@ -42,6 +112,52 @@ export default function TreaboProfilePage() {
               </div>
             </div>
           </div>
+        </section>
+
+        <section className="rounded-[30px] bg-white p-5 shadow-sm">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl font-black">Портфолио</h2>
+              <p className="mt-1 text-sm font-semibold text-[#7d849b]">Галерея работ, до 10 фото</p>
+            </div>
+            <label className="inline-flex cursor-pointer items-center justify-center gap-2 rounded-2xl bg-[#d9f36b] px-4 py-3 text-sm font-black text-[#232323]">
+              <ImagePlus className="h-4 w-4" />
+              {uploadingPortfolio ? 'Загрузка...' : 'Добавить фото'}
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                disabled={uploadingPortfolio || portfolio.length >= 10}
+                onChange={(event) => {
+                  uploadPortfolio(event.target.files);
+                  event.currentTarget.value = '';
+                }}
+              />
+            </label>
+          </div>
+
+          {portfolio.length ? (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+              {portfolio.map((photo) => (
+                <div key={photo} className="group relative overflow-hidden rounded-2xl bg-[#edf1f7]">
+                  <img src={photo} alt="Портфолио мастера" className="h-32 w-full object-cover" loading="lazy" />
+                  <button
+                    type="button"
+                    onClick={() => removePortfolioPhoto(photo)}
+                    className="absolute right-2 top-2 hidden h-8 w-8 items-center justify-center rounded-full bg-white shadow group-hover:flex"
+                    aria-label="Удалить фото"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-3xl border border-dashed border-[#d3d9e8] bg-[#f8f9fb] px-5 py-8 text-sm font-semibold text-[#7d849b]">
+              Добавьте фотографии выполненных работ. Они будут отображаться в списке мастеров и анкете.
+            </div>
+          )}
         </section>
 
         <section className="rounded-[30px] bg-white p-5 shadow-sm">

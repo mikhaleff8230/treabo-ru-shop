@@ -6,6 +6,7 @@ import {
   treaboLogin,
   treaboMe,
   treaboRegister,
+  treaboUpdateProfile,
   type TreaboUser,
 } from '@/data/treabo-auth';
 
@@ -55,6 +56,19 @@ export function useTreaboAuth() {
       const data = await treaboRegister(input);
       setUser(data.user);
       return data;
+    },
+    updateProfile: async (input: {
+      bio?: string;
+      services?: string[];
+      avatar?: string;
+      portfolio?: string[];
+      city?: string;
+      lat?: number;
+      lng?: number;
+    }) => {
+      const updated = await treaboUpdateProfile(input);
+      setUser(updated);
+      return updated;
     },
   };
 }
