@@ -180,11 +180,13 @@ function formatDate(value?: string | null, locale?: string) {
 }
 
 function PhotoGallery({ photos, title, noPhoto }: { photos: string[]; title: string; noPhoto: string }) {
-  const visiblePhotos = photos.filter(Boolean).slice(0, 6);
+  const visiblePhotos = photos.filter(Boolean).slice(0, 12);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const activePhoto = visiblePhotos[activeIndex] || visiblePhotos[0];
 
   if (!visiblePhotos.length) {
     return (
-      <div className="grid grid-cols-[1fr_88px] gap-3 sm:grid-cols-[1fr_140px]">
+      <div className="grid gap-3 md:grid-cols-[1fr_140px]">
         <div className="flex aspect-[4/3] items-center justify-center rounded-[28px] bg-[#edf1f7] text-[#232323]">
           <div className="text-center">
             <ImageIcon className="mx-auto h-12 w-12 text-zinc-400" />
@@ -200,17 +202,33 @@ function PhotoGallery({ photos, title, noPhoto }: { photos: string[]; title: str
   }
 
   return (
-    <div className="grid grid-cols-[1fr_88px] gap-3 sm:grid-cols-[1fr_140px]">
+    <div className="grid gap-3 md:grid-cols-[1fr_140px]">
       <div className="relative overflow-hidden rounded-[28px] bg-[#edf1f7]">
-        <img src={visiblePhotos[0]} alt={title} className="aspect-[4/3] h-full w-full object-cover" />
-        <div className="absolute bottom-3 right-3 rounded-full bg-white/95 px-3 py-1.5 text-sm font-black text-[#232323]">1/{visiblePhotos.length}</div>
+        <img src={activePhoto} alt={title} className="aspect-[4/3] h-full w-full object-cover" />
+        <div className="absolute bottom-3 right-3 rounded-full bg-white/95 px-3 py-1.5 text-sm font-black text-[#232323]">
+          {activeIndex + 1}/{visiblePhotos.length}
+        </div>
       </div>
-      <div className="grid gap-3">
-        {(visiblePhotos.slice(1, 3).length ? visiblePhotos.slice(1, 3) : visiblePhotos.slice(0, 2)).map((photo, index) => (
-          <div key={`${photo}-${index}`} className="overflow-hidden rounded-[22px] bg-[#edf1f7]">
-            <img src={photo} alt={`${title} ${index + 2}`} className="h-full w-full object-cover" />
-          </div>
-        ))}
+      <div className="flex max-h-[min(68vh,620px)] gap-3 overflow-x-auto pb-1 md:block md:space-y-3 md:overflow-x-hidden md:overflow-y-auto md:pb-0 md:pr-1">
+        {visiblePhotos.map((photo, index) => {
+          const isActive = index === activeIndex;
+
+          return (
+            <button
+              key={`${photo}-${index}`}
+              type="button"
+              onClick={() => setActiveIndex(index)}
+              className={`relative h-24 w-24 flex-none overflow-hidden rounded-[22px] bg-[#edf1f7] transition md:h-32 md:w-full ${
+                isActive ? 'ring-4 ring-[#d9fb4f] ring-offset-2' : 'opacity-75 hover:opacity-100'
+              }`}
+              aria-label={`Показать фото ${index + 1}`}
+              aria-current={isActive ? 'true' : undefined}
+            >
+              <img src={photo} alt={`${title} ${index + 1}`} className="h-full w-full object-cover" />
+              {isActive ? <span className="absolute inset-0 rounded-[22px] border-2 border-[#232323]/20" /> : null}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
