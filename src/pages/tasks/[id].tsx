@@ -8,6 +8,7 @@ import {
 import TreaboAuthModal from '@/components/auth/treabo-auth-modal';
 import TreaboApplyConfirmModal from '@/components/treabo/TreaboApplyConfirmModal';
 import TreaboTaskMap from '@/components/treabo/TreaboTaskMap';
+import { ProffiHeader } from '@/components/proffi-mock/ProffiShell';
 import { TitleSeo } from '@/components/seo/title-seo';
 import routes from '@/config/routes';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
@@ -27,7 +28,6 @@ import {
   Image as ImageIcon,
   MapPin,
   MessageCircle,
-  MoreHorizontal,
   Ruler,
   Wallet,
 } from 'lucide-react';
@@ -299,19 +299,16 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
       <TitleSeo title={seo.title} description={seo.description} canonical={seo.canonical} ogImage={seo.ogImage} ogType="article" />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <div className="min-h-screen bg-[#f5f6f1] text-[#232323]">
-        <header className="sticky top-0 z-30 border-b border-zinc-200 bg-white/95 backdrop-blur">
-          <div className="mx-auto flex h-14 max-w-5xl items-center justify-between px-4">
-            <Link href={routes.works} className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-zinc-100">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-            <div className="min-w-0 flex-1 truncate px-2 text-center text-base font-black sm:text-lg">{data.title}</div>
-            <button className="flex h-10 w-10 items-center justify-center rounded-full hover:bg-zinc-100">
-              <MoreHorizontal className="h-5 w-5" />
-            </button>
-          </div>
-        </header>
+        <ProffiHeader />
 
         <main className="mx-auto max-w-5xl px-4 py-5 pb-28 sm:py-8">
+          <div className="mb-4 flex items-center justify-between">
+            <Link href={routes.works} className="inline-flex h-11 items-center gap-2 rounded-full border border-zinc-200 bg-white px-4 text-sm font-bold text-[#232323] shadow-sm hover:border-zinc-950">
+              <ArrowLeft className="h-4 w-4" />
+              {text.common.allTasks}
+            </Link>
+          </div>
+
           <section className="rounded-[30px] bg-white p-4 shadow-sm sm:p-6">
             <div className="mb-4 flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-wide text-[#7d849b]">
               <span>{text.task.privateCustomer}</span>
