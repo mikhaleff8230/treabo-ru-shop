@@ -18,7 +18,8 @@ import TreaboTasksMapModal from '@/components/treabo/TreaboTasksMapModal';
 import type { TreaboCategory, TreaboTask, TreaboTaskFilters } from '@/data/treabo';
 import routes from '@/config/routes';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
-import { faqItems, jobCards, jobFilters, jobTags } from './mock-data';
+import { getTreaboText, treaboLocale } from '@/lib/treabo/i18n';
+import { jobCards } from './mock-data';
 import { ProffiFooter, ProffiHeader } from './ProffiShell';
 
 type JobsMarketplacePageProps = {
@@ -41,38 +42,50 @@ type UiJobCard = {
 };
 
 const money = new Intl.NumberFormat('ru-RU');
-const DEFAULT_CITY = 'Кишинёв';
 
-function mapTaskToCard(task: TreaboTask, categories: TreaboCategory[]): UiJobCard {
+function interpolate(template: string, values: Record<string, string | number>) {
+  return Object.entries(values).reduce((result, [key, value]) => result.replaceAll(`{{${key}}}`, String(value)), template);
+}
+
+function categoryName(category: TreaboCategory | undefined, locale: string) {
+  if (!category) return null;
+  return treaboLocale(locale) === 'ro'
+    ? category.name_ro || category.name_ru
+    : category.name_ru || category.name_ro;
+}
+
+function mapTaskToCard(task: TreaboTask, categories: TreaboCategory[], locale: string): UiJobCard {
+  const text = getTreaboText(locale);
   const category = categories.find(
     (item) => item.id === task.category_id || item.id === task.category || item.slug === task.category,
   );
+  const categoryLabel = categoryName(category, locale) || text.works.taskTag;
   const budget = Number(task.budget || 0);
 
   return {
     id: String(task.id),
     title: task.title,
-    brand: category?.name_ru || 'Частный заказчик',
-    location: [task.city || DEFAULT_CITY, task.address].filter(Boolean).join(', '),
-    time: task.deadline || 'Срок по договоренности',
-    pay: budget > 0 ? `${money.format(budget)} MDL` : 'Цена договорная',
-    duration: task.status === 'open' ? 'Открыт' : task.status || 'Новый',
+    brand: categoryLabel || text.works.privateCustomer,
+    location: [task.city || text.city, task.address].filter(Boolean).join(', '),
+    time: task.deadline || text.works.agreementTerm,
+    pay: budget > 0 ? `${money.format(budget)} MDL` : text.works.negotiablePrice,
+    duration: task.status === 'open' ? text.works.open : task.status || text.works.newOrder,
     tags: [
-      category?.name_ru || 'Задание Treabo',
-      task.photos?.length ? 'Фото объекта' : 'Можно уточнить детали',
-      task.updated_at ? 'Обновлено недавно' : 'Новый заказ',
+      categoryLabel,
+      task.photos?.length ? text.works.objectPhoto : text.works.clarifyDetails,
+      task.updated_at ? text.works.updatedRecently : text.works.new,
     ],
     icon: category?.icon === 'Wrench' ? Wrench : Paintbrush,
     task,
   };
 }
 
-function buildJobCards(tasks: TreaboTask[], categories: TreaboCategory[]) {
+function buildJobCards(tasks: TreaboTask[], categories: TreaboCategory[], locale: string) {
   if (!tasks.length) {
     return jobCards.map((card, index) => ({ ...card, id: `mock-${index + 1}` }));
   }
 
-  return tasks.slice(0, 100).map((task) => mapTaskToCard(task, categories));
+  return tasks.slice(0, 100).map((task) => mapTaskToCard(task, categories, locale));
 }
 
 function buildQuery(filters: TreaboTaskFilters) {
@@ -92,19 +105,23 @@ export default function JobsMarketplacePage({
   initialFilters = {},
 }: JobsMarketplacePageProps) {
   const router = useRouter();
+  const text = getTreaboText(router.locale);
   const auth = useTreaboAuth();
   const [authOpen, setAuthOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
   const [filters, setFilters] = useState<TreaboTaskFilters>({
-    city: initialFilters.city || DEFAULT_CITY,
+    city: initialFilters.city || text.city,
     ...initialFilters,
   });
 
-  const visibleJobs = useMemo(() => buildJobCards(tasks, categories), [tasks, categories]);
+  const visibleJobs = useMemo(() => buildJobCards(tasks, categories, router.locale || 'ro'), [tasks, categories, router.locale]);
   const availableCount = tasks.length || visibleJobs.length;
+  const quickTags = router.locale === 'ru'
+    ? ['срочно', 'с фото', 'рядом с домом', 'ремонт', 'плитка', 'сантехника', 'электрика']
+    : ['urgent', 'cu fotografii', 'aproape', 'reparații', 'gresie', 'sanitare', 'electricitate'];
 
   const categoryOptions = categories.length
-    ? categories.map((item) => ({ id: item.id, label: item.name_ru, slug: item.slug || item.id }))
+    ? categories.map((item) => ({ id: item.id, label: categoryName(item, router.locale || 'ro') || item.slug || item.id }))
     : [];
 
   function applyFilters(next: TreaboTaskFilters) {
@@ -113,7 +130,7 @@ export default function JobsMarketplacePage({
   }
 
   function resetFilters() {
-    const next = { city: DEFAULT_CITY };
+    const next = { city: text.city };
     setFilters(next);
     applyFilters(next);
   }
@@ -126,16 +143,17 @@ export default function JobsMarketplacePage({
   }
 
   function toggleBudgetPreset(preset: string) {
-    if (preset === 'Любая') {
+    const first = text.works.filters[0].options;
+    if (preset === first[0]) {
       setFilters((current) => ({ ...current, budget_min: undefined, budget_max: undefined }));
       return;
     }
-    if (preset === 'Повышенная') {
+    if (preset === first[1]) {
       setFilters((current) => ({ ...current, budget_min: 5000, budget_max: undefined }));
       return;
     }
-    if (preset === 'Сегодня') {
-      setFilters((current) => ({ ...current, q: 'срочно' }));
+    if (preset === first[2]) {
+      setFilters((current) => ({ ...current, q: router.locale === 'ru' ? 'срочно' : 'urgent' }));
     }
   }
 
@@ -147,17 +165,15 @@ export default function JobsMarketplacePage({
           <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
             <div className="flex flex-col gap-3 text-sm text-[#232323] md:flex-row md:items-center md:justify-between">
               <div className="flex flex-wrap items-center gap-2">
-                <Link href="/" className="hover:opacity-75">Главная</Link>
+                <Link href="/" className="hover:opacity-75">{text.common.home}</Link>
                 <span>/</span>
-                <span>{filters.city || DEFAULT_CITY}</span>
+                <span>{filters.city || text.city}</span>
                 <span>/</span>
-                <span>Все задания</span>
+                <span>{text.common.allTasks}</span>
               </div>
-              <div className="flex items-center gap-4">
-                <span className="inline-flex items-center gap-1 font-semibold text-[#232323]">
-                  <MapPin className="h-4 w-4" /> {filters.city || DEFAULT_CITY}
-                </span>
-              </div>
+              <span className="inline-flex items-center gap-1 font-semibold text-[#232323]">
+                <MapPin className="h-4 w-4" /> {filters.city || text.city}
+              </span>
             </div>
           </div>
         </section>
@@ -166,18 +182,16 @@ export default function JobsMarketplacePage({
           <div className="mb-7 grid gap-5 lg:grid-cols-[1fr_360px] lg:items-end">
             <div className="min-w-0" style={{ width: 'min(100%, calc(100vw - 2rem))' }}>
               <h1 className="max-w-full break-words text-[34px] font-black leading-[1.05] sm:text-5xl">
-                Задания и заказы в {filters.city || DEFAULT_CITY}
+                {interpolate(text.works.title, { city: filters.city || text.city })}
               </h1>
-              <p className="mt-3 max-w-3xl text-base leading-7 text-[#232323]">
-                Лента заданий Treabo для специалистов и заказчиков: фильтры, карта, карточки заказов и быстрые действия.
-              </p>
+              <p className="mt-3 max-w-3xl text-base leading-7 text-[#232323]">{text.works.subtitle}</p>
             </div>
             <div className="rounded-[28px] border border-zinc-200 bg-[#d9f36b] p-5 text-[#232323] shadow-sm">
-              <div className="text-sm font-semibold text-[#232323]">Доступно сегодня</div>
-              <div className="mt-1 text-3xl font-black text-[#232323]">{availableCount} заданий</div>
+              <div className="text-sm font-semibold text-[#232323]">{text.works.availableToday}</div>
+              <div className="mt-1 text-3xl font-black text-[#232323]">{interpolate(text.works.tasksCount, { count: availableCount })}</div>
               <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-[#232323]">
                 <CalendarClock className="h-4 w-4" />
-                отклики и чат после входа
+                {text.works.responsesAfterLogin}
               </div>
             </div>
           </div>
@@ -186,19 +200,15 @@ export default function JobsMarketplacePage({
             <div className="flex gap-2 overflow-x-auto">
               <button type="button" className="inline-flex shrink-0 items-center gap-2 rounded-full bg-zinc-950 px-4 py-2.5 text-sm font-bold text-white">
                 <Filter className="h-4 w-4" />
-                Фильтры
+                {text.common.filters}
               </button>
-              <button
-                type="button"
-                onClick={() => setMapOpen(true)}
-                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 px-4 py-2.5 text-sm font-bold"
-              >
+              <button type="button" onClick={() => setMapOpen(true)} className="inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 px-4 py-2.5 text-sm font-bold">
                 <Map className="h-4 w-4" />
-                Карта
+                {text.common.map}
               </button>
               <button type="button" className="inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 px-4 py-2.5 text-sm font-bold">
                 <ArrowUpDown className="h-4 w-4" />
-                Сортировка
+                {text.common.sort}
               </button>
             </div>
           </div>
@@ -207,16 +217,16 @@ export default function JobsMarketplacePage({
             <aside className="hidden lg:block">
               <div className="sticky top-24 rounded-[30px] border border-zinc-200 bg-white p-5 shadow-sm">
                 <div className="mb-5 flex items-center justify-between">
-                  <h2 className="text-xl font-black">Фильтры</h2>
+                  <h2 className="text-xl font-black">{text.common.filters}</h2>
                   <button type="button" onClick={resetFilters} className="text-sm font-bold text-[#232323]">
-                    Сбросить
+                    {text.common.reset}
                   </button>
                 </div>
 
                 <div className="space-y-5">
                   {categoryOptions.length ? (
                     <div className="border-t border-zinc-100 pt-5 first:border-t-0 first:pt-0">
-                      <div className="mb-3 font-black">Категория</div>
+                      <div className="mb-3 font-black">{text.common.category}</div>
                       <div className="flex flex-wrap gap-2">
                         {categoryOptions.map((option) => (
                           <button
@@ -237,16 +247,16 @@ export default function JobsMarketplacePage({
                   ) : null}
 
                   <div className="border-t border-zinc-100 pt-5">
-                    <div className="mb-3 font-black">Город</div>
+                    <div className="mb-3 font-black">{text.common.city}</div>
                     <input
                       className="w-full rounded-2xl border border-zinc-200 px-4 py-3 text-sm"
                       value={filters.city || ''}
                       onChange={(event) => setFilters((current) => ({ ...current, city: event.target.value }))}
-                      placeholder={DEFAULT_CITY}
+                      placeholder={text.city}
                     />
                   </div>
 
-                  {jobFilters.map((group) => (
+                  {text.works.filters.map((group) => (
                     <div key={group.title} className="border-t border-zinc-100 pt-5">
                       <div className="mb-3 flex items-center justify-between font-black">
                         {group.title}
@@ -258,14 +268,9 @@ export default function JobsMarketplacePage({
                             key={option}
                             type="button"
                             onClick={() => {
-                              if (group.title === 'Оплата за задание') toggleBudgetPreset(option);
+                              if (group.title === text.works.filters[0].title) toggleBudgetPreset(option);
                             }}
                             className="rounded-full bg-zinc-100 px-3 py-2 text-xs font-bold text-[#232323] transition hover:bg-zinc-950 hover:text-white"
-                            title={
-                              group.title !== 'Оплата за задание'
-                                ? 'TODO: поле пока не поддерживается API'
-                                : undefined
-                            }
                           >
                             {option}
                           </button>
@@ -275,20 +280,12 @@ export default function JobsMarketplacePage({
                   ))}
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => applyFilters(filters)}
-                  className="mt-6 w-full rounded-2xl bg-zinc-950 px-5 py-3 font-black text-white"
-                >
-                  Применить
+                <button type="button" onClick={() => applyFilters(filters)} className="mt-6 w-full rounded-2xl bg-zinc-950 px-5 py-3 font-black text-white">
+                  {text.common.apply}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => setMapOpen(true)}
-                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-zinc-300 bg-white px-5 py-3 font-black"
-                >
+                <button type="button" onClick={() => setMapOpen(true)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-zinc-300 bg-white px-5 py-3 font-black">
                   <Map className="h-4 w-4" />
-                  Посмотреть на карте
+                  {text.common.viewOnMap}
                 </button>
               </div>
             </aside>
@@ -296,12 +293,12 @@ export default function JobsMarketplacePage({
             <section>
               <div className="mb-4 flex flex-col gap-3 rounded-[26px] border border-zinc-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <div className="text-sm text-[#232323]">Найдено</div>
-                  <div className="text-xl font-black">{visibleJobs.length} подходящих заданий</div>
+                  <div className="text-sm text-[#232323]">{text.common.found}</div>
+                  <div className="text-xl font-black">{interpolate(text.works.matchedTasks, { count: visibleJobs.length })}</div>
                 </div>
                 <button type="button" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-zinc-300 px-4 py-3 text-sm font-black">
                   <SlidersHorizontal className="h-4 w-4" />
-                  Сначала новые
+                  {text.common.newestFirst}
                 </button>
               </div>
 
@@ -335,23 +332,16 @@ export default function JobsMarketplacePage({
                         <div className="flex w-full flex-row gap-2 md:flex-col">
                           {auth.isSpecialist ? (
                             <button type="button" className="min-h-[48px] flex-1 rounded-2xl bg-[#d9f36b] px-5 py-3 text-sm font-semibold text-[#232323] shadow-[0_12px_26px_rgba(132,204,22,0.24)] transition hover:bg-[#c7e85a]">
-                              Откликнуться
+                              {text.works.apply}
                             </button>
                           ) : auth.isAuthenticated ? null : (
-                            <button
-                              type="button"
-                              onClick={() => setAuthOpen(true)}
-                              className="min-h-[48px] flex-1 rounded-2xl bg-[#d9f36b] px-5 py-3 text-sm font-semibold text-[#232323]"
-                            >
-                              Войти и откликнуться
+                            <button type="button" onClick={() => setAuthOpen(true)} className="min-h-[48px] flex-1 rounded-2xl bg-[#d9f36b] px-5 py-3 text-sm font-semibold text-[#232323]">
+                              {text.works.loginAndApply}
                             </button>
                           )}
-                          <Link
-                            href={routes.taskUrl(task || { id: job.id, title: job.title })}
-                            className="flex min-h-[48px] w-12 shrink-0 items-center justify-center rounded-2xl bg-[#eef3f8] px-0 py-3 text-sm font-semibold text-[#232323] transition hover:bg-[#e3ebf2] md:w-full md:flex-1 md:px-5"
-                          >
+                          <Link href={routes.taskUrl(task || { id: job.id, title: job.title })} className="flex min-h-[48px] w-12 shrink-0 items-center justify-center rounded-2xl bg-[#eef3f8] px-0 py-3 text-sm font-semibold text-[#232323] transition hover:bg-[#e3ebf2] md:w-full md:flex-1 md:px-5">
                             <Info className="h-5 w-5 md:hidden" />
-                            <span className="hidden md:inline">Подробнее</span>
+                            <span className="hidden md:inline">{text.common.more}</span>
                           </Link>
                         </div>
                       </div>
@@ -365,7 +355,7 @@ export default function JobsMarketplacePage({
 
         <section className="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-8">
           <div className="flex flex-wrap gap-2">
-            {jobTags.map((tag) => (
+            {quickTags.map((tag) => (
               <button key={tag} type="button" className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-bold text-[#232323]">
                 {tag}
               </button>
@@ -375,19 +365,8 @@ export default function JobsMarketplacePage({
 
         <section className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 lg:grid-cols-[0.8fr_1.2fr] lg:px-8">
           <div>
-            <h2 className="text-3xl font-black tracking-tight">Вопросы и ответы</h2>
-            <p className="mt-3 text-[#232323]">FAQ-блок оставлен как часть основного шаблона, дальше его можно наполнить правилами Treabo.</p>
-          </div>
-          <div className="space-y-3">
-            {faqItems.map((item) => (
-              <details key={item.q} className="group rounded-[24px] bg-white p-5 shadow-sm" open>
-                <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-black">
-                  {item.q}
-                  <ChevronDown className="h-5 w-5 transition group-open:rotate-180" />
-                </summary>
-                <p className="mt-3 text-sm leading-6 text-[#232323]">{item.a}</p>
-              </details>
-            ))}
+            <h2 className="text-3xl font-black tracking-tight">{text.works.faqTitle}</h2>
+            <p className="mt-3 text-[#232323]">{text.works.faqText}</p>
           </div>
         </section>
       </main>

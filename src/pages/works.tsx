@@ -9,6 +9,7 @@ import {
 } from '@/data/treabo';
 import type { NextPageWithLayout } from '@/types';
 import type { GetServerSideProps } from 'next';
+import { useRouter } from 'next/router';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
 type WorksPageProps = {
@@ -19,12 +20,16 @@ type WorksPageProps = {
 
 const WorksPage: NextPageWithLayout<WorksPageProps> = ({ categories, tasks, filters }) => {
   const siteUrl = (process.env.NEXT_PUBLIC_WEBSITE_URL || 'https://treabo.md').replace(/\/+$/, '');
+  const router = useRouter();
+  const isRu = router.locale === 'ru';
 
   return (
     <>
       <TitleSeo
-        title="Задания и подработка в Молдове — Treabo"
-        description="Лента заданий для специалистов и заказчиков Treabo: фильтры, карта, отклики и быстрые заказы."
+        title={isRu ? 'Задания и заказы в Молдове - Treabo' : 'Comenzi și lucrări în Moldova - Treabo'}
+        description={isRu
+          ? 'Лента заданий Treabo для специалистов и заказчиков: фильтры, карта, отклики и быстрые заказы.'
+          : 'Feed Treabo pentru specialiști și clienți: filtre, hartă, oferte și comenzi rapide.'}
         canonical={`${siteUrl}/works`}
       />
       <JobsMarketplacePage categories={categories} tasks={tasks} initialFilters={filters} />
