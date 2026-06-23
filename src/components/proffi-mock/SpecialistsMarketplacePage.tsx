@@ -2,18 +2,18 @@ import Image, { StaticImageData } from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
-  BadgeCheck,
-  Briefcase,
-  ChevronDown,
-  Filter,
-  Map,
-  MapPin,
-  MessageCircle,
-  Search,
-  ShieldCheck,
-  Star,
-  Users,
-} from 'lucide-react';
+BadgeCheck,
+Briefcase,
+ChevronDown,
+Filter,
+Map,
+MapPin,
+MessageCircle,
+Search,
+ShieldCheck,
+Star,
+Users } from
+'lucide-react';
 import team1 from '@/assets/images/team/1.png';
 import team2 from '@/assets/images/team/2.png';
 import team3 from '@/assets/images/team/3.png';
@@ -36,87 +36,86 @@ type Specialist = {
   location: string;
   services: string[];
   photos: Array<StaticImageData | string>;
-  avatar: StaticImageData | string;
-};
+  avatar: StaticImageData | string;};
+
 
 function buildSpecialists(locale?: string, apiSpecialists: TreaboSpecialist[] = []): Specialist[] {
-  const ru = locale === 'ru';
-  if (apiSpecialists.length) {
+if (apiSpecialists.length) {
     const fallbackAvatars = [team1, team2, team3];
     const fallbackPhotos = [
-      [team2, team3, team4],
-      [team5, team6, team3],
-      [team4, team1, team6],
-    ];
+    [team2, team3, team4],
+    [team5, team6, team3],
+    [team4, team1, team6]];
+
 
     return apiSpecialists.map((item, index) => ({
-      name: item.name || (ru ? 'Специалист Treabo' : 'Specialist Treabo'),
-      online: item.last_seen ? (ru ? 'Был в сети недавно' : 'A fost online recent') : (ru ? 'Онлайн' : 'Online'),
+      name: item.name || 'Специалист Treabo',
+      online: item.last_seen ? 'Был в сети недавно' : 'Онлайн',
       rating: String(item.rating || '5,0').replace('.', ','),
-      reviews: ru ? `${item.reviews_count || 0} отзывов` : `${item.reviews_count || 0} recenzii`,
-      praise: ru ? 'Профиль Treabo' : 'Profil Treabo',
-      team: ru ? 'Выезд к клиенту' : 'Deplasare la client',
-      verified: item.email ? (ru ? 'Профиль проверен' : 'Profil verificat') : (ru ? 'Анкета заполнена' : 'Profil completat'),
-      qualification: item.bio || (ru
-        ? 'Специалист принимает заявки Treabo. Портфолио и услуги можно заполнить в анкете мастера.'
-        : 'Specialistul accepta cereri Treabo. Portofoliul si serviciile pot fi completate in profil.'),
-      location: item.city || (ru ? 'Кишинёв' : 'Chisinau'),
-      services: item.services?.length ? item.services : (ru ? ['Ремонт', 'Сантехника', 'Плитка'] : ['Reparatii', 'Sanitare', 'Gresie/faiana']),
+      reviews: `${item.reviews_count || 0} отзывов`,
+      praise: 'Профиль Treabo',
+      team: 'Выезд к клиенту',
+      verified: item.email ? 'Профиль проверен' : 'Анкета заполнена',
+      qualification: item.bio ||
+      'Специалист принимает заявки Treabo. Портфолио и услуги можно заполнить в анкете мастера.',
+
+      location: item.city || 'Кишинёв',
+      services: item.services?.length ? item.services : ['Ремонт', 'Сантехника', 'Плитка'],
       photos: item.portfolio?.length ? item.portfolio.slice(0, 3) : fallbackPhotos[index % fallbackPhotos.length],
-      avatar: item.avatar || fallbackAvatars[index % fallbackAvatars.length],
-    }));
+      avatar: item.avatar || fallbackAvatars[index % fallbackAvatars.length] }));
+
   }
 
   return [
-    {
-      name: ru ? 'Дмитрий Е.' : 'Dumitru E.',
-      online: ru ? 'Был в сети сегодня в 06:34' : 'A fost online astăzi la 06:34',
-      rating: '5,0',
-      reviews: ru ? '52 отзыва' : '52 recenzii',
-      praise: ru ? 'Очень хвалят' : 'Foarte apreciat',
-      team: ru ? 'С командой' : 'Cu echipă',
-      verified: ru ? 'Паспорт проверен' : 'Acte verificate',
-      qualification: ru
-        ? 'Специалист сдал экзамен по услугам: малярные и штукатурные работы, поклейка обоев.'
-        : 'Specialistul a trecut verificarea pentru servicii: lucrări de vopsire, tencuială și tapet.',
-      location: ru ? 'Кишинёв, Ботаника' : 'Chișinău, Botanica',
-      services: ru ? ['Ремонт квартир', 'Покраска стен', 'Плитка', 'Штукатурка'] : ['Reparații apartamente', 'Vopsire pereți', 'Gresie/faianță', 'Tencuială'],
-      photos: [team2, team3, team4],
-      avatar: team1,
-    },
-    {
-      name: ru ? 'Андрей П.' : 'Andrei P.',
-      online: ru ? 'Онлайн' : 'Online',
-      rating: '4,9',
-      reviews: ru ? '38 отзывов' : '38 recenzii',
-      praise: ru ? 'Быстро отвечает' : 'Răspunde rapid',
-      team: ru ? 'Работает сам' : 'Lucrează singur',
-      verified: ru ? 'Документы проверены' : 'Documente verificate',
-      qualification: ru
-        ? 'Выполняет сантехнические работы, сборку мебели и мелкий ремонт по дому.'
-        : 'Execută lucrări sanitare, asamblare mobilă și reparații mici în casă.',
-      location: ru ? 'Кишинёв, Центр' : 'Chișinău, Centru',
-      services: ru ? ['Сантехника', 'Мелкий ремонт', 'Сборка мебели'] : ['Instalații sanitare', 'Reparații mici', 'Asamblare mobilă'],
-      photos: [team5, team6, team3],
-      avatar: team2,
-    },
-    {
-      name: ru ? 'Михаил С.' : 'Mihai S.',
-      online: ru ? 'Был в сети вчера' : 'A fost online ieri',
-      rating: '4,8',
-      reviews: ru ? '71 отзыв' : '71 recenzii',
-      praise: ru ? 'Аккуратная работа' : 'Lucrează atent',
-      team: ru ? 'С напарником' : 'Cu partener',
-      verified: ru ? 'Профиль подтвержден' : 'Profil confirmat',
-      qualification: ru
-        ? 'Берет заказы по электрике, диагностике, установке розеток и светильников.'
-        : 'Preia comenzi de electricitate, diagnostică, instalare prize și corpuri de iluminat.',
-      location: ru ? 'Бельцы' : 'Bălți',
-      services: ru ? ['Электрика', 'Диагностика', 'Светильники'] : ['Electricitate', 'Diagnostică', 'Lămpi'],
-      photos: [team4, team1, team6],
-      avatar: team3,
-    },
-  ];
+  {
+    name: 'Дмитрий Е.',
+    online: 'Был в сети сегодня в 06:34',
+    rating: '5,0',
+    reviews: '52 отзыва',
+    praise: 'Очень хвалят',
+    team: 'С командой',
+    verified: 'Паспорт проверен',
+    qualification:
+    'Специалист сдал экзамен по услугам: малярные и штукатурные работы, поклейка обоев.',
+
+    location: 'Кишинёв, Ботаника',
+    services: ['Ремонт квартир', 'Покраска стен', 'Плитка', 'Штукатурка'],
+    photos: [team2, team3, team4],
+    avatar: team1 },
+
+  {
+    name: 'Андрей П.',
+    online: 'Онлайн',
+    rating: '4,9',
+    reviews: '38 отзывов',
+    praise: 'Быстро отвечает',
+    team: 'Работает сам',
+    verified: 'Документы проверены',
+    qualification:
+    'Выполняет сантехнические работы, сборку мебели и мелкий ремонт по дому.',
+
+    location: 'Кишинёв, Центр',
+    services: ['Сантехника', 'Мелкий ремонт', 'Сборка мебели'],
+    photos: [team5, team6, team3],
+    avatar: team2 },
+
+  {
+    name: 'Михаил С.',
+    online: 'Был в сети вчера',
+    rating: '4,8',
+    reviews: '71 отзыв',
+    praise: 'Аккуратная работа',
+    team: 'С напарником',
+    verified: 'Профиль подтвержден',
+    qualification:
+    'Берет заказы по электрике, диагностике, установке розеток и светильников.',
+
+    location: 'Бельцы',
+    services: ['Электрика', 'Диагностика', 'Светильники'],
+    photos: [team4, team1, team6],
+    avatar: team3 }];
+
+
 }
 
 function interpolate(template: string, values: Record<string, string | number>) {
@@ -128,14 +127,14 @@ function SmartImage({
   alt,
   className,
   width,
-  height,
-}: {
+  height }
+: {
   src: StaticImageData | string;
   alt: string;
   className: string;
   width: number;
-  height: number;
-}) {
+  height: number;})
+{
   if (typeof src === 'string') {
     return <img src={src} alt={alt} width={width} height={height} className={className} loading="lazy" />;
   }
@@ -143,7 +142,7 @@ function SmartImage({
   return <Image src={src} alt={alt} width={width} height={height} className={className} />;
 }
 
-function SpecialistCard({ specialist }: { specialist: Specialist }) {
+function SpecialistCard({ specialist }: {specialist: Specialist;}) {
   const router = useRouter();
   const text = getTreaboText(router.locale);
 
@@ -177,15 +176,15 @@ function SpecialistCard({ specialist }: { specialist: Specialist }) {
           </div>
 
           <div className="mt-5 flex flex-wrap gap-2">
-            {specialist.services.map((service) => (
-              <span key={service} className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-bold text-[#232323]">{service}</span>
-            ))}
+            {specialist.services.map((service) =>
+            <span key={service} className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-bold text-[#232323]">{service}</span>)}
+
           </div>
 
           <div className="mt-5 grid grid-cols-3 gap-2 sm:max-w-lg">
-            {specialist.photos.map((photo, index) => (
-              <SmartImage key={`${specialist.name}-${index}`} src={photo} alt={`${specialist.name} portfolio ${index + 1}`} width={180} height={120} className="h-24 w-full rounded-2xl object-cover" />
-            ))}
+            {specialist.photos.map((photo, index) =>
+            <SmartImage key={`${specialist.name}-${index}`} src={photo} alt={`${specialist.name} portfolio ${index + 1}`} width={180} height={120} className="h-24 w-full rounded-2xl object-cover" />)}
+
           </div>
         </div>
 
@@ -202,11 +201,11 @@ function SpecialistCard({ specialist }: { specialist: Specialist }) {
           </div>
         </aside>
       </div>
-    </article>
-  );
+    </article>);
+
 }
 
-export default function SpecialistsMarketplacePage({ specialists: apiSpecialists = [] }: { specialists?: TreaboSpecialist[] }) {
+export default function SpecialistsMarketplacePage({ specialists: apiSpecialists = [] }: {specialists?: TreaboSpecialist[];}) {
   const router = useRouter();
   const text = getTreaboText(router.locale);
   const specialists = buildSpecialists(router.locale, apiSpecialists);
@@ -251,19 +250,19 @@ export default function SpecialistsMarketplacePage({ specialists: apiSpecialists
                 <Filter className="h-5 w-5" />
               </div>
               <div className="space-y-5">
-                {text.specialists.filters.map((group) => (
-                  <div key={group.title} className="border-t border-zinc-100 pt-5 first:border-t-0 first:pt-0">
+                {text.specialists.filters.map((group) =>
+                <div key={group.title} className="border-t border-zinc-100 pt-5 first:border-t-0 first:pt-0">
                     <div className="mb-3 flex items-center justify-between font-black">
                       {group.title}
                       <ChevronDown className="h-4 w-4" />
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {group.options.map((option) => (
-                        <button key={option} className="rounded-full bg-zinc-100 px-3 py-2 text-xs font-bold text-[#232323]">{option}</button>
-                      ))}
+                      {group.options.map((option) =>
+                    <button key={option} className="rounded-full bg-zinc-100 px-3 py-2 text-xs font-bold text-[#232323]">{option}</button>)}
+
                     </div>
-                  </div>
-                ))}
+                  </div>)}
+
               </div>
               <button className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl border border-zinc-300 bg-white px-5 py-3 font-black">
                 <Map className="h-4 w-4" />
@@ -288,6 +287,6 @@ export default function SpecialistsMarketplacePage({ specialists: apiSpecialists
         </section>
       </main>
       <ProffiFooter />
-    </div>
-  );
+    </div>);
+
 }

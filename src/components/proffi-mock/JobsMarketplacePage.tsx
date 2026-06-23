@@ -18,7 +18,7 @@ import TreaboTasksMapModal from '@/components/treabo/TreaboTasksMapModal';
 import type { TreaboCategory, TreaboTask, TreaboTaskFilters } from '@/data/treabo';
 import routes from '@/config/routes';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
-import { getTreaboText, treaboLocale } from '@/lib/treabo/i18n';
+import { getTreaboText } from '@/lib/treabo/i18n';
 import { jobCards } from './mock-data';
 import { ProffiFooter, ProffiHeader } from './ProffiShell';
 
@@ -48,11 +48,9 @@ function interpolate(template: string, values: Record<string, string | number>) 
   return Object.entries(values).reduce((result, [key, value]) => result.replaceAll(`{{${key}}}`, String(value)), template);
 }
 
-function categoryName(category: TreaboCategory | undefined, locale: string) {
+function categoryName(category: TreaboCategory | undefined, _locale: string) {
   if (!category) return null;
-  return treaboLocale(locale) === 'ro'
-    ? category.name_ro || category.name_ru
-    : category.name_ru || category.name_ro;
+  return category.name_ru;
 }
 
 function mapTaskToCard(task: TreaboTask, categories: TreaboCategory[], locale: string): UiJobCard {
@@ -85,9 +83,9 @@ function mapTaskToCard(task: TreaboTask, categories: TreaboCategory[], locale: s
   };
 }
 
-function buildJobCards(tasks: TreaboTask[], categories: TreaboCategory[], locale: string) {
+function buildJobCards(tasks: TreaboTask[], categories: TreaboCategory[], locale: string): UiJobCard[] {
   if (!tasks.length) {
-    return jobCards.map((card, index) => ({ ...card, id: `mock-${index + 1}`, photos: [] }));
+    return jobCards.map((card, index) => ({ ...card, id: `mock-${index + 1}`, photos: [], task: undefined }));
   }
 
   return tasks.slice(0, 100).map((task) => mapTaskToCard(task, categories, locale));
@@ -119,14 +117,12 @@ export default function JobsMarketplacePage({
     ...initialFilters,
   });
 
-  const visibleJobs = useMemo(() => buildJobCards(tasks, categories, router.locale || 'ro'), [tasks, categories, router.locale]);
+  const visibleJobs = useMemo(() => buildJobCards(tasks, categories, 'ru'), [tasks, categories]);
   const availableCount = tasks.length || visibleJobs.length;
-  const quickTags = router.locale === 'ru'
-    ? ['срочно', 'с фото', 'рядом с домом', 'ремонт', 'плитка', 'сантехника', 'электрика']
-    : ['urgent', 'cu fotografii', 'aproape', 'reparații', 'gresie', 'sanitare', 'electricitate'];
+  const quickTags = ['срочно', 'с фото', 'рядом с домом', 'ремонт', 'плитка', 'сантехника', 'электрика'];
 
   const categoryOptions = categories.length
-    ? categories.map((item) => ({ id: item.id, label: categoryName(item, router.locale || 'ro') || item.slug || item.id }))
+    ? categories.map((item) => ({ id: item.id, label: categoryName(item, 'ru') || item.slug || item.id }))
     : [];
 
   function applyFilters(next: TreaboTaskFilters) {
@@ -158,7 +154,7 @@ export default function JobsMarketplacePage({
       return;
     }
     if (preset === first[2]) {
-      setFilters((current) => ({ ...current, q: router.locale === 'ru' ? 'срочно' : 'urgent' }));
+      setFilters((current) => ({ ...current, q: 'срочно' }));
     }
   }
 

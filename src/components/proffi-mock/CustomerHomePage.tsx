@@ -55,7 +55,7 @@ function buildCategories(
   }
 
   return categories.slice(0, 8).map((category) => ({
-    title: locale === 'ro' ? category.name_ro || category.name_ru : category.name_ru,
+    title: category.name_ru,
     count: 'Treabo',
     icon: categoryIcons[category.icon || ''] || Wrench,
   }));
@@ -72,7 +72,7 @@ export default function CustomerHomePage({ categories = [], tasks = [] }: Custom
   const localizedSpecialists = asArray<{ name: string; role: string; reviews: string; price: string; tags: string[] }>(t('treabo.home.specialists', { returnObjects: true }), []);
   const visibleCategories = buildCategories(categories, router.locale, fallbackCategories);
   const visibleSearches = categories.length
-    ? categories.slice(0, 8).map((category) => (router.locale === 'ro' ? category.name_ro || category.name_ru : category.name_ru))
+    ? categories.slice(0, 8).map((category) => category.name_ru)
     : fallbackSearches;
   const openTasksCount = tasks.length || 248;
   const firstTask = tasks[0];

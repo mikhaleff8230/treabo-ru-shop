@@ -23,7 +23,7 @@ export default function TreaboLocationSelector() {
   const [results, setResults] = useState<MoldovaLocation[]>([]);
   const [selected, setSelected] = useState<MoldovaLocation>(() => getMoldovaLocationById('chisinau'));
 
-  const locale = router.locale === 'ru' ? 'ru' : 'ro';
+  const locale = 'ru' as const;
   const selectedName = getLocationDisplayName(selected, locale);
 
   useEffect(() => {
@@ -111,7 +111,7 @@ export default function TreaboLocationSelector() {
                 onChange={(event) => setQuery(event.target.value)}
                 autoFocus
                 className="w-full bg-transparent text-sm font-semibold text-[#232323] outline-none placeholder:text-[#7d849b]"
-                placeholder={locale === 'ro' ? 'Oraș sau localitate' : 'Город или населенный пункт'}
+                placeholder="Город или населенный пункт"
               />
               {query ? (
                 <button type="button" onClick={() => setQuery('')} className="rounded-full p-1 hover:bg-zinc-100">
@@ -125,13 +125,13 @@ export default function TreaboLocationSelector() {
             {loading ? (
               <div className="flex items-center justify-center gap-2 px-3 py-8 text-sm font-semibold text-[#7d849b]">
                 <Loader2 className="h-4 w-4 animate-spin" />
-                {locale === 'ro' ? 'Se caută...' : 'Поиск...'}
+                Поиск...
               </div>
             ) : null}
 
             {!loading && visibleResults.length === 0 ? (
               <div className="px-3 py-8 text-center text-sm font-semibold text-[#7d849b]">
-                {locale === 'ro' ? 'Nimic găsit' : 'Ничего не найдено'}
+                Ничего не найдено
               </div>
             ) : null}
 
@@ -140,7 +140,7 @@ export default function TreaboLocationSelector() {
                   const active = String(location.id) === String(selected.id);
                   return (
                     <button
-                      key={`${location.id}-${location.cuatm_code || location.name_ro}`}
+                      key={`${location.id}-${location.cuatm_code || location.name_ru}`}
                       type="button"
                       onClick={() => selectLocation(location)}
                       className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition hover:bg-[#f5f6f1]"
@@ -153,7 +153,7 @@ export default function TreaboLocationSelector() {
                           {getLocationDisplayName(location, locale)}
                         </span>
                         <span className="block truncate text-xs font-semibold text-[#7d849b]">
-                          {locale === 'ro' ? location.district_ro : location.district_ru}
+                          {location.district_ru}
                         </span>
                       </span>
                       {active ? <Check className="h-4 w-4 shrink-0" /> : null}
@@ -164,9 +164,7 @@ export default function TreaboLocationSelector() {
           </div>
 
           <div className="border-t border-zinc-100 px-4 py-3 text-xs font-semibold leading-5 text-[#7d849b]">
-            {locale === 'ro'
-              ? 'Sursa: API Moldova/CUATM. Dacă backend-ul nu răspunde, folosim fallback local.'
-              : 'Источник: API Moldova/CUATM. Если backend недоступен, используем локальный fallback.'}
+            Источник: API Moldova/CUATM. Если backend недоступен, используем локальный fallback.
           </div>
         </div>
       ) : null}

@@ -18,7 +18,6 @@ import { useDynamicHeader } from '@/lib/hooks/use-dynamic-header';
 import { useModalAction } from '@/components/modal-views/context';
 import { useDrawer } from '@/components/drawer-views/context';
 import Button from '@/components/ui/button';
-import LanguageSwitcher from '@/components/ui/language-switcher';
 import { LayoutGrid } from 'lucide-react';
 import { useTranslation } from 'next-i18next';
 import DropdownCategoriesMenu from '@/components/menu/dropdown-categories-menu';
@@ -153,9 +152,6 @@ export default function Header({
   
   // Проверяем, находимся ли мы на странице товара
   const isProductPage = asPath?.startsWith('/element/');
-  const isMultiLangEnable =
-    process.env.NEXT_PUBLIC_ENABLE_MULTI_LANG === 'true' &&
-    !!process.env.NEXT_PUBLIC_AVAILABLE_LANGUAGES;
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Функция для открытия мобильного меню (сайдбара)
@@ -241,13 +237,6 @@ export default function Header({
               <ThemeSwitcher />
               {asPath !== routes.checkout && (
                 <CartButton className="hidden sm:flex" />
-              )}
-              {isMultiLangEnable ? (
-                <div className="ltr:ml-auto rtl:mr-auto">
-                  <LanguageSwitcher />
-                </div>
-              ) : (
-                ''
               )}
               <button
                 onClick={() => setIsModalOpen(true)}

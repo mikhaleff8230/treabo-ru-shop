@@ -14,7 +14,6 @@ import {
   Send,
   UserRound,
 } from 'lucide-react';
-import { TreaboLanguageSwitcher } from '@/components/proffi-mock/TreaboLanguageSwitcher';
 import routes from '@/config/routes';
 import { createTreaboTask, uploadTreaboFile, type TreaboUpload } from '@/data/treabo';
 import { getStoredTreaboToken } from '@/data/treabo-auth';
@@ -60,40 +59,32 @@ function treaboApiUrl(path: string) {
   return `/api/treabo/${path.replace(/^\//, '')}`;
 }
 
-function generateLocalAiDraft(text: string, locale?: string): AiDraft {
+function generateLocalAiDraft(text: string, _locale?: string): AiDraft {
   const normalized = text.toLowerCase();
-  const isRo = locale !== 'ru';
-  const hasBath = /ванн|сануз|baie|baia|duș|dus/.test(normalized);
-  const hasTile = /плит|gresie|faian/.test(normalized);
-  const isUrgent = /сроч|urgent|azi|сегодня/.test(normalized);
-  const city = /кишин|chisin|chișin|кишинэ/.test(normalized) ? 'Chișinău' : null;
+  const hasBath = /ванн|сануз|душ/.test(normalized);
+  const hasTile = /плит/.test(normalized);
+  const isUrgent = /сроч|сегодня/.test(normalized);
+  const city = /кишин/.test(normalized) ? 'Кишинёв' : null;
   const category = hasBath ? 'bathroom-renovation' : hasTile ? 'tile-work' : 'other';
 
   return {
-    detected_language: isRo ? 'ro' : 'ru',
-    title: isRo
-      ? hasBath
-        ? 'Reparație baie'
-        : hasTile
-          ? 'Lucrări de faianță și gresie'
-          : 'Cerere pentru specialist'
-      : hasBath
-        ? 'Ремонт ванной комнаты'
-        : hasTile
-          ? 'Плиточные работы'
-          : 'Заявка для специалиста',
+    detected_language: 'ru',
+    title: hasBath
+      ? 'Ремонт ванной комнаты'
+      : hasTile
+        ? 'Плиточные работы'
+        : 'Заявка для специалиста',
     category_slug: category,
     city,
     urgency: isUrgent ? 'urgent' : 'unknown',
-    description: isRo
-      ? `Clientul a descris sarcina astfel: ${text}. Sunt necesare detalii suplimentare pentru estimarea prețului și termenului.`
-      : `Клиент описал задачу так: ${text}. Нужны дополнительные детали для оценки стоимости и сроков.`,
-    master_summary: isRo
-      ? `${hasBath ? 'Baie' : hasTile ? 'Faianță/gresie' : 'Lucrare'}, ${isUrgent ? 'urgent' : 'termen de precizat'}${city ? `, ${city}` : ''}.`
-      : `${hasBath ? 'Ванная' : hasTile ? 'Плитка' : 'Работа'}, ${isUrgent ? 'срочно' : 'срок уточнить'}${city ? `, ${city}` : ''}.`,
-    missing_questions: isRo
-      ? ['Care este suprafața lucrării?', 'Există fotografii?', 'Materialele sunt cumpărate?', 'Când poate veni specialistul la măsurare?']
-      : ['Какая площадь работ?', 'Есть ли фотографии?', 'Материалы уже куплены?', 'Когда специалист может приехать на осмотр?'],
+    description: `Клиент описал задачу так: ${text}. Нужны дополнительные детали для оценки стоимости и сроков.`,
+    master_summary: `${hasBath ? 'Ванная' : hasTile ? 'Плитка' : 'Работа'}, ${isUrgent ? 'срочно' : 'срок уточнить'}${city ? `, ${city}` : ''}.`,
+    missing_questions: [
+      'Какая площадь работ?',
+      'Есть ли фотографии?',
+      'Материалы уже куплены?',
+      'Когда специалист может приехать на осмотр?',
+    ],
     confidence: 0.55,
   };
 }
@@ -277,7 +268,7 @@ export default function RequestWizard() {
           text: prompt,
           city_hint: text.city,
           category_hint: null,
-          language_hint: router.locale === 'ru' ? 'ru' : 'ro',
+          language_hint: 'ru',
         }),
       });
       clearTimeout(timeout);
@@ -501,7 +492,6 @@ export default function RequestWizard() {
           <span className="hidden md:inline">{text.city}</span>
           <Link href={routes.works} className="hidden md:inline">{text.request.specialistSite}</Link>
           <span className="hidden md:inline">{text.request.login}</span>
-          <TreaboLanguageSwitcher />
         </div>
       </header>
 

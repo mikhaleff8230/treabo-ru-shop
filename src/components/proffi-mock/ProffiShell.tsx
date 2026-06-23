@@ -7,7 +7,6 @@ import TreaboLocationSelector from '@/components/treabo/TreaboLocationSelector';
 import routes from '@/config/routes';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
 import { getTreaboText } from '@/lib/treabo/i18n';
-import { TreaboLanguageSwitcher } from './TreaboLanguageSwitcher';
 
 export function ProffiHeader() {
   const router = useRouter();
@@ -51,7 +50,6 @@ export function ProffiHeader() {
             <div className="block lg:hidden">
               <TreaboLocationSelector />
             </div>
-            <TreaboLanguageSwitcher />
             <Link
               href="/request/new"
               className="hidden rounded-full bg-[#d9f36b] px-4 py-2 text-sm font-semibold text-[#232323] shadow-[0_10px_22px_rgba(132,204,22,0.18)] transition hover:bg-[#c7e85a] sm:inline-flex"
@@ -159,9 +157,7 @@ export function ProffiFooter() {
             <span className="text-xl font-black tracking-tight text-[#232323]">Treabo</span>
           </div>
           <p className="max-w-sm text-sm leading-6 text-[#232323]">
-            {router.locale === 'ru'
-              ? 'Treabo соединяет клиентов и специалистов: заявки, отклики, чаты и заказы в одном месте.'
-              : 'Treabo conectează clienții și specialiștii: cereri, oferte, chat-uri și comenzi într-un singur loc.'}
+            Treabo соединяет клиентов и специалистов: заявки, отклики, чаты и заказы в одном месте.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-6 text-sm sm:grid-cols-4">

@@ -171,7 +171,7 @@ function buildTaskJsonLd(task: TreaboTask, seo: ReturnType<typeof buildTaskSeo>,
 
 function formatDate(value?: string | null, locale?: string) {
   if (!value) return getTreaboText(locale).common.noDate;
-  return new Date(value).toLocaleString(locale === 'ru' ? 'ru-RU' : 'ro-RO', {
+  return new Date(value).toLocaleString('ru-RU', {
     day: 'numeric',
     month: 'long',
     hour: '2-digit',
