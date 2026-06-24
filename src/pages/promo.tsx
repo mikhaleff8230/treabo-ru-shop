@@ -9,7 +9,7 @@ const PromoPage: NextPageWithLayout = () => {
   return (
     <>
       <TitleSeo 
-        title="SANCAN Seller - Стань продавцом" 
+        title="Treabo Seller - Стань продавцом" 
         description="Начните бизнес на Sancan с бесплатной регистрацией. Мы создаём среду, в которой бренды, производители и селлеры получают больше, чем просто витрину товаров."
       />
       <div className="min-h-screen bg-white dark:bg-dark-100">
@@ -18,10 +18,10 @@ const PromoPage: NextPageWithLayout = () => {
           <div className="container mx-auto px-4 py-4 flex items-center justify-between">
             <div className="flex items-center gap-8">
               <h2 className="text-2xl font-bold text-light dark:text-light">
-                SANCAN <span className="font-light">seller</span>
+                Treabo <span className="font-light">seller</span>
               </h2>
               <nav className="hidden md:flex items-center gap-6">
-			    <a href="https://treabo.md" className="text-sm text-light/80 hover:text-light transition-colors">Маркетплейс SANCAN.RU</a>
+			    <a href="https://treabo.ru" className="text-sm text-light/80 hover:text-light transition-colors">Маркетплейс Treabo.ru</a>
                 <a href="https://treabo.md/marketplace" className="text-sm text-light/80 hover:text-light transition-colors">О проекте</a>
                 <a href="https://treabo.md/earn" className="text-sm text-light/80 hover:text-light transition-colors">Зарабатывать с Sancan</a>
                 <a href="#" className="text-sm text-light/80 hover:text-light transition-colors">Что продавать</a>
@@ -400,7 +400,7 @@ const PromoPage: NextPageWithLayout = () => {
         <footer className="bg-dark-100 dark:bg-dark-200 border-t border-light-500 dark:border-dark-600 py-12">
           <div className="container mx-auto px-4">
             <div className="text-center space-y-4">
-              <h3 className="text-2xl font-bold text-light dark:text-light">Проект SANCAN.RU</h3>
+              <h3 className="text-2xl font-bold text-light dark:text-light">Проект Treabo.ru</h3>
               <p className="text-light/70 dark:text-light/70 max-w-2xl mx-auto">
                 Медиа-платформа для продвижения оригинальных товаров и брендов.
               </p>

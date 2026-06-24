@@ -49,7 +49,7 @@ const FeedPage: NextPageWithLayout<FeedPageProps> = ({ initialPlaces, initialPag
 
   return (
     <>
-      <TitleSeo title={isAuthorized ? 'Мои избранные плейсы - SANCAN' : 'Фид плейсов - SANCAN'} />
+      <TitleSeo title={isAuthorized ? 'Мои избранные плейсы - Treabo' : 'Фид плейсов - Treabo'} />
       
       <div className="container mx-auto">
         <div className="mb-8 text-center">

@@ -1,16 +1,16 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import {
+  ArrowRight,
   ArrowUpDown,
+  Bookmark,
   CalendarClock,
-  ChevronDown,
   Filter,
   Info,
   Map,
   MapPin,
   Paintbrush,
-  SlidersHorizontal,
   Wrench,
 } from 'lucide-react';
 import TreaboAuthModal from '@/components/auth/treabo-auth-modal';
@@ -20,6 +20,14 @@ import routes from '@/config/routes';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
 import { getTreaboText } from '@/lib/treabo/i18n';
 import { jobCards } from './mock-data';
+import {
+  MarketplaceFilterGroup,
+  MarketplaceFilterOption,
+  MarketplaceFilterSidebar,
+  MarketplaceMobileFiltersDrawer,
+  MarketplaceResultsBar,
+  marketplace,
+} from './marketplace-ui';
 import { ProffiFooter, ProffiHeader } from './ProffiShell';
 
 type JobsMarketplacePageProps = {
@@ -48,9 +56,8 @@ function interpolate(template: string, values: Record<string, string | number>) 
   return Object.entries(values).reduce((result, [key, value]) => result.replaceAll(`{{${key}}}`, String(value)), template);
 }
 
-function categoryName(category: TreaboCategory | undefined, _locale: string) {
-  if (!category) return null;
-  return category.name_ru;
+function categoryName(category: TreaboCategory | undefined) {
+  return category?.name_ru ?? null;
 }
 
 function mapTaskToCard(task: TreaboTask, categories: TreaboCategory[], locale: string): UiJobCard {
@@ -58,7 +65,7 @@ function mapTaskToCard(task: TreaboTask, categories: TreaboCategory[], locale: s
   const category = categories.find(
     (item) => item.id === task.category_id || item.id === task.category || item.slug === task.category,
   );
-  const categoryLabel = categoryName(category, locale) || text.works.taskTag;
+  const categoryLabel = categoryName(category) || text.works.taskTag;
   const budget = Number(task.budget || 0);
 
   return {
@@ -73,7 +80,7 @@ function mapTaskToCard(task: TreaboTask, categories: TreaboCategory[], locale: s
       categoryLabel,
       task.photos?.length ? text.works.objectPhoto : text.works.clarifyDetails,
       task.updated_at ? text.works.updatedRecently : text.works.new,
-    ],
+    ].filter(Boolean) as string[],
     icon: category?.icon === 'Wrench' ? Wrench : Paintbrush,
     photos: (task.photos || [])
       .map((photo) => (typeof photo === 'string' ? photo : photo.url || photo.path || ''))
@@ -87,7 +94,6 @@ function buildJobCards(tasks: TreaboTask[], categories: TreaboCategory[], locale
   if (!tasks.length) {
     return jobCards.map((card, index) => ({ ...card, id: `mock-${index + 1}`, photos: [], task: undefined }));
   }
-
   return tasks.slice(0, 100).map((task) => mapTaskToCard(task, categories, locale));
 }
 
@@ -102,6 +108,195 @@ function buildQuery(filters: TreaboTaskFilters) {
   return params.toString();
 }
 
+function JobCard({
+  job,
+  task,
+  Icon,
+  text,
+  auth,
+  onAuthOpen,
+}: {
+  job: Omit<UiJobCard, 'icon' | 'task'>;
+  task?: TreaboTask;
+  Icon: typeof Wrench;
+  text: ReturnType<typeof getTreaboText>;
+  auth: ReturnType<typeof useTreaboAuth>;
+  onAuthOpen: () => void;
+}) {
+  const [saved, setSaved] = useState(false);
+
+  return (
+    <article className={marketplace.card}>
+      <div className="grid xl:grid-cols-[minmax(0,1fr)_320px]">
+        <div className="p-6 sm:p-7 xl:p-8">
+          <div className="flex gap-4 sm:gap-5">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] bg-[#D9F36B] sm:h-16 sm:w-16 xl:h-[72px] xl:w-[72px] xl:rounded-[24px]">
+              <Icon className="h-7 w-7 text-[#232323] xl:h-8 xl:w-8" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <div className="text-xs font-semibold uppercase tracking-wide text-[#777D88]">{job.brand}</div>
+              <h3 className="mt-1 break-words text-[22px] font-bold leading-tight text-[#232323] sm:text-[26px] xl:text-[30px]">
+                {job.title}
+              </h3>
+              <div className="mt-3 flex flex-col gap-2 text-sm text-[#777D88] sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
+                <span className="inline-flex items-center gap-2">
+                  <MapPin className="h-[18px] w-[18px] shrink-0" />
+                  <span className="break-words">{job.location}</span>
+                </span>
+                <span className="inline-flex items-center gap-2">
+                  <CalendarClock className="h-[18px] w-[18px] shrink-0" />
+                  {job.time}
+                </span>
+              </div>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {job.tags.map((tag) => (
+                  <span key={tag} className={marketplace.chip}>
+                    {tag}
+                  </span>
+                ))}
+              </div>
+              {job.photos.length ? (
+                <div className="mt-4 flex gap-2 overflow-x-auto">
+                  {job.photos.map((photo, index) => (
+                    <img
+                      key={`${job.id}-photo-${index}`}
+                      src={photo}
+                      alt={`${job.title} ${index + 1}`}
+                      className="h-16 w-24 shrink-0 rounded-xl object-cover sm:h-20 sm:w-28"
+                      loading="lazy"
+                    />
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col border-[#E7E9EC] p-6 sm:p-7 xl:border-l xl:p-8">
+          <div className="text-sm text-[#777D88]">{job.duration}</div>
+          <div className="mt-1 text-[32px] font-bold leading-none text-[#232323] sm:text-[36px]">{job.pay}</div>
+          <div className="mt-5 flex gap-2">
+            {auth.isSpecialist ? (
+              <button
+                type="button"
+                className="inline-flex min-h-[54px] flex-1 items-center justify-center gap-2 rounded-[18px] bg-[#D9F36B] px-5 text-sm font-semibold text-[#232323] transition hover:bg-[#c7e85a]"
+              >
+                {text.works.apply}
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            ) : auth.isAuthenticated ? null : (
+              <button
+                type="button"
+                onClick={onAuthOpen}
+                className="inline-flex min-h-[54px] flex-1 items-center justify-center gap-2 rounded-[18px] bg-[#D9F36B] px-5 text-sm font-semibold text-[#232323] transition hover:bg-[#c7e85a]"
+              >
+                {text.works.loginAndApply}
+                <ArrowRight className="h-4 w-4" />
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => setSaved((v) => !v)}
+              aria-pressed={saved}
+              className={`flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-[18px] border bg-white transition ${
+                saved ? 'border-[#D9F36B] text-[#232323]' : 'border-[#E7E9EC] text-[#777D88]'
+              }`}
+            >
+              <Bookmark className={`h-5 w-5 ${saved ? 'fill-[#232323]' : ''}`} />
+            </button>
+          </div>
+          <Link
+            href={routes.taskUrl(task || { id: job.id, title: job.title })}
+            className="mt-3 inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[18px] border border-[#E7E9EC] bg-white text-sm font-semibold text-[#232323] transition hover:bg-[#FAFAFA]"
+          >
+            <Info className="h-4 w-4" />
+            {text.common.more}
+          </Link>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function WorksFiltersPanel({
+  text,
+  filters,
+  setFilters,
+  categoryOptions,
+  openSections,
+  toggleSection,
+  toggleCategory,
+  toggleBudgetPreset,
+  isBudgetSelected,
+}: {
+  text: ReturnType<typeof getTreaboText>;
+  filters: TreaboTaskFilters;
+  setFilters: Dispatch<SetStateAction<TreaboTaskFilters>>;
+  categoryOptions: { id: string; label: string }[];
+  openSections: Set<string>;
+  toggleSection: (key: string) => void;
+  toggleCategory: (id: string) => void;
+  toggleBudgetPreset: (preset: string) => void;
+  isBudgetSelected: (option: string) => boolean;
+}) {
+  return (
+    <>
+      {categoryOptions.length ? (
+        <MarketplaceFilterGroup
+          title={text.common.category}
+          open={openSections.has('category')}
+          onToggle={() => toggleSection('category')}
+        >
+          <div className="flex flex-wrap gap-2">
+            {categoryOptions.map((option) => (
+              <MarketplaceFilterOption
+                key={option.id}
+                label={option.label}
+                type="chip"
+                selected={filters.category_id === option.id}
+                onClick={() => toggleCategory(option.id)}
+              />
+            ))}
+          </div>
+        </MarketplaceFilterGroup>
+      ) : null}
+
+      <MarketplaceFilterGroup
+        title={text.common.city}
+        open={openSections.has('city')}
+        onToggle={() => toggleSection('city')}
+      >
+        <input
+          className="w-full rounded-xl border border-[#E7E9EC] px-4 py-3 text-sm text-[#232323] outline-none focus:border-[#D9F36B]"
+          value={filters.city || ''}
+          onChange={(event) => setFilters((current) => ({ ...current, city: event.target.value }))}
+          placeholder={text.city}
+        />
+      </MarketplaceFilterGroup>
+
+      {text.works.filters.map((group) => (
+        <MarketplaceFilterGroup
+          key={group.title}
+          title={group.title}
+          open={openSections.has(group.title)}
+          onToggle={() => toggleSection(group.title)}
+        >
+          {group.options.map((option) => (
+            <MarketplaceFilterOption
+              key={option}
+              label={option}
+              selected={group.title === text.works.filters[0].title ? isBudgetSelected(option) : false}
+              onClick={() => {
+                if (group.title === text.works.filters[0].title) toggleBudgetPreset(option);
+              }}
+            />
+          ))}
+        </MarketplaceFilterGroup>
+      ))}
+    </>
+  );
+}
+
 export default function JobsMarketplacePage({
   categories = [],
   tasks = [],
@@ -112,6 +307,10 @@ export default function JobsMarketplacePage({
   const auth = useTreaboAuth();
   const [authOpen, setAuthOpen] = useState(false);
   const [mapOpen, setMapOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [openSections, setOpenSections] = useState<Set<string>>(
+    () => new Set(['category', 'city', text.works.filters[0]?.title]),
+  );
   const [filters, setFilters] = useState<TreaboTaskFilters>({
     city: initialFilters.city || text.city,
     ...initialFilters,
@@ -122,7 +321,7 @@ export default function JobsMarketplacePage({
   const quickTags = ['срочно', 'с фото', 'рядом с домом', 'ремонт', 'плитка', 'сантехника', 'электрика'];
 
   const categoryOptions = categories.length
-    ? categories.map((item) => ({ id: item.id, label: categoryName(item, 'ru') || item.slug || item.id }))
+    ? categories.map((item) => ({ id: item.id, label: categoryName(item) || item.slug || item.id }))
     : [];
 
   function applyFilters(next: TreaboTaskFilters) {
@@ -146,11 +345,11 @@ export default function JobsMarketplacePage({
   function toggleBudgetPreset(preset: string) {
     const first = text.works.filters[0].options;
     if (preset === first[0]) {
-      setFilters((current) => ({ ...current, budget_min: undefined, budget_max: undefined }));
+      setFilters((current) => ({ ...current, budget_min: undefined, budget_max: undefined, q: undefined }));
       return;
     }
     if (preset === first[1]) {
-      setFilters((current) => ({ ...current, budget_min: 5000, budget_max: undefined }));
+      setFilters((current) => ({ ...current, budget_min: 5000, budget_max: undefined, q: undefined }));
       return;
     }
     if (preset === first[2]) {
@@ -158,233 +357,173 @@ export default function JobsMarketplacePage({
     }
   }
 
+  function isBudgetSelected(option: string) {
+    const first = text.works.filters[0].options;
+    if (option === first[0]) return filters.budget_min == null && filters.budget_max == null && !filters.q;
+    if (option === first[1]) return filters.budget_min === 5000;
+    if (option === first[2]) return filters.q === 'срочно';
+    return false;
+  }
+
+  function toggleSection(key: string) {
+    setOpenSections((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }
+
+  const filtersPanel = (
+    <WorksFiltersPanel
+      text={text}
+      filters={filters}
+      setFilters={setFilters}
+      categoryOptions={categoryOptions}
+      openSections={openSections}
+      toggleSection={toggleSection}
+      toggleCategory={toggleCategory}
+      toggleBudgetPreset={toggleBudgetPreset}
+      isBudgetSelected={isBudgetSelected}
+    />
+  );
+
   return (
-    <div className="min-h-screen max-w-full overflow-x-hidden bg-[#f5f6f1] text-[#232323]" style={{ width: '100vw' }}>
+    <div className={`min-h-screen max-w-full overflow-x-hidden ${marketplace.pageBg} ${marketplace.text}`}>
       <ProffiHeader />
       <main className="overflow-hidden">
-        <section className="border-b border-zinc-200 bg-white">
-          <div className="mx-auto max-w-7xl px-4 py-4 sm:px-6 lg:px-8">
-            <div className="flex flex-col gap-3 text-sm text-[#232323] md:flex-row md:items-center md:justify-between">
+        <section className="border-b border-[#E7E9EC] bg-white">
+          <div className={`mx-auto ${marketplace.maxWidth} px-4 py-4 sm:px-6 lg:px-8`}>
+            <div className="flex flex-col gap-3 text-sm text-[#777D88] md:flex-row md:items-center md:justify-between">
               <div className="flex flex-wrap items-center gap-2">
-                <Link href="/" className="hover:opacity-75">{text.common.home}</Link>
+                <Link href="/" className="hover:text-[#232323]">
+                  {text.common.home}
+                </Link>
                 <span>/</span>
                 <span>{filters.city || text.city}</span>
                 <span>/</span>
-                <span>{text.common.allTasks}</span>
+                <span className="text-[#232323]">{text.common.allTasks}</span>
               </div>
-              <span className="inline-flex items-center gap-1 font-semibold text-[#232323]">
+              <span className="inline-flex items-center gap-1 font-medium text-[#232323]">
                 <MapPin className="h-4 w-4" /> {filters.city || text.city}
               </span>
             </div>
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-          <div className="mb-7 grid gap-5 lg:grid-cols-[1fr_360px] lg:items-end">
-            <div className="min-w-0" style={{ width: 'min(100%, calc(100vw - 2rem))' }}>
-              <h1 className="max-w-full break-words text-[34px] font-black leading-[1.05] sm:text-5xl">
+        <section className={`mx-auto ${marketplace.maxWidth} px-4 py-8 sm:px-6 lg:px-8`}>
+          <div className="mb-8 grid gap-5 lg:grid-cols-[1fr_320px] lg:items-end">
+            <div className="min-w-0">
+              <h1 className="break-words text-[34px] font-bold leading-[1.05] text-[#232323] sm:text-[44px]">
                 {interpolate(text.works.title, { city: filters.city || text.city })}
               </h1>
-              <p className="mt-3 max-w-3xl text-base leading-7 text-[#232323]">{text.works.subtitle}</p>
+              <p className="mt-3 max-w-3xl text-base leading-7 text-[#777D88]">{text.works.subtitle}</p>
             </div>
-            <div className="rounded-[28px] border border-zinc-200 bg-[#d9f36b] p-5 text-[#232323] shadow-sm">
-              <div className="text-sm font-semibold text-[#232323]">{text.works.availableToday}</div>
-              <div className="mt-1 text-3xl font-black text-[#232323]">{interpolate(text.works.tasksCount, { count: availableCount })}</div>
-              <div className="mt-3 flex items-center gap-2 text-sm font-semibold text-[#232323]">
+            <div className="rounded-[28px] border border-[#E7E9EC] bg-[#D9F36B] p-5 text-[#232323]">
+              <div className="text-sm font-semibold">{text.works.availableToday}</div>
+              <div className="mt-1 text-3xl font-bold">{interpolate(text.works.tasksCount, { count: availableCount })}</div>
+              <div className="mt-3 flex items-center gap-2 text-sm font-medium">
                 <CalendarClock className="h-4 w-4" />
                 {text.works.responsesAfterLogin}
               </div>
             </div>
           </div>
 
-          <div className="sticky top-16 z-30 -mx-4 mb-4 border-y border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
+          <div className="sticky top-16 z-30 -mx-4 mb-5 border-y border-[#E7E9EC] bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
             <div className="flex gap-2 overflow-x-auto">
-              <button type="button" className="inline-flex shrink-0 items-center gap-2 rounded-full bg-zinc-950 px-4 py-2.5 text-sm font-bold text-white">
+              <button
+                type="button"
+                onClick={() => setFiltersOpen(true)}
+                className="inline-flex shrink-0 items-center gap-2 rounded-full bg-[#232323] px-4 py-2.5 text-sm font-semibold text-white"
+              >
                 <Filter className="h-4 w-4" />
                 {text.common.filters}
               </button>
-              <button type="button" onClick={() => setMapOpen(true)} className="inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 px-4 py-2.5 text-sm font-bold">
+              <button
+                type="button"
+                onClick={() => setMapOpen(true)}
+                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[#E7E9EC] bg-white px-4 py-2.5 text-sm font-semibold"
+              >
                 <Map className="h-4 w-4" />
                 {text.common.map}
               </button>
-              <button type="button" className="inline-flex shrink-0 items-center gap-2 rounded-full border border-zinc-300 px-4 py-2.5 text-sm font-bold">
+              <button
+                type="button"
+                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[#E7E9EC] bg-white px-4 py-2.5 text-sm font-semibold"
+              >
                 <ArrowUpDown className="h-4 w-4" />
                 {text.common.sort}
               </button>
             </div>
           </div>
 
-          <div className="grid gap-6 lg:grid-cols-[310px_minmax(0,1fr)]">
+          <div className="grid gap-6 lg:grid-cols-[290px_minmax(0,1fr)]">
             <aside className="hidden lg:block">
-              <div className="sticky top-24 rounded-[30px] border border-zinc-200 bg-white p-5 shadow-sm">
-                <div className="mb-5 flex items-center justify-between">
-                  <h2 className="text-xl font-black">{text.common.filters}</h2>
-                  <button type="button" onClick={resetFilters} className="text-sm font-bold text-[#232323]">
-                    {text.common.reset}
-                  </button>
-                </div>
-
-                <div className="space-y-5">
-                  {categoryOptions.length ? (
-                    <div className="border-t border-zinc-100 pt-5 first:border-t-0 first:pt-0">
-                      <div className="mb-3 font-black">{text.common.category}</div>
-                      <div className="flex flex-wrap gap-2">
-                        {categoryOptions.map((option) => (
-                          <button
-                            key={option.id}
-                            type="button"
-                            onClick={() => toggleCategory(option.id)}
-                            className={`rounded-full px-3 py-2 text-xs font-bold transition ${
-                              filters.category_id === option.id
-                                ? 'bg-zinc-950 text-white'
-                                : 'bg-zinc-100 text-[#232323] hover:bg-zinc-950 hover:text-white'
-                            }`}
-                          >
-                            {option.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  <div className="border-t border-zinc-100 pt-5">
-                    <div className="mb-3 font-black">{text.common.city}</div>
-                    <input
-                      className="w-full rounded-2xl border border-zinc-200 px-4 py-3 text-sm"
-                      value={filters.city || ''}
-                      onChange={(event) => setFilters((current) => ({ ...current, city: event.target.value }))}
-                      placeholder={text.city}
-                    />
-                  </div>
-
-                  {text.works.filters.map((group) => (
-                    <div key={group.title} className="border-t border-zinc-100 pt-5">
-                      <div className="mb-3 flex items-center justify-between font-black">
-                        {group.title}
-                        <ChevronDown className="h-4 w-4" />
-                      </div>
-                      <div className="flex flex-wrap gap-2">
-                        {group.options.map((option) => (
-                          <button
-                            key={option}
-                            type="button"
-                            onClick={() => {
-                              if (group.title === text.works.filters[0].title) toggleBudgetPreset(option);
-                            }}
-                            className="rounded-full bg-zinc-100 px-3 py-2 text-xs font-bold text-[#232323] transition hover:bg-zinc-950 hover:text-white"
-                          >
-                            {option}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                <button type="button" onClick={() => applyFilters(filters)} className="mt-6 w-full rounded-2xl bg-zinc-950 px-5 py-3 font-black text-white">
-                  {text.common.apply}
-                </button>
-                <button type="button" onClick={() => setMapOpen(true)} className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl border border-zinc-300 bg-white px-5 py-3 font-black">
-                  <Map className="h-4 w-4" />
-                  {text.common.viewOnMap}
-                </button>
-              </div>
+              <MarketplaceFilterSidebar
+                title={text.common.filters}
+                resetLabel={text.common.reset}
+                onReset={resetFilters}
+                applyLabel={text.common.apply}
+                onApply={() => applyFilters(filters)}
+                viewOnMapLabel={text.common.viewOnMap}
+                onViewMap={() => setMapOpen(true)}
+              >
+                {filtersPanel}
+              </MarketplaceFilterSidebar>
             </aside>
 
             <section>
-              <div className="mb-4 flex flex-col gap-3 rounded-[26px] border border-zinc-200 bg-white p-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="text-sm text-[#232323]">{text.common.found}</div>
-                  <div className="text-xl font-black">{interpolate(text.works.matchedTasks, { count: visibleJobs.length })}</div>
-                </div>
-                <button type="button" className="inline-flex items-center justify-center gap-2 rounded-2xl border border-zinc-300 px-4 py-3 text-sm font-black">
-                  <SlidersHorizontal className="h-4 w-4" />
-                  {text.common.newestFirst}
-                </button>
-              </div>
+              <MarketplaceResultsBar
+                foundLabel={text.common.found}
+                countLabel={interpolate(text.works.matchedTasks, { count: visibleJobs.length })}
+                sortLabel={text.common.newestFirst}
+              />
 
-              <div className="space-y-4">
+              <div className="space-y-5 sm:space-y-6">
                 {visibleJobs.map(({ icon: Icon, task, ...job }) => (
-                  <article key={job.id} className="overflow-hidden rounded-[30px] border border-zinc-200 bg-white shadow-sm transition hover:shadow-xl">
-                    <div className="grid gap-4 p-5 md:grid-cols-[1fr_190px]">
-                      <div className="flex gap-4">
-                        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[#d9f36b]">
-                          <Icon className="h-7 w-7 text-zinc-950" />
-                        </div>
-                        <div className="min-w-0">
-                          <div className="text-xs font-bold uppercase tracking-wide text-[#232323]">{job.brand}</div>
-                          <h3 className="mt-1 text-xl font-black leading-tight">{job.title}</h3>
-                          <div className="mt-3 grid gap-2 text-sm text-[#232323] sm:grid-cols-2">
-                            <span className="inline-flex items-center gap-2"><MapPin className="h-4 w-4" /> {job.location}</span>
-                            <span className="inline-flex items-center gap-2"><CalendarClock className="h-4 w-4" /> {job.time}</span>
-                          </div>
-                          <div className="mt-4 flex flex-wrap gap-2">
-                            {job.tags.map((tag) => (
-                              <span key={tag} className="rounded-full bg-zinc-100 px-3 py-1.5 text-xs font-bold text-[#232323]">{tag}</span>
-                            ))}
-                          </div>
-                          {job.photos.length ? (
-                            <div className="mt-4 grid max-w-md grid-cols-3 gap-2">
-                              {job.photos.map((photo, index) => (
-                                <img
-                                  key={`${job.id}-photo-${index}`}
-                                  src={photo}
-                                  alt={`${job.title} ${index + 1}`}
-                                  className="h-20 w-full rounded-2xl object-cover"
-                                  loading="lazy"
-                                />
-                              ))}
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                      <div className="flex flex-row items-center justify-between gap-3 rounded-2xl border border-zinc-200 bg-white p-4 shadow-sm md:flex-col md:items-stretch">
-                        <div>
-                          <div className="text-sm font-bold text-[#232323]">{job.duration}</div>
-                          <div className="text-3xl font-black text-[#232323]">{job.pay}</div>
-                        </div>
-                        <div className="flex w-full flex-row gap-2 md:flex-col">
-                          {auth.isSpecialist ? (
-                            <button type="button" className="min-h-[48px] flex-1 rounded-2xl bg-[#d9f36b] px-5 py-3 text-sm font-semibold text-[#232323] shadow-[0_12px_26px_rgba(132,204,22,0.24)] transition hover:bg-[#c7e85a]">
-                              {text.works.apply}
-                            </button>
-                          ) : auth.isAuthenticated ? null : (
-                            <button type="button" onClick={() => setAuthOpen(true)} className="min-h-[48px] flex-1 rounded-2xl bg-[#d9f36b] px-5 py-3 text-sm font-semibold text-[#232323]">
-                              {text.works.loginAndApply}
-                            </button>
-                          )}
-                          <Link href={routes.taskUrl(task || { id: job.id, title: job.title })} className="flex min-h-[48px] w-12 shrink-0 items-center justify-center rounded-2xl bg-[#eef3f8] px-0 py-3 text-sm font-semibold text-[#232323] transition hover:bg-[#e3ebf2] md:w-full md:flex-1 md:px-5">
-                            <Info className="h-5 w-5 md:hidden" />
-                            <span className="hidden md:inline">{text.common.more}</span>
-                          </Link>
-                        </div>
-                      </div>
-                    </div>
-                  </article>
+                  <JobCard
+                    key={job.id}
+                    job={job}
+                    task={task}
+                    Icon={Icon}
+                    text={text}
+                    auth={auth}
+                    onAuthOpen={() => setAuthOpen(true)}
+                  />
                 ))}
               </div>
             </section>
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-4 pb-6 sm:px-6 lg:px-8">
+        <section className={`mx-auto ${marketplace.maxWidth} px-4 pb-6 sm:px-6 lg:px-8`}>
           <div className="flex flex-wrap gap-2">
             {quickTags.map((tag) => (
-              <button key={tag} type="button" className="rounded-full border border-zinc-200 bg-white px-4 py-2 text-sm font-bold text-[#232323]">
+              <button key={tag} type="button" className={marketplace.chip}>
                 {tag}
               </button>
             ))}
           </div>
         </section>
 
-        <section className="mx-auto grid max-w-7xl gap-8 px-4 py-12 sm:px-6 lg:grid-cols-[0.8fr_1.2fr] lg:px-8">
-          <div>
-            <h2 className="text-3xl font-black tracking-tight">{text.works.faqTitle}</h2>
-            <p className="mt-3 text-[#232323]">{text.works.faqText}</p>
-          </div>
+        <section className={`mx-auto ${marketplace.maxWidth} px-4 py-12 sm:px-6 lg:px-8`}>
+          <h2 className="text-3xl font-bold tracking-tight text-[#232323]">{text.works.faqTitle}</h2>
+          <p className="mt-3 text-[#777D88]">{text.works.faqText}</p>
         </section>
       </main>
       <ProffiFooter />
+
+      <MarketplaceMobileFiltersDrawer
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        title={text.common.filters}
+        resetLabel={text.common.reset}
+        onReset={resetFilters}
+        applyLabel={text.common.apply}
+        onApply={() => applyFilters(filters)}
+      >
+        {filtersPanel}
+      </MarketplaceMobileFiltersDrawer>
 
       <TreaboTasksMapModal open={mapOpen} onClose={() => setMapOpen(false)} tasks={tasks} />
       <TreaboAuthModal

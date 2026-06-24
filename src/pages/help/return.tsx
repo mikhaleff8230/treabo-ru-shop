@@ -15,7 +15,7 @@ const ReturnPage: NextPageWithLayout = () => {
     <>
       <Seo
         title="Условия возврата товаров"
-        description="Условия и сроки возврата товаров на SANCAN.ru"
+        description="Условия и сроки возврата товаров на Treabo.ru"
         url={routes.return}
       />
       <div className="mx-auto flex h-full w-full max-w-screen-xl flex-col p-4 sm:p-5">

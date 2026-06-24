@@ -94,7 +94,7 @@ const FavoritesPage: NextPageWithLayout<FavoritesPageProps> = ({ initialPlaces, 
 
   return (
     <>
-      <TitleSeo title="Мои плейсы - SANCAN" />
+      <TitleSeo title="Мои плейсы - Treabo" />
 
       <div className="container mx-auto">
         <div className="mb-8 text-center">

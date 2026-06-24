@@ -68,7 +68,7 @@ const getHorizontalSuggestions = async (query: string) => {
 
 export default function SearchInput({
   className = '',
-  placeholder = 'Искать на SANCAN',
+  placeholder = 'Искать на Treabo',
 }: SearchInputProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFocused, setIsFocused] = useState(false);

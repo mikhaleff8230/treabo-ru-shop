@@ -36,7 +36,7 @@ const DefaultSeo = () => {
         settings?.siteTitle ||
         'Дизайнерский маркетплейс'
       } | %s`}
-      defaultTitle="SANCAN.ru - Маркетплейс дизайнерских товаров."
+      defaultTitle="Treabo.ru — маркетплейс услуг и специалистов"
       description={settings?.seo?.metaDescription || settings?.siteSubtitle}
       // canonical убран - каждая страница должна иметь свой canonical URL
       // canonical={settings?.seo?.canonicalUrl}
@@ -44,7 +44,7 @@ const DefaultSeo = () => {
         title: settings?.seo?.ogTitle,
         description: settings?.seo?.ogDescription,
         type: 'website',
-        locale: 'en_US',
+        locale: 'ru_RU',
         site_name: settings?.siteTitle,
         images: [
           {

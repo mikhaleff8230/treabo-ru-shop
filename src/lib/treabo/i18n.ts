@@ -39,6 +39,8 @@ const ru = {
     found: 'Найдено',
     newestFirst: 'Сначала новые',
     more: 'Подробнее',
+    save: 'Сохранить',
+    saved: 'Сохранено',
     createRequest: 'Создать заявку',
     search: 'Найти',
     servicePlaceholder: 'Какая услуга нужна?',

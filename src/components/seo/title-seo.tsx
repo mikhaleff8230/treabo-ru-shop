@@ -56,7 +56,7 @@ export const TitleSeo = (props: Props) => {
         settings?.siteTitle ||
         'Платформа для продажи авторских вещей, брендов и хендмейда.'
       }`}
-      defaultTitle="SANCAN — новый формат дизайнерского маркетплейса."
+      defaultTitle="Treabo — маркетплейс услуг и специалистов"
       description={props.description || settings?.seo?.metaDescription || settings?.siteSubtitle}
       // Используем только переданный canonical, без fallback на settings
       // чтобы избежать дублирования с DefaultSeo

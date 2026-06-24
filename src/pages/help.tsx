@@ -16,7 +16,7 @@ const HelpPage: NextPageWithLayout = () => {
     <>
       <Seo
         title="Помощь"
-        description="Условия обработки данных, правила возвратов и доставки на SANCAN.ru"
+        description="Условия обработки данных, правила возвратов и доставки на Treabo.ru"
         url={routes.help}
       />
       <div className="mx-auto flex h-full w-full max-w-screen-xl flex-col p-4 sm:p-5">
