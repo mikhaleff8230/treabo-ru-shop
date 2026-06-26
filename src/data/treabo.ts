@@ -21,6 +21,10 @@ export type TreaboTask = {
   deadline?: string | null;
   status?: string | null;
   photos?: Array<string | TreaboUpload>;
+  customer?: { name?: string | null } | null;
+  customer_name?: string | null;
+  client_name?: string | null;
+  user?: { name?: string | null } | null;
   applications_count?: number;
   response_price_mdl?: number | null;
   photos_count?: number;

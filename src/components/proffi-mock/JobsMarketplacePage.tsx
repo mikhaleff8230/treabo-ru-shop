@@ -6,8 +6,8 @@ import {
   ArrowUpDown,
   Bookmark,
   CalendarClock,
-  ChevronDown,
   Filter,
+  Info,
   Map,
   MapPin,
   Paintbrush,
@@ -43,6 +43,7 @@ type UiJobCard = {
   location: string;
   time: string;
   pay: string;
+  priceNote: string;
   duration: string;
   tags: string[];
   icon: typeof Wrench;
@@ -60,6 +61,10 @@ function categoryName(category: TreaboCategory | undefined) {
   return category?.name_ru ?? null;
 }
 
+function taskCustomerName(task: TreaboTask) {
+  return task.customer_name || task.customer?.name || task.client_name || task.user?.name || 'Заказчик';
+}
+
 function mapTaskToCard(task: TreaboTask, categories: TreaboCategory[], locale: string): UiJobCard {
   const text = getTreaboText(locale);
   const category = categories.find(
@@ -71,10 +76,11 @@ function mapTaskToCard(task: TreaboTask, categories: TreaboCategory[], locale: s
   return {
     id: String(task.id),
     title: task.title,
-    brand: categoryLabel || text.works.privateCustomer,
+    brand: taskCustomerName(task),
     location: [task.city || text.city, task.address].filter(Boolean).join(', '),
     time: task.deadline || text.works.agreementTerm,
     pay: budget > 0 ? `${money.format(budget)} ₽` : text.works.negotiablePrice,
+    priceNote: budget > 0 ? 'Начальная цена' : 'Цена по договоренности',
     duration: task.status === 'open' ? text.works.open : task.status || text.works.newOrder,
     tags: [
       categoryLabel,
@@ -92,7 +98,7 @@ function mapTaskToCard(task: TreaboTask, categories: TreaboCategory[], locale: s
 
 function buildJobCards(tasks: TreaboTask[], categories: TreaboCategory[], locale: string): UiJobCard[] {
   if (!tasks.length) {
-    return jobCards.map((card, index) => ({ ...card, id: `mock-${index + 1}`, photos: [], task: undefined }));
+    return jobCards.map((card, index) => ({ ...card, id: `mock-${index + 1}`, task: undefined }));
   }
   return tasks.slice(0, 100).map((task) => mapTaskToCard(task, categories, locale));
 }
@@ -124,98 +130,129 @@ function JobCard({
   onAuthOpen: () => void;
 }) {
   const [saved, setSaved] = useState(false);
+  const primaryPhoto = job.photos[0] || '/proffi/task-preview-default.svg';
+  const previewPhotos = job.photos.slice(1, 4);
 
   return (
     <article className={marketplace.card}>
-      <div className="grid xl:grid-cols-[minmax(0,1fr)_386px]">
-        <div className="p-6 sm:p-8 xl:px-9 xl:py-10">
-          <div className="flex gap-5 sm:gap-7">
-            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[24px] bg-[#D9F36B] shadow-[inset_0_1px_0_rgba(255,255,255,0.42)] sm:h-[78px] sm:w-[78px] sm:rounded-[27px]">
-              <Icon className="h-8 w-8 stroke-[2.2] text-[#1F2430] sm:h-10 sm:w-10" />
+      <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_clamp(150px,18%,230px)_260px]">
+        <div className="p-3 sm:p-4">
+          <div className="flex gap-3 sm:gap-4">
+            <div className="relative h-[64px] w-[64px] shrink-0 overflow-hidden rounded-[16px] bg-[#F3F4F6] sm:h-[72px] sm:w-[72px]">
+              <img src={primaryPhoto} alt={`${job.title} preview`} className="h-full w-full object-cover" loading="lazy" />
+              {job.photos.length > 1 ? (
+                <span className="absolute bottom-1 right-1 rounded-full bg-white/90 px-1.5 py-0.5 text-[9px] font-medium leading-none text-[#20242D]">
+                  +{job.photos.length - 1}
+                </span>
+              ) : null}
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-[13px] font-[300] uppercase leading-none tracking-[0.055em] text-[#7D828D] sm:text-[15px]">
+              <div className="text-[9px] font-[400] uppercase leading-none tracking-[0.055em] text-[#7D828D] sm:text-[10px]">
                 {job.brand}
               </div>
-              <h3 className="mt-4 break-words text-[28px] font-[300] leading-[1.12] tracking-[-0.035em] text-[#1F2430] sm:text-[34px] xl:text-[38px]">
+              <h3 className="mt-1.5 break-words text-[17px] font-[300] leading-[1.08] tracking-[-0.025em] text-[#1F2430] sm:text-[20px] xl:text-[21px]">
                 {job.title}
               </h3>
-              <div className="mt-7 flex flex-col gap-3 text-[15px] font-[300] leading-none text-[#777D88] sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-9 sm:gap-y-3 sm:text-[17px]">
-                <span className="inline-flex items-center gap-3">
-                  <MapPin className="h-[21px] w-[21px] shrink-0 stroke-[1.8] text-[#525862]" />
+              <div className="mt-2 flex flex-col gap-1.5 text-[11px] font-[300] leading-none text-[#777D88] sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1.5 sm:text-[12px]">
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="h-[14px] w-[14px] shrink-0 stroke-[1.8] text-[#525862]" />
                   <span className="break-words">{job.location}</span>
                 </span>
-                <span className="inline-flex items-center gap-3">
-                  <CalendarClock className="h-[21px] w-[21px] shrink-0 stroke-[1.8] text-[#525862]" />
+                <span className="inline-flex items-center gap-1.5">
+                  <CalendarClock className="h-[14px] w-[14px] shrink-0 stroke-[1.8] text-[#525862]" />
                   {job.time}
                 </span>
               </div>
-              <div className="mt-8 flex flex-wrap gap-3">
+              <div className="mt-2.5 flex flex-wrap gap-1.5">
                 {job.tags.map((tag) => (
                   <span key={tag} className={marketplace.chip}>
                     {tag}
                   </span>
                 ))}
               </div>
-              {job.photos.length ? (
-                <div className="mt-4 flex gap-2 overflow-x-auto">
-                  {job.photos.map((photo, index) => (
-                    <img
-                      key={`${job.id}-photo-${index}`}
-                      src={photo}
-                      alt={`${job.title} ${index + 1}`}
-                      className="h-16 w-24 shrink-0 rounded-xl object-cover sm:h-20 sm:w-28"
-                      loading="lazy"
-                    />
-                  ))}
-                </div>
-              ) : null}
             </div>
           </div>
         </div>
 
-        <div className="flex flex-col border-[#E7E9EC] p-6 sm:p-8 xl:my-10 xl:border-l xl:py-0 xl:pl-10 xl:pr-9">
-          <div className="text-[15px] font-[300] leading-none text-[#777D88] sm:text-[17px]">{job.duration}</div>
-          <div className="mt-6 text-[44px] font-[300] leading-none tracking-[-0.045em] text-[#A9CD24] sm:text-[54px]">
-            {job.pay}
+        <div className="hidden items-center border-[#E7E9EC] px-3 py-3 xl:flex">
+          {previewPhotos.length ? (
+            <div className="grid w-full grid-cols-3 gap-1.5">
+              {previewPhotos.map((photo, index) => (
+                <div
+                  key={`${job.id}-photo-${index}`}
+                  className="relative overflow-hidden rounded-[12px] bg-[#F3F4F6]"
+                >
+                  <img
+                    src={photo}
+                    alt={`${job.title} ${index + 1}`}
+                    className="aspect-square w-full object-cover"
+                    loading="lazy"
+                  />
+                  {index === 2 && job.photos.length > 3 ? (
+                    <span className="absolute inset-0 flex items-center justify-center bg-[#232323]/45 text-xs font-medium text-white">
+                      +{job.photos.length - 3}
+                    </span>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <img
+              src="/proffi/task-preview-default.svg"
+              alt={`${job.title} default preview`}
+              className="h-[76px] w-full rounded-[14px] object-cover"
+              loading="lazy"
+            />
+          )}
+        </div>
+
+        <div className="flex flex-col border-[#E7E9EC] px-3 pb-3 pt-0 sm:px-4 sm:pb-4 xl:my-4 xl:border-l xl:px-4 xl:py-0">
+          <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+            <div className="text-[19px] font-[300] leading-none tracking-[-0.03em] text-[#232323] sm:text-[22px]">
+              {job.pay}
+            </div>
+            <div className="text-[9px] font-[300] leading-none text-[#8B91A0] sm:text-[10px]">
+              {job.priceNote}
+            </div>
           </div>
-          <div className="mt-8 flex gap-4">
+          <div className="mt-3 flex gap-2">
             {auth.isSpecialist ? (
               <button
                 type="button"
-                className="inline-flex min-h-[62px] flex-1 items-center justify-between rounded-[16px] bg-[#D9F36B] px-8 text-[18px] font-[300] text-[#20242D] transition hover:bg-[#c7e85a] sm:min-h-[70px]"
+                className="inline-flex min-h-[34px] flex-1 items-center justify-between rounded-[11px] bg-[#D9F36B] px-3 text-[12px] font-[300] text-[#20242D] transition hover:bg-[#c7e85a] sm:min-h-[36px] sm:text-[13px]"
               >
                 {text.works.apply}
-                <ArrowRight className="h-5 w-5 stroke-[1.8]" />
+                <ArrowRight className="h-4 w-4 stroke-[1.8]" />
               </button>
             ) : auth.isAuthenticated ? null : (
               <button
                 type="button"
                 onClick={onAuthOpen}
-                className="inline-flex min-h-[62px] flex-1 items-center justify-between rounded-[16px] bg-[#D9F36B] px-8 text-[18px] font-[300] text-[#20242D] transition hover:bg-[#c7e85a] sm:min-h-[70px]"
+                className="inline-flex min-h-[34px] flex-1 items-center justify-between rounded-[11px] bg-[#D9F36B] px-3 text-[12px] font-[300] text-[#20242D] transition hover:bg-[#c7e85a] sm:min-h-[36px] sm:text-[13px]"
               >
                 {text.works.apply}
-                <ArrowRight className="h-5 w-5 stroke-[1.8]" />
+                <ArrowRight className="h-4 w-4 stroke-[1.8]" />
               </button>
             )}
             <button
               type="button"
               onClick={() => setSaved((v) => !v)}
               aria-pressed={saved}
-              className={`flex h-[62px] w-[62px] shrink-0 items-center justify-center rounded-[16px] border bg-white transition sm:h-[70px] sm:w-[70px] ${
+              className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px] border bg-white transition sm:h-[36px] sm:w-[36px] ${
                 saved ? 'border-[#D9F36B] text-[#232323]' : 'border-[#E7E9EC] text-[#777D88]'
               }`}
             >
-              <Bookmark className={`h-6 w-6 stroke-[1.8] ${saved ? 'fill-[#232323]' : ''}`} />
+              <Bookmark className={`h-4 w-4 stroke-[1.8] ${saved ? 'fill-[#232323]' : ''}`} />
             </button>
+            <Link
+              href={routes.taskUrl(task || { id: job.id, title: job.title })}
+              aria-label={text.common.more}
+              title={text.common.more}
+              className="flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px] bg-[#F3F4F6] text-[#3E424B] transition hover:bg-[#ECEEF2] sm:h-[36px] sm:w-[36px]"
+            >
+              <Info className="h-4 w-4 stroke-[1.8]" />
+            </Link>
           </div>
-          <Link
-            href={routes.taskUrl(task || { id: job.id, title: job.title })}
-            className="mt-8 inline-flex min-h-[54px] w-full items-center justify-center rounded-[12px] bg-[#F3F4F6] px-6 text-[16px] font-[300] text-[#3E424B] transition hover:bg-[#ECEEF2]"
-          >
-            <span className="flex-1 text-center">{text.common.more}</span>
-            <ChevronDown className="h-5 w-5 stroke-[1.8] text-[#3E424B]" />
-          </Link>
         </div>
       </div>
     </article>
@@ -433,7 +470,7 @@ export default function JobsMarketplacePage({
             </div>
           </div>
 
-          <div className="sticky top-16 z-30 -mx-4 mb-5 border-y border-[#E7E9EC] bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
+          <div className="sticky top-14 z-30 -mx-4 mb-5 border-y border-[#E7E9EC] bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
             <div className="flex gap-2 overflow-x-auto">
               <button
                 type="button"

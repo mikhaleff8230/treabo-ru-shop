@@ -23,19 +23,19 @@ export function ProffiHeader() {
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-14 max-w-[1516px] items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-950 text-sm font-black text-white">
+            <span className="flex h-8 w-8 items-center justify-center rounded-[11px] bg-zinc-950 text-xs font-semibold text-white">
               T
             </span>
-            <span className="text-xl font-black tracking-tight text-[#232323]">Treabo</span>
+            <span className="text-lg font-semibold tracking-tight text-[#232323]">Treabo</span>
           </Link>
 
           <div className="hidden lg:block">
             <TreaboLocationSelector />
           </div>
 
-          <nav className="hidden items-center gap-7 text-sm font-medium text-[#232323] md:flex">
+          <nav className="hidden items-center gap-6 text-xs font-medium text-[#232323] md:flex">
             <Link href="/specialists" className="hover:opacity-75">{text.header.findSpecialist}</Link>
             <Link href={routes.works} className="hover:opacity-75">{text.header.tasks}</Link>
             <Link href="/master-registration" className="hover:opacity-75">{text.header.masterLogin}</Link>
@@ -52,7 +52,7 @@ export function ProffiHeader() {
             </div>
             <Link
               href="/request/new"
-              className="hidden rounded-full bg-[#d9f36b] px-4 py-2 text-sm font-semibold text-[#232323] shadow-[0_10px_22px_rgba(132,204,22,0.18)] transition hover:bg-[#c7e85a] sm:inline-flex"
+              className="hidden rounded-full bg-[#d9f36b] px-4 py-2 text-xs font-semibold text-[#232323] shadow-[0_8px_18px_rgba(132,204,22,0.14)] transition hover:bg-[#c7e85a] sm:inline-flex"
             >
               {text.header.createRequest}
             </Link>
@@ -64,7 +64,7 @@ export function ProffiHeader() {
                   className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white py-1 pl-2 pr-3 text-[#232323] transition hover:border-zinc-950"
                   aria-label={text.header.profile}
                 >
-                  <span className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-full bg-[#d9f36b] text-sm font-black">
+                  <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#d9f36b] text-xs font-semibold">
                     {auth.user?.avatar ? (
                       <img src={auth.user.avatar} alt={auth.user.name} className="h-full w-full object-cover" />
                     ) : (
@@ -111,14 +111,14 @@ export function ProffiHeader() {
               <button
                 type="button"
                 onClick={() => openAuth('login')}
-                className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-zinc-950 text-white"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-zinc-950 text-white"
                 aria-label={text.header.login}
               >
-                <UserRound className="h-5 w-5" />
-              </button>
-            ) : null}
-            <button className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-zinc-200 md:hidden" aria-label="Menu">
-              <Menu className="h-5 w-5" />
+              <UserRound className="h-4 w-4" />
+            </button>
+          ) : null}
+            <button className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 md:hidden" aria-label="Menu">
+              <Menu className="h-4 w-4" />
             </button>
           </div>
         </div>
@@ -148,23 +148,23 @@ export function ProffiFooter() {
 
   return (
     <footer className="border-t border-zinc-200 bg-white">
-      <div className="mx-auto grid max-w-7xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-[1fr_2fr] lg:px-8">
+      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 md:grid-cols-[1fr_2fr] lg:px-8">
         <div>
-          <div className="mb-3 flex items-center gap-2">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-zinc-950 text-sm font-black text-white">
+          <div className="mb-2 flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-[11px] bg-zinc-950 text-xs font-black text-white">
               T
             </span>
-            <span className="text-xl font-black tracking-tight text-[#232323]">Treabo</span>
+            <span className="text-lg font-semibold tracking-tight text-[#232323]">Treabo</span>
           </div>
-          <p className="max-w-sm text-sm leading-6 text-[#232323]">
+          <p className="max-w-sm text-xs leading-5 text-[#777D88]">
             Treabo соединяет клиентов и специалистов: заявки, отклики, чаты и заказы в одном месте.
           </p>
         </div>
-        <div className="grid grid-cols-2 gap-6 text-sm sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 text-xs sm:grid-cols-4">
           {footerColumns.map((title) => (
             <div key={title}>
-              <div className="mb-3 font-bold text-[#232323]">{title}</div>
-              <div className="space-y-2 text-[#232323]">
+              <div className="mb-2 font-semibold text-[#232323]">{title}</div>
+              <div className="space-y-1.5 text-[#777D88]">
                 <div>{text.common.category}</div>
                 <div>{text.header.chats}</div>
                 <div>{text.header.support}</div>

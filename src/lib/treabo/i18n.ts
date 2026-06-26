@@ -9,7 +9,7 @@ export function getTreaboText(_locale?: string) {
 }
 
 const ru = {
-  city: 'Кишинёв',
+  city: 'Москва',
   header: {
     findSpecialist: 'Найти специалиста',
     tasks: 'Задания',
