@@ -9,7 +9,7 @@ declare global {
   }
 }
 
-const CHISINAU_CENTER: [number, number] = [47.0105, 28.8638];
+const MOSCOW_CENTER: [number, number] = [55.7522, 37.6156];
 
 type TreaboTasksMapModalProps = {
   open: boolean;
@@ -43,7 +43,7 @@ export default function TreaboTasksMapModal({ open, onClose, tasks }: TreaboTask
   );
 
   const center = useMemo<[number, number]>(() => {
-    if (!points.length) return CHISINAU_CENTER;
+    if (!points.length) return MOSCOW_CENTER;
     const lat = points.reduce((sum, point) => sum + point.lat, 0) / points.length;
     const lng = points.reduce((sum, point) => sum + point.lng, 0) / points.length;
     return [lat, lng];
@@ -125,7 +125,7 @@ export default function TreaboTasksMapModal({ open, onClose, tasks }: TreaboTask
           <div>
             <div className="text-sm font-bold text-[#7d849b]">Карта заданий</div>
             <h2 className="text-xl font-black text-[#232323]">
-              {points.length ? `${points.length} точек на карте` : 'Кишинёв и Молдова'}
+              {points.length ? `${points.length} точек на карте` : 'Москва и Россия'}
             </h2>
           </div>
           <button
@@ -146,7 +146,7 @@ export default function TreaboTasksMapModal({ open, onClose, tasks }: TreaboTask
           <div ref={mapRef} className="h-full w-full" />
           {!points.length && !loading ? (
             <div className="pointer-events-none absolute bottom-4 left-4 rounded-2xl bg-white/95 px-4 py-3 text-sm font-semibold text-[#232323] shadow">
-              Координаты заданий пока не указаны — показан центр Кишинёва
+              Координаты заданий пока не указаны — показан центр Москвы
             </div>
           ) : null}
         </div>

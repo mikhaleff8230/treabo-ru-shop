@@ -3,13 +3,13 @@ import { useRouter } from 'next/router';
 import { Check, ChevronDown, Loader2, MapPin, Search, X } from 'lucide-react';
 import {
   getLocationDisplayName,
-  getMoldovaLocationById,
-  MoldovaLocation,
+  getRussiaLocationById,
+  RussiaLocation,
   readStoredTreaboLocation,
-  searchMoldovaLocationsWithFallback,
+  searchRussiaLocationsWithFallback,
   toStoredTreaboLocation,
   TREABO_LOCATION_STORAGE_KEY,
-} from '@/data/moldova-locations';
+} from '@/data/russia-locations';
 
 const DEBOUNCE_MS = 250;
 
@@ -20,8 +20,8 @@ export default function TreaboLocationSelector() {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<MoldovaLocation[]>([]);
-  const [selected, setSelected] = useState<MoldovaLocation>(() => getMoldovaLocationById('chisinau'));
+  const [results, setResults] = useState<RussiaLocation[]>([]);
+  const [selected, setSelected] = useState<RussiaLocation>(() => getRussiaLocationById('moscow'));
 
   const locale = 'ru' as const;
   const selectedName = getLocationDisplayName(selected, locale);
@@ -40,7 +40,7 @@ export default function TreaboLocationSelector() {
     }
 
     debounceRef.current = setTimeout(async () => {
-      const next = await searchMoldovaLocationsWithFallback(query, { limit: 14, locale });
+      const next = await searchRussiaLocationsWithFallback(query, { limit: 14 });
       setResults(next);
       setLoading(false);
     }, DEBOUNCE_MS);
@@ -65,7 +65,7 @@ export default function TreaboLocationSelector() {
 
   const visibleResults = useMemo(() => results, [results]);
 
-  function selectLocation(location: MoldovaLocation) {
+  function selectLocation(location: RussiaLocation) {
     setSelected(location);
     setQuery('');
     setOpen(false);
@@ -140,7 +140,7 @@ export default function TreaboLocationSelector() {
                   const active = String(location.id) === String(selected.id);
                   return (
                     <button
-                      key={`${location.id}-${location.cuatm_code || location.name_ru}`}
+                      key={`${location.id}-${location.geoname_id || location.name_ru}`}
                       type="button"
                       onClick={() => selectLocation(location)}
                       className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left transition hover:bg-[#f5f6f1]"
@@ -153,7 +153,7 @@ export default function TreaboLocationSelector() {
                           {getLocationDisplayName(location, locale)}
                         </span>
                         <span className="block truncate text-xs font-semibold text-[#7d849b]">
-                          {location.district_ru}
+                          {location.region_ru}
                         </span>
                       </span>
                       {active ? <Check className="h-4 w-4 shrink-0" /> : null}
@@ -164,7 +164,7 @@ export default function TreaboLocationSelector() {
           </div>
 
           <div className="border-t border-zinc-100 px-4 py-3 text-xs font-semibold leading-5 text-[#7d849b]">
-            Источник: API Moldova/CUATM. Если backend недоступен, используем локальный fallback.
+            Источник: локальный справочник GeoNames. DaData используется только как резервный поиск.
           </div>
         </div>
       ) : null}

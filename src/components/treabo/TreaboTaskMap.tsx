@@ -7,7 +7,7 @@ declare global {
   }
 }
 
-const CHISINAU_CENTER: [number, number] = [47.0105, 28.8638];
+const MOSCOW_CENTER: [number, number] = [55.7522, 37.6156];
 
 export default function TreaboTaskMap({ task }: { task: TreaboTask }) {
   const mapRef = useRef<HTMLDivElement>(null);
@@ -16,7 +16,7 @@ export default function TreaboTaskMap({ task }: { task: TreaboTask }) {
   const center: [number, number] =
     task.lat != null && task.lng != null
       ? [Number(task.lat), Number(task.lng)]
-      : CHISINAU_CENTER;
+      : MOSCOW_CENTER;
 
   useEffect(() => {
     let destroyed = false;
@@ -63,7 +63,7 @@ export default function TreaboTaskMap({ task }: { task: TreaboTask }) {
       ) : null}
       <div ref={mapRef} className="h-full w-full" />
       <div className="pointer-events-none absolute bottom-4 left-4 max-w-[80%] rounded-2xl bg-white/95 px-4 py-3 text-sm font-semibold text-[#232323] shadow-sm">
-        {task.city || 'Кишинёв'}
+        {task.city || 'Москва'}
       </div>
     </div>
   );
