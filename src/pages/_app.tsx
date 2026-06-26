@@ -89,7 +89,7 @@ function CustomApp({ Component, pageProps }: AppPropsWithLayout) {
   }, [dir]);
 
   useEffect(() => {
-    if (process.env.NODE_ENV !== 'development' || typeof window === 'undefined') {
+    if (typeof window === 'undefined') {
       return;
     }
 
