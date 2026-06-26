@@ -37,7 +37,7 @@ type TaskDetailProps = {
 };
 
 const money = new Intl.NumberFormat('ru-RU');
-const DEFAULT_RESPONSE_PRICE_MDL = 15;
+const DEFAULT_RESPONSE_PRICE_RUB = 15;
 const siteUrl = (process.env.NEXT_PUBLIC_WEBSITE_URL || 'https://treabo.md').replace(/\/+$/, '');
 
 function mockTask(locale?: string): TreaboTask {
@@ -96,7 +96,7 @@ function buildTaskSeo(task: TreaboTask, photos: string[], locale?: string) {
   const fallbackDescription = [
     `${text.task.treaboTask}: ${task.title}.`,
     location ? `${text.task.address}: ${location}.` : '',
-    budget > 0 ? `${text.task.facts.budget}: ${money.format(budget)} MDL.` : text.task.facts.negotiable,
+    budget > 0 ? `${text.task.facts.budget}: ${money.format(budget)} ₽.` : text.task.facts.negotiable,
   ].filter(Boolean).join(' ');
 
   return {
@@ -147,7 +147,7 @@ function buildTaskJsonLd(task: TreaboTask, seo: ReturnType<typeof buildTaskSeo>,
   if (budget > 0) {
     jobPosting.baseSalary = {
       '@type': 'MonetaryAmount',
-      currency: 'MDL',
+      currency: 'RUB',
       value: {
         '@type': 'QuantitativeValue',
         value: budget,
@@ -249,7 +249,7 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
   const [applyError, setApplyError] = useState<string | null>(null);
   const data = task || mockTask(router.locale);
   const budget = Number(data.budget || 0);
-  const responsePrice = Number(data.response_price_mdl || DEFAULT_RESPONSE_PRICE_MDL);
+  const responsePrice = Number(data.response_price_mdl || DEFAULT_RESPONSE_PRICE_RUB);
   const photos = (data.photos || []).map(photoUrl).filter(Boolean);
   const seo = buildTaskSeo(data, photos, router.locale);
   const jsonLd = buildTaskJsonLd(data, seo, router.locale);
@@ -306,7 +306,7 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
   }
 
   const facts = useMemo(() => [
-    { icon: Wallet, label: text.task.facts.budget, value: budget > 0 ? `${money.format(budget)} MDL` : text.task.facts.negotiable },
+    { icon: Wallet, label: text.task.facts.budget, value: budget > 0 ? `${money.format(budget)} ₽` : text.task.facts.negotiable },
     { icon: CalendarClock, label: text.task.facts.term, value: data.deadline || text.task.facts.byAgreement },
     { icon: CheckCircle2, label: text.task.facts.status, value: data.status === 'open' ? text.task.facts.open : data.status || text.task.facts.new },
     { icon: Ruler, label: text.task.facts.params, value: text.task.facts.details },

@@ -6,8 +6,8 @@ import {
   ArrowUpDown,
   Bookmark,
   CalendarClock,
+  ChevronDown,
   Filter,
-  Info,
   Map,
   MapPin,
   Paintbrush,
@@ -74,7 +74,7 @@ function mapTaskToCard(task: TreaboTask, categories: TreaboCategory[], locale: s
     brand: categoryLabel || text.works.privateCustomer,
     location: [task.city || text.city, task.address].filter(Boolean).join(', '),
     time: task.deadline || text.works.agreementTerm,
-    pay: budget > 0 ? `${money.format(budget)} MDL` : text.works.negotiablePrice,
+    pay: budget > 0 ? `${money.format(budget)} ₽` : text.works.negotiablePrice,
     duration: task.status === 'open' ? text.works.open : task.status || text.works.newOrder,
     tags: [
       categoryLabel,
@@ -127,28 +127,30 @@ function JobCard({
 
   return (
     <article className={marketplace.card}>
-      <div className="grid xl:grid-cols-[minmax(0,1fr)_320px]">
-        <div className="p-6 sm:p-7 xl:p-8">
-          <div className="flex gap-4 sm:gap-5">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] bg-[#D9F36B] sm:h-16 sm:w-16 xl:h-[72px] xl:w-[72px] xl:rounded-[24px]">
-              <Icon className="h-7 w-7 text-[#232323] xl:h-8 xl:w-8" />
+      <div className="grid xl:grid-cols-[minmax(0,1fr)_386px]">
+        <div className="p-6 sm:p-8 xl:px-9 xl:py-10">
+          <div className="flex gap-5 sm:gap-7">
+            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[24px] bg-[#D9F36B] shadow-[inset_0_1px_0_rgba(255,255,255,0.42)] sm:h-[78px] sm:w-[78px] sm:rounded-[27px]">
+              <Icon className="h-8 w-8 stroke-[2.2] text-[#1F2430] sm:h-10 sm:w-10" />
             </div>
             <div className="min-w-0 flex-1">
-              <div className="text-xs font-semibold uppercase tracking-wide text-[#777D88]">{job.brand}</div>
-              <h3 className="mt-1 break-words text-[22px] font-bold leading-tight text-[#232323] sm:text-[26px] xl:text-[30px]">
+              <div className="text-[13px] font-[300] uppercase leading-none tracking-[0.055em] text-[#7D828D] sm:text-[15px]">
+                {job.brand}
+              </div>
+              <h3 className="mt-4 break-words text-[28px] font-[300] leading-[1.12] tracking-[-0.035em] text-[#1F2430] sm:text-[34px] xl:text-[38px]">
                 {job.title}
               </h3>
-              <div className="mt-3 flex flex-col gap-2 text-sm text-[#777D88] sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
-                <span className="inline-flex items-center gap-2">
-                  <MapPin className="h-[18px] w-[18px] shrink-0" />
+              <div className="mt-7 flex flex-col gap-3 text-[15px] font-[300] leading-none text-[#777D88] sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-9 sm:gap-y-3 sm:text-[17px]">
+                <span className="inline-flex items-center gap-3">
+                  <MapPin className="h-[21px] w-[21px] shrink-0 stroke-[1.8] text-[#525862]" />
                   <span className="break-words">{job.location}</span>
                 </span>
-                <span className="inline-flex items-center gap-2">
-                  <CalendarClock className="h-[18px] w-[18px] shrink-0" />
+                <span className="inline-flex items-center gap-3">
+                  <CalendarClock className="h-[21px] w-[21px] shrink-0 stroke-[1.8] text-[#525862]" />
                   {job.time}
                 </span>
               </div>
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mt-8 flex flex-wrap gap-3">
                 {job.tags.map((tag) => (
                   <span key={tag} className={marketplace.chip}>
                     {tag}
@@ -172,45 +174,47 @@ function JobCard({
           </div>
         </div>
 
-        <div className="flex flex-col border-[#E7E9EC] p-6 sm:p-7 xl:border-l xl:p-8">
-          <div className="text-sm text-[#777D88]">{job.duration}</div>
-          <div className="mt-1 text-[32px] font-bold leading-none text-[#232323] sm:text-[36px]">{job.pay}</div>
-          <div className="mt-5 flex gap-2">
+        <div className="flex flex-col border-[#E7E9EC] p-6 sm:p-8 xl:my-10 xl:border-l xl:py-0 xl:pl-10 xl:pr-9">
+          <div className="text-[15px] font-[300] leading-none text-[#777D88] sm:text-[17px]">{job.duration}</div>
+          <div className="mt-6 text-[44px] font-[300] leading-none tracking-[-0.045em] text-[#A9CD24] sm:text-[54px]">
+            {job.pay}
+          </div>
+          <div className="mt-8 flex gap-4">
             {auth.isSpecialist ? (
               <button
                 type="button"
-                className="inline-flex min-h-[54px] flex-1 items-center justify-center gap-2 rounded-[18px] bg-[#D9F36B] px-5 text-sm font-semibold text-[#232323] transition hover:bg-[#c7e85a]"
+                className="inline-flex min-h-[62px] flex-1 items-center justify-between rounded-[16px] bg-[#D9F36B] px-8 text-[18px] font-[300] text-[#20242D] transition hover:bg-[#c7e85a] sm:min-h-[70px]"
               >
                 {text.works.apply}
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="h-5 w-5 stroke-[1.8]" />
               </button>
             ) : auth.isAuthenticated ? null : (
               <button
                 type="button"
                 onClick={onAuthOpen}
-                className="inline-flex min-h-[54px] flex-1 items-center justify-center gap-2 rounded-[18px] bg-[#D9F36B] px-5 text-sm font-semibold text-[#232323] transition hover:bg-[#c7e85a]"
+                className="inline-flex min-h-[62px] flex-1 items-center justify-between rounded-[16px] bg-[#D9F36B] px-8 text-[18px] font-[300] text-[#20242D] transition hover:bg-[#c7e85a] sm:min-h-[70px]"
               >
-                {text.works.loginAndApply}
-                <ArrowRight className="h-4 w-4" />
+                {text.works.apply}
+                <ArrowRight className="h-5 w-5 stroke-[1.8]" />
               </button>
             )}
             <button
               type="button"
               onClick={() => setSaved((v) => !v)}
               aria-pressed={saved}
-              className={`flex h-[54px] w-[54px] shrink-0 items-center justify-center rounded-[18px] border bg-white transition ${
+              className={`flex h-[62px] w-[62px] shrink-0 items-center justify-center rounded-[16px] border bg-white transition sm:h-[70px] sm:w-[70px] ${
                 saved ? 'border-[#D9F36B] text-[#232323]' : 'border-[#E7E9EC] text-[#777D88]'
               }`}
             >
-              <Bookmark className={`h-5 w-5 ${saved ? 'fill-[#232323]' : ''}`} />
+              <Bookmark className={`h-6 w-6 stroke-[1.8] ${saved ? 'fill-[#232323]' : ''}`} />
             </button>
           </div>
           <Link
             href={routes.taskUrl(task || { id: job.id, title: job.title })}
-            className="mt-3 inline-flex min-h-[48px] w-full items-center justify-center gap-2 rounded-[18px] border border-[#E7E9EC] bg-white text-sm font-semibold text-[#232323] transition hover:bg-[#FAFAFA]"
+            className="mt-8 inline-flex min-h-[54px] w-full items-center justify-center rounded-[12px] bg-[#F3F4F6] px-6 text-[16px] font-[300] text-[#3E424B] transition hover:bg-[#ECEEF2]"
           >
-            <Info className="h-4 w-4" />
-            {text.common.more}
+            <span className="flex-1 text-center">{text.common.more}</span>
+            <ChevronDown className="h-5 w-5 stroke-[1.8] text-[#3E424B]" />
           </Link>
         </div>
       </div>

@@ -14,7 +14,7 @@ const SpecialistsPage: NextPageWithLayout<SpecialistsPageProps> = ({ specialists
   return (
     <>
       <TitleSeo
-        title="Найти специалиста в Молдове — Treabo"
+        title="Найти специалиста в России — Treabo"
         description="Каталог мастеров Treabo: рейтинг, отзывы, документы, портфолио и выезд к клиенту."
         canonical={`${siteUrl}/specialists`}
       />

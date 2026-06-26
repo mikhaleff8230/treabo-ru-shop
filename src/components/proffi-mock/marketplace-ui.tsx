@@ -2,15 +2,15 @@ import { ChevronDown, X } from 'lucide-react';
 import { useEffect, type ReactNode } from 'react';
 
 export const marketplace = {
-  pageBg: 'bg-[#F6F7F5]',
+  pageBg: 'bg-[#F7F7F4]',
   text: 'text-[#232323]',
   textSecondary: 'text-[#777D88]',
   border: 'border-[#E7E9EC]',
   accent: 'bg-[#D9F36B]',
   accentText: 'text-[#232323]',
   maxWidth: 'max-w-[1360px]',
-  card: 'rounded-[30px] border border-[#E7E9EC] bg-white shadow-[0_10px_36px_rgba(24,28,35,0.06)] transition-shadow hover:shadow-[0_14px_40px_rgba(24,28,35,0.08)]',
-  chip: 'rounded-full border border-[#E7E9EC] bg-white px-4 py-2.5 text-sm font-medium text-[#232323]',
+  card: 'rounded-[30px] border border-white/70 bg-white shadow-[0_12px_38px_rgba(25,31,42,0.07)] transition-shadow hover:shadow-[0_16px_44px_rgba(25,31,42,0.09)] sm:rounded-[34px]',
+  chip: 'rounded-full border border-[#E6E9EF] bg-white px-5 py-2.5 text-[15px] font-[300] leading-none text-[#3A3D45] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)]',
 } as const;
 
 type FilterSidebarProps = {

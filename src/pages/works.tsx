@@ -22,8 +22,8 @@ const WorksPage: NextPageWithLayout<WorksPageProps> = ({ categories, tasks, filt
   return (
     <>
       <TitleSeo
-        title="Задания и заказы в Молдове — Treabo"
-        description="Лента заданий Treabo для специалистов и заказчиков: фильтры, карта, отклики и быстрые заказы."
+        title="Задания и заказы в России — Treabo"
+        description="Лента заданий Treabo для специалистов и заказчиков в России: фильтры, карта, отклики и быстрые заказы."
         canonical={`${siteUrl}/works`}
       />
       <JobsMarketplacePage categories={categories} tasks={tasks} initialFilters={filters} />
