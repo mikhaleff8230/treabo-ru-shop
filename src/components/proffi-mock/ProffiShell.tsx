@@ -130,6 +130,8 @@ export function ProffiHeader() {
         initialTab={authTab}
         login={auth.login}
         register={auth.register}
+        sendOtp={auth.sendOtp}
+        verifyOtp={auth.verifyOtp}
         onSuccess={auth.refresh}
       />
     </>

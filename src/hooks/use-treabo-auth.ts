@@ -2,11 +2,17 @@ import { useCallback, useEffect, useState } from 'react';
 import {
   clearTreaboSession,
   getStoredTreaboUser,
+  isTreaboOtpSentResponse,
   isTreaboSpecialist,
   treaboLogin,
   treaboMe,
   treaboRegister,
+  treaboSendPhoneOtp,
   treaboUpdateProfile,
+  treaboVerifyPhoneOtp,
+  type TreaboAuthResponse,
+  type TreaboAuthResult,
+  type TreaboOtpSentResponse,
   type TreaboUser,
 } from '@/data/treabo-auth';
 
@@ -33,6 +39,11 @@ export function useTreaboAuth() {
     setUser(null);
   }, []);
 
+  const completeAuth = useCallback((data: TreaboAuthResponse) => {
+    setUser(data.user);
+    return data;
+  }, []);
+
   return {
     user,
     loading,
@@ -40,9 +51,25 @@ export function useTreaboAuth() {
     isSpecialist: isTreaboSpecialist(user),
     refresh,
     logout,
-    login: async (input: { phone?: string; email?: string; password: string }) => {
-      const data = await treaboLogin(input);
+    sendOtp: async (input: {
+      phone: string;
+      purpose: 'login' | 'register';
+      password?: string;
+      name?: string;
+      role?: 'customer' | 'specialist';
+      email?: string;
+      city?: string;
+    }): Promise<TreaboOtpSentResponse> => treaboSendPhoneOtp(input),
+    verifyOtp: async (input: { phone: string; otp_id: string; code: string }) => {
+      const data = await treaboVerifyPhoneOtp(input);
       setUser(data.user);
+      return data;
+    },
+    login: async (input: { phone?: string; email?: string; password: string }): Promise<TreaboAuthResult> => {
+      const data = await treaboLogin(input);
+      if (!isTreaboOtpSentResponse(data)) {
+        return completeAuth(data);
+      }
       return data;
     },
     register: async (input: {
@@ -52,9 +79,11 @@ export function useTreaboAuth() {
       role: 'customer' | 'specialist';
       email?: string;
       city?: string;
-    }) => {
+    }): Promise<TreaboAuthResult> => {
       const data = await treaboRegister(input);
-      setUser(data.user);
+      if (!isTreaboOtpSentResponse(data)) {
+        return completeAuth(data);
+      }
       return data;
     },
     updateProfile: async (input: {

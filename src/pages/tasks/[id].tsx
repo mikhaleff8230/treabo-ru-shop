@@ -392,7 +392,7 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
           </div>
         ) : null}
 
-        <TreaboAuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialTab="login" login={auth.login} register={auth.register} onSuccess={auth.refresh} />
+        <TreaboAuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialTab="login" login={auth.login} register={auth.register} sendOtp={auth.sendOtp} verifyOtp={auth.verifyOtp} onSuccess={auth.refresh} />
         <TreaboApplyConfirmModal
           open={applyOpen}
           price={responsePrice}

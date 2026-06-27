@@ -277,6 +277,8 @@ export default function MasterRegistrationPage() {
         initialRole="specialist"
         login={auth.login}
         register={auth.register}
+        sendOtp={auth.sendOtp}
+        verifyOtp={auth.verifyOtp}
         onSuccess={auth.refresh}
       />
     </div>

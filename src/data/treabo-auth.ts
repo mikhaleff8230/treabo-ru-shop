@@ -18,6 +18,14 @@ export type TreaboAuthResponse = {
   user: TreaboUser;
 };
 
+export type TreaboOtpSentResponse = {
+  status: 'otp_sent';
+  phone: string;
+  otp_id: string;
+};
+
+export type TreaboAuthResult = TreaboAuthResponse | TreaboOtpSentResponse;
+
 const TOKEN_KEY = 'treabo_token';
 const USER_KEY = 'treabo_user';
 
@@ -53,6 +61,15 @@ async function authFetch<T>(path: string, init?: RequestInit): Promise<T> {
   }
 
   return payload as T;
+}
+
+export function isTreaboOtpSentResponse(payload: unknown): payload is TreaboOtpSentResponse {
+  return (
+    typeof payload === 'object' &&
+    payload !== null &&
+    (payload as TreaboOtpSentResponse).status === 'otp_sent' &&
+    typeof (payload as TreaboOtpSentResponse).otp_id === 'string'
+  );
 }
 
 export function getStoredTreaboToken(): string | null {
@@ -96,15 +113,26 @@ export function clearTreaboSession() {
   window.localStorage.removeItem('treabo_role');
 }
 
-export async function treaboRegister(input: {
-  name: string;
+export async function treaboSendPhoneOtp(input: {
   phone: string;
-  password: string;
-  role: 'customer' | 'specialist';
+  purpose: 'login' | 'register';
+  password?: string;
+  name?: string;
+  role?: 'customer' | 'specialist';
   email?: string;
   city?: string;
 }) {
-  const data = await authFetch<TreaboAuthResponse>('/auth/register-phone', {
+  return authFetch<TreaboOtpSentResponse>('/auth/phone/send-otp', {
+    method: 'POST',
+    body: JSON.stringify({
+      ...input,
+      phone: normalizeTreaboPhone(input.phone),
+    }),
+  });
+}
+
+export async function treaboVerifyPhoneOtp(input: { phone: string; otp_id: string; code: string }) {
+  const data = await authFetch<TreaboAuthResponse>('/auth/phone/verify-otp', {
     method: 'POST',
     body: JSON.stringify({
       ...input,
@@ -116,7 +144,34 @@ export async function treaboRegister(input: {
   return data;
 }
 
-export async function treaboLogin(input: { phone?: string; email?: string; password: string }) {
+export async function treaboRegister(input: {
+  name: string;
+  phone: string;
+  password: string;
+  role: 'customer' | 'specialist';
+  email?: string;
+  city?: string;
+}): Promise<TreaboAuthResult> {
+  const payload = await authFetch<TreaboAuthResult>('/auth/register-phone', {
+    method: 'POST',
+    body: JSON.stringify({
+      ...input,
+      phone: normalizeTreaboPhone(input.phone),
+    }),
+  });
+
+  if (!isTreaboOtpSentResponse(payload)) {
+    persistTreaboSession(payload);
+  }
+
+  return payload;
+}
+
+export async function treaboLogin(input: {
+  phone?: string;
+  email?: string;
+  password: string;
+}): Promise<TreaboAuthResult> {
   const body: Record<string, string> = { password: input.password };
 
   if (input.email?.trim()) {
@@ -125,13 +180,16 @@ export async function treaboLogin(input: { phone?: string; email?: string; passw
     body.phone = normalizeTreaboPhone(input.phone);
   }
 
-  const data = await authFetch<TreaboAuthResponse>('/auth/login', {
+  const payload = await authFetch<TreaboAuthResult>('/auth/login', {
     method: 'POST',
     body: JSON.stringify(body),
   });
 
-  persistTreaboSession(data);
-  return data;
+  if (!isTreaboOtpSentResponse(payload)) {
+    persistTreaboSession(payload);
+  }
+
+  return payload;
 }
 
 export async function treaboMe(token = getStoredTreaboToken()): Promise<TreaboUser | null> {

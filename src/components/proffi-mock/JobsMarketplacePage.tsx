@@ -574,6 +574,8 @@ export default function JobsMarketplacePage({
         initialTab="login"
         login={auth.login}
         register={auth.register}
+        sendOtp={auth.sendOtp}
+        verifyOtp={auth.verifyOtp}
         onSuccess={auth.refresh}
       />
     </div>
