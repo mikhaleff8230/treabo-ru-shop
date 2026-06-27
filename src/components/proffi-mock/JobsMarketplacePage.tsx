@@ -14,6 +14,7 @@ import {
   Wrench,
 } from 'lucide-react';
 import TreaboAuthModal from '@/components/auth/treabo-auth-modal';
+import TreaboTasksMap from '@/components/treabo/TreaboTasksMap';
 import TreaboTasksMapModal from '@/components/treabo/TreaboTasksMapModal';
 import TreaboCategorySearchInput from '@/components/treabo/TreaboCategorySearchInput';
 import RussiaCityInput from '@/components/treabo/RussiaCityInput';
@@ -120,6 +121,8 @@ function JobCard({
   text,
   auth,
   onAuthOpen,
+  highlighted,
+  cardRef,
 }: {
   job: Omit<UiJobCard, 'icon' | 'task'>;
   task?: TreaboTask;
@@ -127,13 +130,18 @@ function JobCard({
   text: ReturnType<typeof getTreaboText>;
   auth: ReturnType<typeof useTreaboAuth>;
   onAuthOpen: () => void;
+  highlighted?: boolean;
+  cardRef?: (node: HTMLElement | null) => void;
 }) {
   const [saved, setSaved] = useState(false);
   const primaryPhoto = job.photos[0] || '/proffi/task-preview-default.svg';
   const previewPhotos = job.photos.slice(1, 4);
 
   return (
-    <article className={marketplace.card}>
+    <article
+      ref={cardRef}
+      className={`${marketplace.card} transition ${highlighted ? 'ring-2 ring-[#D9F36B] ring-offset-2' : ''}`}
+    >
       <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_clamp(150px,18%,230px)_260px]">
         <div className="p-3 sm:p-4">
           <div className="flex gap-3 sm:gap-4">
@@ -357,6 +365,8 @@ export default function JobsMarketplacePage({
   });
   const [serviceQuery, setServiceQuery] = useState(initialFilters.q || '');
   const [searchCategoryId, setSearchCategoryId] = useState(initialFilters.category_id || '');
+  const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
+  const cardRefs = useMemo(() => new Map<string, HTMLElement>(), []);
 
   const visibleJobs = useMemo(() => buildJobCards(tasks, categories, 'ru'), [tasks, categories]);
   const availableCount = tasks.length || visibleJobs.length;
@@ -365,6 +375,27 @@ export default function JobsMarketplacePage({
   const categoryOptions = categories.length
     ? flattenCategoryOptions(categories)
     : [];
+
+  function handleTaskMapClick(task: TreaboTask) {
+    const id = String(task.id);
+    setHighlightedTaskId(id);
+    const node = cardRefs.get(id);
+    if (node) {
+      node.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+  }
+
+  function runQuickTagSearch(tag: string) {
+    setServiceQuery(tag);
+    setSearchCategoryId('');
+    const next: TreaboTaskFilters = {
+      ...filters,
+      q: tag,
+      category_id: undefined,
+    };
+    setFilters(next);
+    applyFilters(next);
+  }
 
   function runSearch() {
     const next: TreaboTaskFilters = {
@@ -453,66 +484,81 @@ export default function JobsMarketplacePage({
       <ProffiHeader />
       <main className="overflow-hidden">
         <section className="border-b border-[#E7E9EC] bg-white">
-          <div className={`mx-auto ${marketplace.maxWidth} px-4 py-4 sm:px-6 lg:px-8`}>
-            <div className="flex flex-col gap-3 text-sm text-[#777D88] md:flex-row md:items-center md:justify-between">
-              <div className="flex flex-wrap items-center gap-2">
-                <Link href="/" className="hover:text-[#232323]">
-                  {text.common.home}
-                </Link>
-                <span>/</span>
-                <span>{filters.city || text.city}</span>
-                <span>/</span>
-                <span className="text-[#232323]">{text.common.allTasks}</span>
+          <div className={`mx-auto ${marketplace.maxWidth} px-4 py-5 sm:px-6 lg:px-8`}>
+            <div className="grid gap-4 lg:grid-cols-[1fr_320px] lg:items-end">
+              <div className="min-w-0">
+                <div className="mb-3 flex flex-wrap items-center gap-2 text-sm text-[#777D88]">
+                  <Link href="/" className="hover:text-[#232323]">
+                    {text.common.home}
+                  </Link>
+                  <span>/</span>
+                  <span>{filters.city || text.city}</span>
+                  <span>/</span>
+                  <span className="text-[#232323]">{text.common.allTasks}</span>
+                </div>
+                <h1 className="break-words text-[28px] font-[400] leading-[1.06] text-[#232323] sm:text-[36px]">
+                  {interpolate(text.works.title, { city: filters.city || text.city })}
+                </h1>
+                <p className="mt-2 max-w-2xl text-[13px] leading-6 text-[#777D88] sm:text-sm">{text.works.subtitle}</p>
               </div>
-              <span className="inline-flex items-center gap-1 font-medium text-[#232323]">
-                <MapPin className="h-4 w-4" /> {filters.city || text.city}
-              </span>
+              <div className="rounded-[20px] border border-[#E7E9EC] bg-[#D9F36B] p-4">
+                <div className="text-xs font-semibold">{text.works.availableToday}</div>
+                <div className="mt-1 text-2xl font-[400]">{interpolate(text.works.tasksCount, { count: availableCount })}</div>
+                <div className="mt-1 text-xs font-medium">{text.works.responsesAfterLogin}</div>
+              </div>
+            </div>
+
+            <div className="mt-5 grid gap-2 rounded-[22px] border border-[#E7E9EC] bg-white p-2 shadow-[0_8px_24px_rgba(24,28,35,0.045)] sm:grid-cols-[1fr_205px_130px]">
+              <TreaboCategorySearchInput
+                categories={categories}
+                value={serviceQuery}
+                categoryId={searchCategoryId}
+                onValueChange={setServiceQuery}
+                onCategoryIdChange={setSearchCategoryId}
+                placeholder={text.common.servicePlaceholder}
+              />
+              <label className="flex h-11 items-center gap-2.5 rounded-[16px] bg-[#F6F7F5] px-3.5">
+                <MapPin className="h-4 w-4 text-[#777D88]" />
+                <RussiaCityInput
+                  value={filters.city || ''}
+                  onChange={(city) => setFilters((current) => ({ ...current, city }))}
+                  placeholder={text.city}
+                />
+              </label>
+              <button
+                type="button"
+                onClick={runSearch}
+                className="rounded-[16px] bg-[#232323] px-4 text-xs font-semibold text-white"
+              >
+                {text.common.search}
+              </button>
             </div>
           </div>
         </section>
 
-        <section className={`mx-auto ${marketplace.maxWidth} px-4 py-8 sm:px-6 lg:px-8`}>
-          <div className="mb-8 grid gap-5 lg:grid-cols-[1fr_320px] lg:items-end">
-            <div className="min-w-0">
-              <h1 className="break-words text-[34px] font-bold leading-[1.05] text-[#232323] sm:text-[44px]">
-                {interpolate(text.works.title, { city: filters.city || text.city })}
-              </h1>
-              <p className="mt-3 max-w-3xl text-base leading-7 text-[#777D88]">{text.works.subtitle}</p>
-            </div>
-            <div className="rounded-[28px] border border-[#E7E9EC] bg-[#D9F36B] p-5 text-[#232323]">
-              <div className="text-sm font-semibold">{text.works.availableToday}</div>
-              <div className="mt-1 text-3xl font-bold">{interpolate(text.works.tasksCount, { count: availableCount })}</div>
-              <div className="mt-3 flex items-center gap-2 text-sm font-medium">
-                <CalendarClock className="h-4 w-4" />
-                {text.works.responsesAfterLogin}
+        <section className={`mx-auto ${marketplace.maxWidth} px-4 py-6 sm:px-6 lg:px-8`}>
+          <div className="mb-6">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-bold text-[#232323]">{text.common.map}</div>
+                <div className="text-xs text-[#777D88]">Чёрные плашки — цена и название задания</div>
               </div>
+              <button
+                type="button"
+                onClick={() => setMapOpen(true)}
+                className="inline-flex items-center gap-2 rounded-full border border-[#E7E9EC] bg-white px-4 py-2 text-xs font-semibold text-[#232323]"
+              >
+                <Map className="h-4 w-4" />
+                {text.common.viewOnMap}
+              </button>
             </div>
-          </div>
-
-          <div className="mb-8 grid gap-2 rounded-[22px] border border-[#E7E9EC] bg-white p-2 shadow-[0_8px_24px_rgba(24,28,35,0.045)] sm:grid-cols-[1fr_205px_130px]">
-            <TreaboCategorySearchInput
-              categories={categories}
-              value={serviceQuery}
-              categoryId={searchCategoryId}
-              onValueChange={setServiceQuery}
-              onCategoryIdChange={setSearchCategoryId}
-              placeholder={text.common.servicePlaceholder}
+            <TreaboTasksMap
+              tasks={tasks}
+              heightClassName="h-[320px] sm:h-[380px]"
+              highlightedTaskId={highlightedTaskId}
+              onTaskClick={handleTaskMapClick}
+              navigateOnClick={false}
             />
-            <label className="flex h-11 items-center gap-2.5 rounded-[16px] bg-[#F6F7F5] px-3.5">
-              <MapPin className="h-4 w-4 text-[#777D88]" />
-              <RussiaCityInput
-                value={filters.city || ''}
-                onChange={(city) => setFilters((current) => ({ ...current, city }))}
-                placeholder={text.city}
-              />
-            </label>
-            <button
-              type="button"
-              onClick={runSearch}
-              className="rounded-[16px] bg-[#232323] px-4 text-xs font-semibold text-white"
-            >
-              {text.common.search}
-            </button>
           </div>
 
           <div className="sticky top-14 z-30 -mx-4 mb-5 border-y border-[#E7E9EC] bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
@@ -575,6 +621,11 @@ export default function JobsMarketplacePage({
                     text={text}
                     auth={auth}
                     onAuthOpen={() => setAuthOpen(true)}
+                    highlighted={highlightedTaskId === job.id}
+                    cardRef={(node) => {
+                      if (node) cardRefs.set(job.id, node);
+                      else cardRefs.delete(job.id);
+                    }}
                   />
                 )) : (
                   <div className="rounded-[28px] border border-[#E7E9EC] bg-white p-8 text-center shadow-sm">
@@ -592,7 +643,7 @@ export default function JobsMarketplacePage({
         <section className={`mx-auto ${marketplace.maxWidth} px-4 pb-6 sm:px-6 lg:px-8`}>
           <div className="flex flex-wrap gap-2">
             {quickTags.map((tag) => (
-              <button key={tag} type="button" className={marketplace.chip}>
+              <button key={tag} type="button" className={marketplace.chip} onClick={() => runQuickTagSearch(tag)}>
                 {tag}
               </button>
             ))}
@@ -618,7 +669,13 @@ export default function JobsMarketplacePage({
         {filtersPanel}
       </MarketplaceMobileFiltersDrawer>
 
-      <TreaboTasksMapModal open={mapOpen} onClose={() => setMapOpen(false)} tasks={tasks} />
+      <TreaboTasksMapModal
+        open={mapOpen}
+        onClose={() => setMapOpen(false)}
+        tasks={tasks}
+        highlightedTaskId={highlightedTaskId}
+        onTaskClick={handleTaskMapClick}
+      />
       <TreaboAuthModal
         open={authOpen}
         onClose={() => setAuthOpen(false)}

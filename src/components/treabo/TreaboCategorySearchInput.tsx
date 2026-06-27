@@ -12,6 +12,7 @@ type TreaboCategorySearchInputProps = {
   placeholder?: string;
   className?: string;
   inputClassName?: string;
+  showSelectedHint?: boolean;
 };
 
 export default function TreaboCategorySearchInput({
@@ -23,6 +24,7 @@ export default function TreaboCategorySearchInput({
   placeholder = 'Какая услуга нужна?',
   className = '',
   inputClassName = 'w-full bg-transparent text-xs font-medium text-[#232323] outline-none placeholder:text-[#777D88] sm:text-[13px]',
+  showSelectedHint = false,
 }: TreaboCategorySearchInputProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(false);
@@ -67,7 +69,7 @@ export default function TreaboCategorySearchInput({
         />
       </div>
 
-      {selectedCategory && categoryId ? (
+      {showSelectedHint && selectedCategory && categoryId ? (
         <div className="mt-2 text-xs font-medium text-[#777D88]">
           Категория: <span className="text-[#232323]">{categoryLabel(selectedCategory)}</span>
         </div>
