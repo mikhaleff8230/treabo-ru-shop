@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import Link from 'next/link';
 import {
@@ -7,38 +7,37 @@ import {
   Check,
   CheckCircle2,
   ListChecks,
-  MapPin,
   MessageCircle,
-  Minus,
   Plus,
   Send,
   UserRound,
 } from 'lucide-react';
 import routes from '@/config/routes';
+import TreaboPhoneInput from '@/components/treabo/TreaboPhoneInput';
+import TreaboAddressPicker from '@/components/treabo/TreaboAddressPicker';
+import RussiaCityInput from '@/components/treabo/RussiaCityInput';
+import OtpCodeInput from '@/components/auth/otp-code-input';
 import { createTreaboTask, uploadTreaboFile, type TreaboUpload } from '@/data/treabo';
-import { getStoredTreaboToken } from '@/data/treabo-auth';
+import { getStoredTreaboToken, isTreaboOtpSentResponse } from '@/data/treabo-auth';
+import { useTreaboAuth } from '@/hooks/use-treabo-auth';
 import { getTreaboText } from '@/lib/treabo/i18n';
-
-type Draft = Record<string, any> & {
-  id?: string;
-  prompt?: string;
-  category?: string;
-  saved?: boolean;
-  photos?: TreaboUpload[];
-  taskId?: string;
-};
-
-type AiDraft = {
-  detected_language: string;
-  title: string;
-  category_slug: string;
-  city: string | null;
-  urgency: string;
-  description: string;
-  master_summary: string;
-  missing_questions: string[];
-  confidence: number;
-};
+import { normalizeTreaboPhone } from '@/lib/treabo/phone';
+import {
+  type AiDraft,
+  type ClarifyField,
+  buildClarifyFields,
+  buildTaskDescription,
+  categorySlugToLabel,
+  generateLocalAiDraft,
+  needsManualCategory,
+  needsManualCity,
+  needsManualUrgency,
+  parseBudgetInput,
+  resolveTaskCategory,
+  resolveTaskTitle,
+  urgencyToLabel,
+  type WizardDraft,
+} from '@/lib/treabo/request-wizard';
 
 type Step = {
   key: string;
@@ -49,7 +48,10 @@ type Step = {
   optional?: boolean;
 };
 
-const inputClass = 'w-full rounded-2xl bg-[#eef1f7] px-4 py-4 text-base text-[#232323] outline-none placeholder:text-[#7d849b] focus:ring-2 focus:ring-[#d9f36b]';
+const MAX_PHOTO_BYTES = 20 * 1024 * 1024;
+const MAX_PHOTOS = 10;
+const inputClass =
+  'w-full rounded-2xl bg-[#eef1f7] px-4 py-4 text-base text-[#232323] outline-none placeholder:text-[#7d849b] focus:ring-2 focus:ring-[#d9f36b]';
 
 function createDraftId() {
   return `trb-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -57,36 +59,6 @@ function createDraftId() {
 
 function treaboApiUrl(path: string) {
   return `/api/treabo/${path.replace(/^\//, '')}`;
-}
-
-function generateLocalAiDraft(text: string, _locale?: string): AiDraft {
-  const normalized = text.toLowerCase();
-  const hasBath = /ванн|сануз|душ/.test(normalized);
-  const hasTile = /плит/.test(normalized);
-  const isUrgent = /сроч|сегодня/.test(normalized);
-  const city = /кишин/.test(normalized) ? 'Кишинёв' : null;
-  const category = hasBath ? 'bathroom-renovation' : hasTile ? 'tile-work' : 'other';
-
-  return {
-    detected_language: 'ru',
-    title: hasBath
-      ? 'Ремонт ванной комнаты'
-      : hasTile
-        ? 'Плиточные работы'
-        : 'Заявка для специалиста',
-    category_slug: category,
-    city,
-    urgency: isUrgent ? 'urgent' : 'unknown',
-    description: `Клиент описал задачу так: ${text}. Нужны дополнительные детали для оценки стоимости и сроков.`,
-    master_summary: `${hasBath ? 'Ванная' : hasTile ? 'Плитка' : 'Работа'}, ${isUrgent ? 'срочно' : 'срок уточнить'}${city ? `, ${city}` : ''}.`,
-    missing_questions: [
-      'Какая площадь работ?',
-      'Есть ли фотографии?',
-      'Материалы уже куплены?',
-      'Когда специалист может приехать на осмотр?',
-    ],
-    confidence: 0.55,
-  };
 }
 
 function Option({
@@ -110,38 +82,38 @@ function Option({
   );
 }
 
-function TreaboMapMock({ label }: { label: string }) {
-  return (
-    <div className="relative mt-8 h-[360px] overflow-hidden rounded-2xl border border-[#dfe4ee] bg-[#eaf0e3] md:h-[520px]">
-      <div className="absolute inset-0 opacity-80 [background-image:linear-gradient(30deg,transparent_46%,#d1d9c8_47%,#d1d9c8_53%,transparent_54%),linear-gradient(120deg,transparent_46%,#cfd8e3_47%,#cfd8e3_53%,transparent_54%),linear-gradient(#f8faf5_1px,transparent_1px),linear-gradient(90deg,#f8faf5_1px,transparent_1px)] [background-size:180px_180px,240px_240px,56px_56px,56px_56px]" />
-      <div className="absolute left-[47%] top-[43%] flex h-12 w-12 items-center justify-center rounded-full bg-[#232323] text-white shadow-xl">
-        <MapPin className="h-6 w-6 fill-white" />
-      </div>
-      <div className="absolute bottom-5 right-5 flex flex-col overflow-hidden rounded-full bg-white shadow-xl">
-        <button className="flex h-12 w-12 items-center justify-center border-b border-zinc-100"><Plus className="h-5 w-5" /></button>
-        <button className="flex h-12 w-12 items-center justify-center"><Minus className="h-5 w-5" /></button>
-      </div>
-      <div className="absolute bottom-4 left-4 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-[#232323]">{label}</div>
-    </div>
-  );
-}
-
 export default function RequestWizard() {
   const router = useRouter();
   const text = getTreaboText(router.locale);
   const steps = text.request.steps as Step[];
+  const { user, isAuthenticated, login, register, sendOtp, verifyOtp } = useTreaboAuth();
+
   const [stepIndex, setStepIndex] = useState(0);
-  const [draft, setDraft] = useState<Draft>({});
+  const [draft, setDraft] = useState<WizardDraft>({ city: text.city });
   const [aiDraft, setAiDraft] = useState<AiDraft | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [savingTask, setSavingTask] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [taskCreated, setTaskCreated] = useState(false);
+  const [createdTaskId, setCreatedTaskId] = useState<string | null>(null);
+
+  const [phone, setPhone] = useState('7');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [otpStep, setOtpStep] = useState(false);
+  const [otpId, setOtpId] = useState<string | null>(null);
+  const [otpPhone, setOtpPhone] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [otpPurpose, setOtpPurpose] = useState<'login' | 'register'>('login');
+  const [resendTimer, setResendTimer] = useState(0);
+  const autoCreateAttempted = useRef(false);
 
   const step = steps[stepIndex];
-  const taskName = draft.category || draft.prompt || text.request.newRequest;
-  const selectedMaterials = useMemo(() => new Set<string>(draft.materials || []), [draft.materials]);
+  const clarifyFields = useMemo(() => buildClarifyFields(aiDraft), [aiDraft]);
+  const taskName = draft.category || aiDraft?.title || draft.prompt || text.request.newRequest;
 
   useEffect(() => {
     const queryPrompt = typeof router.query.q === 'string' ? router.query.q : '';
@@ -152,12 +124,26 @@ export default function RequestWizard() {
 
   useEffect(() => {
     if (!draft.id) return;
-    localStorage.setItem(`treabo-request-${draft.id}`, JSON.stringify(draft));
+    const { pendingPhotoFiles, ...serializable } = draft;
+    localStorage.setItem(`treabo-request-${draft.id}`, JSON.stringify(serializable));
   }, [draft]);
 
-  function update(key: string, value: any) {
+  useEffect(() => {
+    if (!otpStep || resendTimer <= 0) return undefined;
+    const timer = window.setInterval(() => setResendTimer((v) => (v > 0 ? v - 1 : 0)), 1000);
+    return () => window.clearInterval(timer);
+  }, [otpStep, resendTimer]);
+
+  const update = useCallback((key: string, value: unknown) => {
     setDraft((current) => ({ ...current, [key]: value }));
-  }
+  }, []);
+
+  const updateAiAnswer = useCallback((question: string, value: string) => {
+    setDraft((current) => ({
+      ...current,
+      aiAnswers: { ...(current.aiAnswers || {}), [question]: value },
+    }));
+  }, []);
 
   function ensureDraftId() {
     if (draft.id) return draft.id;
@@ -167,45 +153,190 @@ export default function RequestWizard() {
     return id;
   }
 
-  async function saveTaskIfPossible(nextDraft: Draft) {
-    const token = getStoredTreaboToken();
-    if (!token || nextDraft.taskId) return nextDraft;
+  async function uploadAllPhotos(token: string, currentDraft: WizardDraft): Promise<TreaboUpload[]> {
+    const existing = currentDraft.photos || [];
+    const pending = currentDraft.pendingPhotoFiles || [];
+    if (!pending.length) return existing;
 
+    const uploaded = await Promise.all(
+      pending.map((file) => uploadTreaboFile(file, { token, folder: 'tasks' })),
+    );
+    return [...existing, ...uploaded].slice(0, MAX_PHOTOS);
+  }
+
+  async function createTaskFromDraft(currentDraft: WizardDraft, token: string) {
+    const photos = await uploadAllPhotos(token, currentDraft);
+    const budget = parseBudgetInput(String(currentDraft.budget || ''));
+
+    return createTreaboTask(token, {
+      title: resolveTaskTitle(currentDraft, text.request.newRequest),
+      description: buildTaskDescription(currentDraft),
+      category: resolveTaskCategory(currentDraft),
+      city: currentDraft.city || aiDraft?.city || text.city,
+      address: currentDraft.address || '',
+      lat: currentDraft.lat ?? undefined,
+      lng: currentDraft.lng ?? undefined,
+      budget,
+      deadline: currentDraft.deadline || null,
+      photos,
+    });
+  }
+
+  const finishWithTask = useCallback(
+    async (token: string) => {
+      setSavingTask(true);
+      setSubmitError('');
+      try {
+        const task = await createTaskFromDraft(draft, token);
+        setCreatedTaskId(String(task.id));
+        setTaskCreated(true);
+        setDraft((current) => ({ ...current, taskId: String(task.id), pendingPhotoFiles: [] }));
+        router.push(routes.taskUrl(task));
+      } catch (error) {
+        const message = error instanceof Error ? error.message : text.request.taskCreateError;
+        setSubmitError(message);
+        ensureDraftId();
+      } finally {
+        setSavingTask(false);
+      }
+    },
+    [draft, router, text.request.taskCreateError],
+  );
+
+  useEffect(() => {
+    if (step?.key !== 'contacts' || !isAuthenticated || savingTask || taskCreated || autoCreateAttempted.current) return;
+    const token = getStoredTreaboToken();
+    if (token) {
+      autoCreateAttempted.current = true;
+      finishWithTask(token);
+    }
+  }, [step?.key, isAuthenticated, savingTask, taskCreated, finishWithTask]);
+
+  async function handleAuthAndCreate() {
+    setSubmitError('');
     setSavingTask(true);
+
     try {
-      const task = await createTreaboTask(token, {
-        title: nextDraft.category || nextDraft.aiDraft?.title || nextDraft.prompt || text.request.newRequest,
-        description: nextDraft.details || nextDraft.aiDraft?.description || nextDraft.prompt || text.request.newRequest,
-        category: nextDraft.aiDraft?.category_slug || 'other',
-        city: nextDraft.city || nextDraft.aiDraft?.city || text.city,
-        address: nextDraft.address || '',
-        budget: nextDraft.budget ? Number(String(nextDraft.budget).replace(/\D/g, '')) : null,
-        deadline: nextDraft.deadline || null,
-        photos: nextDraft.photos || [],
-      });
-      return { ...nextDraft, taskId: task.id };
-    } catch {
-      return nextDraft;
+      if (isAuthenticated) {
+        const token = getStoredTreaboToken();
+        if (!token) throw new Error(text.request.taskCreateError);
+        await finishWithTask(token);
+        return;
+      }
+
+      const normalizedPhone = normalizeTreaboPhone(phone);
+
+      if (name.trim()) {
+        const result = await register({
+          name: name.trim(),
+          phone: normalizedPhone,
+          password,
+          role: 'customer',
+          city: draft.city || text.city,
+        });
+        if (isTreaboOtpSentResponse(result)) {
+          setOtpStep(true);
+          setOtpId(result.otp_id);
+          setOtpPhone(result.phone);
+          setOtpPurpose('register');
+          setResendTimer(60);
+          return;
+        }
+        await finishWithTask(result.token);
+        return;
+      }
+
+      const result = await login({ phone: normalizedPhone, password });
+      if (isTreaboOtpSentResponse(result)) {
+        setOtpStep(true);
+        setOtpId(result.otp_id);
+        setOtpPhone(result.phone);
+        setOtpPurpose('login');
+        setResendTimer(60);
+        return;
+      }
+      await finishWithTask(result.token);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : text.request.taskCreateError);
     } finally {
       setSavingTask(false);
     }
   }
 
-  async function next() {
-    ensureDraftId();
-    if (stepIndex >= steps.length - 1) {
-      const nextDraft = await saveTaskIfPossible({ ...draft, saved: true, savedAt: new Date().toISOString() });
-      setDraft(nextDraft);
-      return;
+  async function handleVerifyOtp(code: string) {
+    if (!otpId) return;
+    setSubmitError('');
+    setSavingTask(true);
+    try {
+      const data = await verifyOtp({ phone: otpPhone, otp_id: otpId, code });
+      await finishWithTask(data.token);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'Неверный код');
+    } finally {
+      setSavingTask(false);
     }
+  }
+
+  async function handleResendOtp() {
+    if (resendTimer > 0 || savingTask) return;
+    setSubmitError('');
+    setSavingTask(true);
+    try {
+      const payload =
+        otpPurpose === 'register'
+          ? await sendOtp({
+              phone: otpPhone,
+              purpose: 'register',
+              password,
+              name: name.trim(),
+              role: 'customer',
+              city: draft.city || text.city,
+            })
+          : await sendOtp({ phone: otpPhone, purpose: 'login', password });
+      setOtpId(payload.otp_id);
+      setOtpCode('');
+      setResendTimer(60);
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : 'SMS не отправлено');
+    } finally {
+      setSavingTask(false);
+    }
+  }
+
+  function next() {
+    ensureDraftId();
+    if (stepIndex >= steps.length - 1) return;
     setStepIndex((value) => value + 1);
   }
 
-  async function uploadPhotos(files: FileList | null) {
+  function addPhotoFiles(files: FileList | null) {
+    if (!files?.length) return;
+    const currentCount = (draft.photos?.length || 0) + (draft.pendingPhotoFiles?.length || 0);
+    const selected = Array.from(files).slice(0, Math.max(0, MAX_PHOTOS - currentCount));
+    const tooLarge = selected.find((file) => file.size > MAX_PHOTO_BYTES);
+    if (tooLarge) {
+      setUploadError(text.request.fileTooLarge);
+      return;
+    }
+    setUploadError('');
+    setDraft((current) => ({
+      ...current,
+      pendingPhotoFiles: [...(current.pendingPhotoFiles || []), ...selected].slice(0, MAX_PHOTOS),
+    }));
+  }
+
+  async function uploadPhotosWithAuth(files: FileList | null) {
     if (!files?.length) return;
     const token = getStoredTreaboToken();
     if (!token) {
-      setUploadError(text.request.login || 'Login required');
+      addPhotoFiles(files);
+      return;
+    }
+
+    const selected = Array.from(files);
+    const tooLarge = selected.find((file) => file.size > MAX_PHOTO_BYTES);
+    if (tooLarge) {
+      setUploadError(text.request.fileTooLarge);
       return;
     }
 
@@ -213,10 +344,10 @@ export default function RequestWizard() {
     setUploadError('');
     try {
       const currentPhotos = draft.photos || [];
-      const slots = Math.max(0, 10 - currentPhotos.length);
-      const selected = Array.from(files).slice(0, slots);
-      const uploaded = await Promise.all(selected.map((file) => uploadTreaboFile(file, { token, folder: 'tasks' })));
-      setDraft((current) => ({ ...current, photos: [...(current.photos || []), ...uploaded].slice(0, 10) }));
+      const slots = Math.max(0, MAX_PHOTOS - currentPhotos.length - (draft.pendingPhotoFiles?.length || 0));
+      const toUpload = selected.slice(0, slots);
+      const uploaded = await Promise.all(toUpload.map((file) => uploadTreaboFile(file, { token, folder: 'tasks' })));
+      setDraft((current) => ({ ...current, photos: [...(current.photos || []), ...uploaded].slice(0, MAX_PHOTOS) }));
     } catch (error) {
       setUploadError(error instanceof Error ? error.message : 'Upload failed');
     } finally {
@@ -231,19 +362,20 @@ export default function RequestWizard() {
     }));
   }
 
+  function removePendingPhoto(index: number) {
+    setDraft((current) => ({
+      ...current,
+      pendingPhotoFiles: (current.pendingPhotoFiles || []).filter((_, i) => i !== index),
+    }));
+  }
+
   function back() {
-    if (draft.saved) {
-      setDraft((current) => ({ ...current, saved: false }));
+    if (otpStep) {
+      setOtpStep(false);
+      setOtpCode('');
       return;
     }
     setStepIndex((value) => Math.max(0, value - 1));
-  }
-
-  function toggleMaterial(value: string) {
-    const nextValues = new Set(selectedMaterials);
-    if (nextValues.has(value)) nextValues.delete(value);
-    else nextValues.add(value);
-    update('materials', Array.from(nextValues));
   }
 
   async function submitPrompt() {
@@ -259,14 +391,14 @@ export default function RequestWizard() {
 
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 10000);
+      const timeout = setTimeout(() => controller.abort(), 15000);
       const response = await fetch(treaboApiUrl('/ai/job-draft'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json; charset=utf-8', Accept: 'application/json' },
         signal: controller.signal,
         body: JSON.stringify({
           text: prompt,
-          city_hint: text.city,
+          city_hint: draft.city || text.city,
           category_hint: null,
           language_hint: 'ru',
         }),
@@ -277,42 +409,202 @@ export default function RequestWizard() {
       if (!response.ok || !payload?.success) throw new Error(payload?.message || 'AI error');
 
       const generatedDraft = payload.data as AiDraft;
-      setAiDraft(generatedDraft);
-      setDraft((current) => ({
-        ...current,
-        aiDraft: generatedDraft,
-        category: generatedDraft.title || current.category,
-        city: generatedDraft.city || current.city,
-        details: generatedDraft.description || current.details,
-      }));
+      applyAiDraft(generatedDraft);
     } catch {
-      const generatedDraft = generateLocalAiDraft(prompt, router.locale);
-      setAiDraft(generatedDraft);
-      setDraft((current) => ({
-        ...current,
-        aiDraft: generatedDraft,
-        category: generatedDraft.title || current.category,
-        city: generatedDraft.city || current.city,
-        details: generatedDraft.description || current.details,
-      }));
+      applyAiDraft(generateLocalAiDraft(prompt, draft.city || text.city));
     } finally {
       setAiLoading(false);
     }
   }
 
+  function applyAiDraft(generatedDraft: AiDraft) {
+    setAiDraft(generatedDraft);
+    setDraft((current) => ({
+      ...current,
+      aiDraft: generatedDraft,
+      category: categorySlugToLabel(generatedDraft.category_slug) || current.category,
+      city: generatedDraft.city || current.city || text.city,
+      deadline:
+        generatedDraft.urgency && generatedDraft.urgency !== 'unknown'
+          ? urgencyToLabel(generatedDraft.urgency)
+          : current.deadline,
+      aiAnswers: current.aiAnswers || {},
+    }));
+  }
+
+  function renderClarifyField(field: ClarifyField) {
+    const value = draft.aiAnswers?.[field.question] || '';
+
+    if (field.type === 'yesno') {
+      return (
+        <div className="flex gap-2">
+          {[text.request.yes, text.request.no].map((label) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => updateAiAnswer(field.question, label)}
+              className={`rounded-xl px-4 py-2 text-sm font-bold ${value === label ? 'bg-[#232323] text-white' : 'bg-[#eef1f7] text-[#232323]'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      );
+    }
+
+    if (field.type === 'area') {
+      return (
+        <input
+          value={value}
+          onChange={(event) => updateAiAnswer(field.question, event.target.value)}
+          placeholder="Например: 12 м²"
+          className={inputClass}
+        />
+      );
+    }
+
+    if (field.type === 'datetime') {
+      return (
+        <input
+          type="datetime-local"
+          value={value}
+          onChange={(event) => updateAiAnswer(field.question, event.target.value)}
+          className={inputClass}
+        />
+      );
+    }
+
+    if (field.type === 'photos') {
+      const photoAnswer = value || '';
+      return (
+        <div className="space-y-3">
+          <div className="flex gap-2">
+            {[text.request.yes, text.request.no].map((label) => (
+              <button
+                key={label}
+                type="button"
+                onClick={() => updateAiAnswer(field.question, label)}
+                className={`rounded-xl px-4 py-2 text-sm font-bold ${photoAnswer === label ? 'bg-[#232323] text-white' : 'bg-[#eef1f7] text-[#232323]'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          {photoAnswer === text.request.yes ? (
+            <label className="flex cursor-pointer items-center justify-between rounded-2xl border border-dashed border-[#d3d9e8] bg-white px-5 py-4 text-sm">
+              <span>Добавить фото</span>
+              <Plus className="h-4 w-4" />
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(event) => {
+                  uploadPhotosWithAuth(event.target.files);
+                  event.currentTarget.value = '';
+                }}
+              />
+            </label>
+          ) : null}
+        </div>
+      );
+    }
+
+    return (
+      <input
+        value={value}
+        onChange={(event) => updateAiAnswer(field.question, event.target.value)}
+        className={inputClass}
+      />
+    );
+  }
+
+  function renderAiClarifications() {
+    if (!aiDraft) return null;
+
+    const showCategory = needsManualCategory(aiDraft);
+    const showCity = needsManualCity(aiDraft, draft.city);
+    const showUrgency = needsManualUrgency(aiDraft, draft.deadline);
+
+    return (
+      <div className="mt-6 space-y-5 border-t border-[#eef1f7] pt-5">
+        <div className="text-sm font-black uppercase tracking-wide text-[#7d849b]">{text.request.clarifyFieldsTitle}</div>
+
+        {showCategory ? (
+          <label className="block space-y-2">
+            <span className="text-sm font-bold text-[#232323]">{text.request.category}</span>
+            <select
+              value={draft.category || categorySlugToLabel(aiDraft.category_slug)}
+              onChange={(event) => update('category', event.target.value)}
+              className={inputClass}
+            >
+              {text.request.categories.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
+        {showCity ? (
+          <label className="block space-y-2">
+            <span className="text-sm font-bold text-[#232323]">{text.request.city}</span>
+            <div className={inputClass}>
+              <RussiaCityInput
+                value={draft.city || text.city}
+                onChange={(city) => update('city', city)}
+                inputClassName="w-full bg-transparent text-base outline-none"
+              />
+            </div>
+          </label>
+        ) : null}
+
+        {showUrgency ? (
+          <label className="block space-y-2">
+            <span className="text-sm font-bold text-[#232323]">{text.request.urgency}</span>
+            <select
+              value={draft.deadline || ''}
+              onChange={(event) => update('deadline', event.target.value)}
+              className={inputClass}
+            >
+              <option value="">Выберите срок</option>
+              {text.request.deadlines.map((item) => (
+                <option key={item} value={item}>
+                  {item}
+                </option>
+              ))}
+            </select>
+          </label>
+        ) : null}
+
+        {clarifyFields.map((field) => (
+          <label key={field.key} className="block space-y-2">
+            <span className="text-sm font-bold text-[#232323]">{field.question}</span>
+            {renderClarifyField(field)}
+          </label>
+        ))}
+      </div>
+    );
+  }
+
   function renderStep() {
-    if (draft.saved) {
+    if (taskCreated && createdTaskId) {
       return (
         <div className="flex min-h-[520px] flex-col justify-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-[#d9f36b]">
             <CheckCircle2 className="h-9 w-9 text-[#232323]" />
           </div>
-          <h1 className="mt-7 max-w-2xl text-4xl font-black leading-tight text-[#232323] md:text-5xl">{text.request.draftSavedTitle}</h1>
-          <p className="mt-4 max-w-xl text-base leading-7 text-[#232323]">{text.request.draftSavedText}</p>
-          <div className="mt-8 rounded-3xl bg-[#f6f7f2] p-5">
-            <div className="text-sm font-bold text-[#7d849b]">{text.request.draftNumber}</div>
-            <div className="mt-1 text-xl font-black text-[#232323]">{draft.id}</div>
-          </div>
+          <h1 className="mt-7 max-w-2xl text-4xl font-black leading-tight text-[#232323] md:text-5xl">
+            {text.request.taskCreatedTitle}
+          </h1>
+          <p className="mt-4 max-w-xl text-base leading-7 text-[#232323]">{text.request.taskCreatedText}</p>
+          <Link
+            href={routes.taskUrl(createdTaskId)}
+            className="mt-8 inline-flex h-12 items-center gap-3 rounded-xl bg-[#d9f36b] px-6 text-base font-black text-[#232323]"
+          >
+            {text.request.viewTasks} <ArrowRight className="h-5 w-5" />
+          </Link>
         </div>
       );
     }
@@ -331,89 +623,121 @@ export default function RequestWizard() {
                 className="min-h-[150px] w-full resize-none bg-transparent px-3 py-3 text-lg font-semibold text-[#232323] outline-none placeholder:text-[#8b92a8]"
               />
               <div className="flex justify-end">
-                <button onClick={submitPrompt} disabled={aiLoading} className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#d9f36b] text-[#232323] disabled:cursor-wait disabled:opacity-60">
+                <button
+                  onClick={submitPrompt}
+                  disabled={aiLoading}
+                  className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#d9f36b] text-[#232323] disabled:cursor-wait disabled:opacity-60"
+                >
                   <Send className="h-5 w-5" />
                 </button>
               </div>
             </div>
-            {aiLoading && <div className="mt-5 max-w-3xl rounded-3xl border border-[#dfe4ee] bg-white p-5 text-base font-semibold text-[#232323]">{text.request.aiLoading}</div>}
-            {aiError && <div className="mt-5 max-w-3xl rounded-3xl border border-red-200 bg-red-50 p-5 text-base font-semibold text-red-700">{aiError}</div>}
-            {aiDraft && (
+            {aiLoading ? (
+              <div className="mt-5 max-w-3xl rounded-3xl border border-[#dfe4ee] bg-white p-5 text-base font-semibold text-[#232323]">
+                {text.request.aiLoading}
+              </div>
+            ) : null}
+            {aiError ? (
+              <div className="mt-5 max-w-3xl rounded-3xl border border-red-200 bg-red-50 p-5 text-base font-semibold text-red-700">
+                {aiError}
+              </div>
+            ) : null}
+            {aiDraft ? (
               <div className="mt-5 max-w-3xl rounded-3xl border border-[#dfe4ee] bg-white p-5 shadow-sm">
                 <div className="text-sm font-black uppercase tracking-wide text-[#7d849b]">{text.request.aiDraft}</div>
                 <h2 className="mt-2 text-2xl font-black text-[#232323]">{aiDraft.title}</h2>
                 <p className="mt-3 text-base leading-7 text-[#232323]">{aiDraft.description}</p>
                 <div className="mt-4 grid gap-3 text-sm font-semibold text-[#232323] sm:grid-cols-3">
-                  <span className="rounded-2xl bg-[#f3f5fa] px-4 py-3">{text.request.category}: {aiDraft.category_slug}</span>
-                  <span className="rounded-2xl bg-[#f3f5fa] px-4 py-3">{text.request.city}: {aiDraft.city || text.request.unknownCity}</span>
-                  <span className="rounded-2xl bg-[#f3f5fa] px-4 py-3">{text.request.urgency}: {aiDraft.urgency}</span>
+                  <span className="rounded-2xl bg-[#f3f5fa] px-4 py-3">
+                    {text.request.category}: {categorySlugToLabel(aiDraft.category_slug)}
+                  </span>
+                  <span className="rounded-2xl bg-[#f3f5fa] px-4 py-3">
+                    {text.request.city}: {aiDraft.city || draft.city || text.request.unknownCity}
+                  </span>
+                  <span className="rounded-2xl bg-[#f3f5fa] px-4 py-3">
+                    {text.request.urgency}: {urgencyToLabel(aiDraft.urgency)}
+                  </span>
                 </div>
-                {aiDraft.missing_questions?.length > 0 && (
-                  <div className="mt-5">
-                    <div className="text-sm font-black text-[#232323]">{text.request.clarify}</div>
-                    <ul className="mt-2 space-y-2 text-sm leading-6 text-[#232323]">
-                      {aiDraft.missing_questions.map((question) => (
-                        <li key={question} className="rounded-2xl bg-[#f8f9fb] px-4 py-3">{question}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-                <button onClick={next} className="mt-5 inline-flex h-12 items-center gap-3 rounded-xl bg-[#d9f36b] px-6 text-base font-black text-[#232323] transition hover:bg-[#c7e85a]">
+                {renderAiClarifications()}
+                <button
+                  onClick={next}
+                  className="mt-5 inline-flex h-12 items-center gap-3 rounded-xl bg-[#d9f36b] px-6 text-base font-black text-[#232323] transition hover:bg-[#c7e85a]"
+                >
                   {text.request.continue} <ArrowRight className="h-5 w-5" />
                 </button>
               </div>
-            )}
+            ) : null}
           </>
         );
       case 'category':
-        return <ChoiceStep title={step.title} items={text.request.categories} value={draft.category} onSelect={(item) => update('category', item)} />;
-      case 'area':
         return (
-          <>
-            <h1 className="text-4xl font-black leading-tight text-[#232323] md:text-5xl">{step.title}</h1>
-            <p className="mt-8 text-lg text-[#232323]">{step.subtitle}</p>
-            <input value={draft.area || ''} onChange={(event) => update('area', event.target.value)} placeholder="0 м²" className={`${inputClass} mt-7 max-w-[290px]`} />
-          </>
-        );
-      case 'surface':
-        return (
-          <>
-            <ChoiceStep title={step.title} items={text.request.surfaces} value={draft.surface} onSelect={(item) => update('surface', item)} />
-            <OtherInput value={draft.surfaceOther || ''} placeholder={text.request.other} onChange={(value) => update('surfaceOther', value)} />
-          </>
-        );
-      case 'materials':
-        return (
-          <>
-            <h1 className="text-4xl font-black leading-tight text-[#232323] md:text-5xl">{step.title}</h1>
-            <div className="mt-9 max-w-xl space-y-1">
-              {text.request.materials.map((item) => <Option key={item} label={item} multi active={selectedMaterials.has(item)} onClick={() => toggleMaterial(item)} />)}
-            </div>
-            <OtherInput value={draft.materialOther || ''} placeholder={text.request.other} onChange={(value) => update('materialOther', value)} />
-          </>
+          <ChoiceStep
+            title={step.title}
+            items={text.request.categories}
+            value={draft.category || (aiDraft ? categorySlugToLabel(aiDraft.category_slug) : undefined)}
+            onSelect={(item) => update('category', item)}
+          />
         );
       case 'deadline':
-        return <ChoiceStep title={step.title} items={text.request.deadlines} value={draft.deadline} onSelect={(item) => update('deadline', item)} />;
+        return (
+          <ChoiceStep
+            title={step.title}
+            items={text.request.deadlines}
+            value={draft.deadline}
+            onSelect={(item) => update('deadline', item)}
+          />
+        );
       case 'address':
         return (
           <>
             <h1 className="text-4xl font-black leading-tight text-[#232323] md:text-5xl">{step.title}</h1>
-            <input value={draft.address || ''} onChange={(event) => update('address', event.target.value)} placeholder={text.request.streetPlaceholder} className={`${inputClass} mt-8`} />
-            <TreaboMapMock label={text.request.localMapHint} />
+            <TreaboAddressPicker
+              city={draft.city || text.city}
+              address={draft.address || ''}
+              lat={draft.lat}
+              lng={draft.lng}
+              onCityChange={(city) => update('city', city)}
+              onAddressChange={(address) => update('address', address)}
+              onCoordinatesChange={(lat, lng) => setDraft((current) => ({ ...current, lat, lng }))}
+              addressPlaceholder={text.request.streetPlaceholder}
+            />
           </>
         );
       case 'budget':
         return (
           <>
             <h1 className="max-w-3xl text-4xl font-black leading-tight text-[#232323] md:text-5xl">{step.title}</h1>
-            <input value={draft.budget || ''} onChange={(event) => update('budget', event.target.value)} placeholder={text.request.budgetPlaceholder} className={`${inputClass} mt-12 max-w-[290px]`} />
+            {step.subtitle ? <p className="mt-4 text-lg text-[#232323]">{step.subtitle}</p> : null}
+            <input
+              value={draft.budget || ''}
+              onChange={(event) => update('budget', event.target.value)}
+              placeholder={text.request.budgetPlaceholder}
+              className={`${inputClass} mt-8 max-w-[290px]`}
+            />
+            <div className="mt-4 flex flex-wrap gap-2">
+              {text.request.budgetPresets.map((preset) => (
+                <button
+                  key={preset}
+                  type="button"
+                  onClick={() => update('budget', preset.replace(/[^\d–\-]/g, '').split('–')[0] || preset)}
+                  className="rounded-xl bg-[#eef1f7] px-4 py-2 text-sm font-bold text-[#232323] hover:bg-[#e3e7f1]"
+                >
+                  {preset}
+                </button>
+              ))}
+            </div>
           </>
         );
       case 'details':
         return (
           <>
             <h1 className="text-4xl font-black leading-tight text-[#232323] md:text-5xl">{step.title}</h1>
-            <textarea value={draft.details || ''} onChange={(event) => update('details', event.target.value)} placeholder={text.request.detailsPlaceholder} className={`${inputClass} mt-10 min-h-[136px] resize-none`} />
+            <textarea
+              value={draft.details || ''}
+              onChange={(event) => update('details', event.target.value)}
+              placeholder={text.request.detailsPlaceholder}
+              className={`${inputClass} mt-10 min-h-[136px] resize-none`}
+            />
             <label className="mt-5 flex w-full cursor-pointer items-center justify-between rounded-2xl border border-dashed border-[#d3d9e8] bg-white px-5 py-5 text-left text-[#232323]">
               <span>{uploading ? 'Загрузка...' : text.request.addFile}</span>
               <Plus className="h-5 w-5 text-[#7d849b]" />
@@ -424,15 +748,17 @@ export default function RequestWizard() {
                 className="hidden"
                 disabled={uploading}
                 onChange={(event) => {
-                  uploadPhotos(event.target.files);
+                  uploadPhotosWithAuth(event.target.files);
                   event.currentTarget.value = '';
                 }}
               />
             </label>
-            {uploadError && <div className="mt-3 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{uploadError}</div>}
-            {draft.photos?.length ? (
+            {uploadError ? (
+              <div className="mt-3 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{uploadError}</div>
+            ) : null}
+            {draft.photos?.length || draft.pendingPhotoFiles?.length ? (
               <div className="mt-4 grid grid-cols-3 gap-3 sm:grid-cols-5">
-                {draft.photos.map((photo) => {
+                {(draft.photos || []).map((photo) => {
                   const url = photo.url || '';
                   return (
                     <div key={photo.path || photo.url} className="group relative overflow-hidden rounded-2xl bg-[#eef1f7]">
@@ -447,36 +773,129 @@ export default function RequestWizard() {
                     </div>
                   );
                 })}
+                {(draft.pendingPhotoFiles || []).map((file, index) => (
+                  <div key={`${file.name}-${index}`} className="group relative overflow-hidden rounded-2xl bg-[#eef1f7]">
+                    <div className="flex h-24 items-center justify-center px-2 text-center text-xs font-semibold text-[#7d849b]">
+                      {file.name}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removePendingPhoto(index)}
+                      className="absolute right-2 top-2 hidden h-7 w-7 items-center justify-center rounded-full bg-white text-sm font-black shadow group-hover:flex"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
               </div>
             ) : null}
           </>
         );
-      case 'choice':
-        return <ChoiceStep title={step.title} items={text.request.choices} value={draft.choice} onSelect={(item) => update('choice', item)} />;
       case 'contacts':
+        if (isAuthenticated) {
+          return (
+            <div className="mx-auto max-w-3xl">
+              <h1 className="text-4xl font-black leading-tight text-[#232323] md:text-5xl">{step.title}</h1>
+              <p className="mt-6 text-base text-[#232323]">{text.request.alreadyLoggedIn}</p>
+              {user?.name ? <p className="mt-2 text-sm text-[#7d849b]">{user.name}</p> : null}
+              {submitError ? (
+                <div className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{submitError}</div>
+              ) : null}
+              <button
+                onClick={handleAuthAndCreate}
+                disabled={savingTask}
+                className="mt-8 w-full rounded-2xl bg-[#d9f36b] px-5 py-4 text-base font-black text-[#232323] disabled:opacity-60"
+              >
+                {savingTask ? text.request.creatingTask : text.request.authCreateTask}
+              </button>
+            </div>
+          );
+        }
+
+        if (otpStep) {
+          return (
+            <div className="mx-auto max-w-3xl">
+              <h1 className="text-4xl font-black leading-tight text-[#232323] md:text-5xl">{text.request.otpTitle}</h1>
+              <p className="mt-4 text-sm leading-6 text-[#7d849b]">
+                {text.request.otpHint}{' '}
+                <span className="font-bold text-[#232323]">{otpPhone}</span>
+              </p>
+              <div className="mt-8">
+                <OtpCodeInput
+                  value={otpCode}
+                  onChange={setOtpCode}
+                  onComplete={handleVerifyOtp}
+                  disabled={savingTask}
+                  error={submitError || undefined}
+                />
+              </div>
+              <div className="mt-4 flex items-center justify-between gap-3">
+                <button type="button" onClick={() => setOtpStep(false)} className="text-sm font-bold text-[#7d849b]">
+                  Назад
+                </button>
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  disabled={resendTimer > 0 || savingTask}
+                  className="text-sm font-bold text-[#232323] disabled:text-[#b8bcc8]"
+                >
+                  {resendTimer > 0 ? `${text.request.otpResend} (${resendTimer}с)` : text.request.otpResend}
+                </button>
+              </div>
+              <button
+                onClick={() => handleVerifyOtp(otpCode)}
+                disabled={savingTask || otpCode.length < 6}
+                className="mt-6 w-full rounded-2xl bg-[#d9f36b] px-5 py-4 text-base font-black text-[#232323] disabled:opacity-60"
+              >
+                {savingTask ? text.request.creatingTask : text.request.otpVerify}
+              </button>
+            </div>
+          );
+        }
+
         return (
           <div className="mx-auto max-w-3xl">
             <h1 className="text-4xl font-black leading-tight text-[#232323] md:text-5xl">{step.title}</h1>
-            <div className="mt-14 flex items-center">
-              {['M', 'A', 'I', 'C', 'E'].map((letter) => (
-                <span key={letter} className="-ml-2 flex h-9 w-9 first:ml-0 items-center justify-center rounded-full border-2 border-white bg-[#d9f36b] text-sm font-black text-[#232323]">
-                  {letter}
-                </span>
-              ))}
-              <span className="ml-2 text-sm font-bold text-[#7d849b]">10+</span>
-            </div>
-            <p className="mt-16 text-sm text-[#7d849b]">{text.request.phoneHint}</p>
-            <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[#cfd5e6] bg-white px-4 py-4">
-              <span className="text-sm">🇷🇺</span>
-              <input value={draft.phone || ''} onChange={(event) => update('phone', event.target.value)} placeholder={text.request.phonePlaceholder} className="w-full bg-transparent text-base text-[#232323] outline-none" />
-            </div>
-            <button onClick={next} className="mt-4 w-full rounded-2xl bg-[#d9f36b] px-5 py-4 text-base font-black text-[#232323]">{text.request.continue}</button>
-            <div className="my-8 flex items-center gap-4 text-sm text-[#7d849b]">
-              <span className="h-px flex-1 bg-[#dfe4ee]" />
-              {text.request.or}
-              <span className="h-px flex-1 bg-[#dfe4ee]" />
-            </div>
-            <button className="w-full rounded-2xl bg-[#eef1f7] px-5 py-4 text-base font-black text-[#8b3ffc]">{text.request.yandex}</button>
+            <p className="mt-6 text-sm text-[#7d849b]">{text.request.phoneHint}</p>
+
+            <label className="mt-4 block space-y-2">
+              <span className="text-sm font-bold text-[#232323]">Телефон</span>
+              <TreaboPhoneInput value={phone} onChange={setPhone} />
+            </label>
+
+            <label className="mt-4 block space-y-2">
+              <span className="text-sm font-bold text-[#232323]">{text.request.nameLabel}</span>
+              <input
+                value={name}
+                onChange={(event) => setName(event.target.value)}
+                placeholder="Если вы новый пользователь"
+                className={inputClass}
+              />
+            </label>
+
+            <label className="mt-4 block space-y-2">
+              <span className="text-sm font-bold text-[#232323]">{text.request.passwordLabel}</span>
+              <input
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                className={inputClass}
+                required
+                minLength={4}
+              />
+            </label>
+
+            {submitError ? (
+              <div className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{submitError}</div>
+            ) : null}
+
+            <button
+              onClick={handleAuthAndCreate}
+              disabled={savingTask || password.length < 4}
+              className="mt-6 w-full rounded-2xl bg-[#d9f36b] px-5 py-4 text-base font-black text-[#232323] disabled:opacity-60"
+            >
+              {savingTask ? text.request.creatingTask : text.request.authCreateTask}
+            </button>
           </div>
         );
       default:
@@ -487,11 +906,15 @@ export default function RequestWizard() {
   return (
     <div className="min-h-screen bg-[#f3f5fa] text-[#232323]">
       <header className="mx-auto flex h-16 max-w-[1180px] items-center justify-between px-4">
-        <Link href="/" className="text-3xl font-black tracking-tight text-[#232323]">Treabo</Link>
+        <Link href="/" className="text-3xl font-black tracking-tight text-[#232323]">
+          Treabo
+        </Link>
         <div className="flex items-center gap-3 text-sm font-medium md:gap-8">
-          <span className="hidden md:inline">{text.city}</span>
-          <Link href={routes.works} className="hidden md:inline">{text.request.specialistSite}</Link>
-          <span className="hidden md:inline">{text.request.login}</span>
+          <span className="hidden md:inline">{draft.city || text.city}</span>
+          <Link href={routes.works} className="hidden md:inline">
+            {text.request.specialistSite}
+          </Link>
+          <span className="hidden md:inline">{isAuthenticated ? user?.name || text.request.login : text.request.login}</span>
         </div>
       </header>
 
@@ -500,14 +923,20 @@ export default function RequestWizard() {
           <h2 className="max-w-[240px] text-3xl font-black leading-tight">{taskName}</h2>
           <div className="mt-6 space-y-3">
             <div className="flex items-center justify-between rounded-2xl bg-[#e3e7f1] px-4 py-4 text-sm font-bold">
-              <span className="flex items-center gap-3"><ListChecks className="h-4 w-4" /> {text.request.navDetails}</span>
-              <span>{draft.saved ? 100 : step.progress}%</span>
+              <span className="flex items-center gap-3">
+                <ListChecks className="h-4 w-4" /> {text.request.navDetails}
+              </span>
+              <span>{taskCreated ? 100 : step.progress}%</span>
             </div>
             <div className="flex items-center justify-between px-4 py-3 text-sm">
-              <span className="flex items-center gap-3"><MessageCircle className="h-4 w-4" /> {text.request.navOffers}</span>
+              <span className="flex items-center gap-3">
+                <MessageCircle className="h-4 w-4" /> {text.request.navOffers}
+              </span>
             </div>
             <div className="flex items-center justify-between px-4 py-3 text-sm">
-              <span className="flex items-center gap-3"><UserRound className="h-4 w-4" /> {text.request.navSpecialists}</span>
+              <span className="flex items-center gap-3">
+                <UserRound className="h-4 w-4" /> {text.request.navSpecialists}
+              </span>
               <span className="text-[#7d849b]">12735</span>
             </div>
           </div>
@@ -519,15 +948,13 @@ export default function RequestWizard() {
             <button onClick={back} className="flex h-12 w-16 items-center justify-center rounded-xl bg-[#eef1f7] text-[#232323]">
               <ArrowLeft className="h-5 w-5" />
             </button>
-            {!draft.saved && step.key !== 'prompt' && step.key !== 'contacts' && (
-              <button onClick={next} className="inline-flex h-12 items-center gap-3 rounded-xl bg-[#d9f36b] px-6 text-base font-black text-[#232323] transition hover:bg-[#c7e85a]">
+            {!taskCreated && step.key !== 'prompt' && step.key !== 'contacts' && (
+              <button
+                onClick={next}
+                className="inline-flex h-12 items-center gap-3 rounded-xl bg-[#d9f36b] px-6 text-base font-black text-[#232323] transition hover:bg-[#c7e85a]"
+              >
                 {step.action || text.request.continue} <ArrowRight className="h-5 w-5" />
               </button>
-            )}
-            {draft.saved && (
-              <Link href={routes.works} className="inline-flex h-12 items-center gap-3 rounded-xl bg-[#d9f36b] px-6 text-base font-black text-[#232323]">
-                {text.request.viewTasks} <ArrowRight className="h-5 w-5" />
-              </Link>
             )}
           </div>
         </section>
@@ -536,22 +963,25 @@ export default function RequestWizard() {
   );
 }
 
-function ChoiceStep({ title, items, value, onSelect }: { title: string; items: string[]; value?: string; onSelect: (item: string) => void }) {
+function ChoiceStep({
+  title,
+  items,
+  value,
+  onSelect,
+}: {
+  title: string;
+  items: string[];
+  value?: string;
+  onSelect: (item: string) => void;
+}) {
   return (
     <>
       <h1 className="text-4xl font-black leading-tight text-[#232323] md:text-5xl">{title}</h1>
       <div className="mt-9 max-w-xl space-y-1">
-        {items.map((item) => <Option key={item} label={item} active={value === item} onClick={() => onSelect(item)} />)}
+        {items.map((item) => (
+          <Option key={item} label={item} active={value === item} onClick={() => onSelect(item)} />
+        ))}
       </div>
     </>
-  );
-}
-
-function OtherInput({ value, placeholder, onChange }: { value: string; placeholder: string; onChange: (value: string) => void }) {
-  return (
-    <div className="flex items-center gap-3 pt-2">
-      <span className="h-6 w-6 shrink-0 rounded-lg bg-[#e9edf5]" />
-      <input value={value} onChange={(event) => onChange(event.target.value)} placeholder={placeholder} className={`${inputClass} max-w-[230px]`} />
-    </div>
   );
 }

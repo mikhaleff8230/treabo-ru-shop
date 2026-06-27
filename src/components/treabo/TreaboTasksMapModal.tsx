@@ -15,6 +15,7 @@ type TreaboTasksMapModalProps = {
   open: boolean;
   onClose: () => void;
   tasks: TreaboTask[];
+  onTaskClick?: (task: TreaboTask) => void;
 };
 
 type MapPoint = {
@@ -22,9 +23,22 @@ type MapPoint = {
   title: string;
   lat: number;
   lng: number;
+  priceLabel: string;
 };
 
-export default function TreaboTasksMapModal({ open, onClose, tasks }: TreaboTasksMapModalProps) {
+function formatPriceLabel(task: TreaboTask) {
+  if (task.budget && task.budget > 0) {
+    return `от ${new Intl.NumberFormat('ru-RU').format(task.budget)} ₽`;
+  }
+  return 'Цена договорная';
+}
+
+export default function TreaboTasksMapModal({
+  open,
+  onClose,
+  tasks,
+  onTaskClick,
+}: TreaboTasksMapModalProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const [loading, setLoading] = useState(true);
@@ -38,6 +52,7 @@ export default function TreaboTasksMapModal({ open, onClose, tasks }: TreaboTask
           title: task.title,
           lat: Number(task.lat),
           lng: Number(task.lng),
+          priceLabel: formatPriceLabel(task),
         })),
     [tasks],
   );
@@ -54,6 +69,15 @@ export default function TreaboTasksMapModal({ open, onClose, tasks }: TreaboTask
 
     let destroyed = false;
 
+    function createMarkerLayout() {
+      return window.ymaps.templateLayoutFactory.createClass(
+        `<div style="background:#232323;color:#fff;padding:8px 12px;border-radius:12px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,0.25);max-width:200px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+          <div style="font-size:12px;font-weight:700;white-space:nowrap;">{{ properties.priceLabel }}</div>
+          <div style="font-size:11px;margin-top:4px;line-height:1.3;opacity:0.95;">{{ properties.title }}</div>
+        </div>`,
+      );
+    }
+
     function initMap() {
       if (!mapRef.current || !window.ymaps || destroyed) return;
 
@@ -63,21 +87,34 @@ export default function TreaboTasksMapModal({ open, onClose, tasks }: TreaboTask
         controls: ['zoomControl', 'fullscreenControl'],
       });
 
+      const layout = createMarkerLayout();
+
       points.forEach((point) => {
         const placemark = new window.ymaps.Placemark(
           [point.lat, point.lng],
           {
-            balloonContent: `<strong>${point.title}</strong>`,
+            priceLabel: point.priceLabel,
+            title: point.title,
             hintContent: point.title,
           },
-          { preset: 'islands#darkGreenDotIcon' },
+          {
+            iconLayout: layout,
+            iconShape: {
+              type: 'Rectangle',
+              coordinates: [[-80, -40], [80, 0]],
+            },
+            iconOffset: [-80, -40],
+          },
         );
 
         placemark.events.add('click', () => {
           const task = tasks.find((item) => String(item.id) === point.id);
-          if (task) {
-            window.location.href = routes.taskUrl(task);
+          if (!task) return;
+          if (onTaskClick) {
+            onTaskClick(task);
+            return;
           }
+          window.location.href = routes.taskUrl(task);
         });
 
         mapInstanceRef.current.geoObjects.add(placemark);
@@ -113,7 +150,7 @@ export default function TreaboTasksMapModal({ open, onClose, tasks }: TreaboTask
         mapInstanceRef.current = null;
       }
     };
-  }, [open, center, points, tasks]);
+  }, [open, center, points, tasks, onTaskClick]);
 
   if (!open) return null;
 
