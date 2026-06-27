@@ -200,6 +200,9 @@ export function getTreaboPublicApiBase(): string {
   if (typeof window !== 'undefined') {
     const explicit = process.env.NEXT_PUBLIC_TREABO_API_ENDPOINT;
     if (explicit) return trimSlash(explicit);
+    if (window.location.hostname === 'treabo.ru' || window.location.hostname.endsWith('.treabo.ru')) {
+      return 'https://api.treabo.ru/api';
+    }
     if (window.location.hostname === 'treabo.md' || window.location.hostname.endsWith('.treabo.md')) {
       return 'https://api.treabo.md/api';
     }

@@ -30,7 +30,7 @@ export default function TreaboAuthModal({
 }: TreaboAuthModalProps) {
   const [tab, setTab] = useState<'login' | 'register'>(initialTab);
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('373');
+  const [phone, setPhone] = useState('7');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<'customer' | 'specialist'>('customer');
@@ -142,7 +142,7 @@ export default function TreaboAuthModal({
                     onClick={() => setRole('customer')}
                     className={`rounded-2xl border px-3 py-3 text-sm font-bold ${
                       role === 'customer'
-                        ? 'border-zinc-950 bg-zinc-950 text-white'
+                        ? 'border-[#D9F36B] bg-[#D9F36B] text-[#232323]'
                         : 'border-zinc-200 text-[#232323]'
                     }`}
                   >
@@ -153,7 +153,7 @@ export default function TreaboAuthModal({
                     onClick={() => setRole('specialist')}
                     className={`rounded-2xl border px-3 py-3 text-sm font-bold ${
                       role === 'specialist'
-                        ? 'border-zinc-950 bg-zinc-950 text-white'
+                        ? 'border-[#D9F36B] bg-[#D9F36B] text-[#232323]'
                         : 'border-zinc-200 text-[#232323]'
                     }`}
                   >

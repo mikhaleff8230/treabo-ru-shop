@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import TreaboAuthModal from '@/components/auth/treabo-auth-modal';
 import TreaboTasksMapModal from '@/components/treabo/TreaboTasksMapModal';
+import RussiaCityInput from '@/components/treabo/RussiaCityInput';
 import type { TreaboCategory, TreaboTask, TreaboTaskFilters } from '@/data/treabo';
 import routes from '@/config/routes';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
@@ -307,11 +308,11 @@ function WorksFiltersPanel({
         open={openSections.has('city')}
         onToggle={() => toggleSection('city')}
       >
-        <input
-          className="w-full rounded-xl border border-[#E7E9EC] px-4 py-3 text-sm text-[#232323] outline-none focus:border-[#D9F36B]"
+        <RussiaCityInput
           value={filters.city || ''}
-          onChange={(event) => setFilters((current) => ({ ...current, city: event.target.value }))}
+          onChange={(city) => setFilters((current) => ({ ...current, city }))}
           placeholder={text.city}
+          inputClassName="w-full rounded-xl border border-[#E7E9EC] px-4 py-3 text-sm text-[#232323] outline-none focus:border-[#D9F36B]"
         />
       </MarketplaceFilterGroup>
 

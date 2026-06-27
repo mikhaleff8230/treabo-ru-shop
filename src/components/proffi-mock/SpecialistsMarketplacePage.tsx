@@ -20,6 +20,7 @@ import team5 from '@/assets/images/team/5.png';
 import team6 from '@/assets/images/team/6.png';
 import type { TreaboSpecialist } from '@/data/treabo';
 import { getTreaboText } from '@/lib/treabo/i18n';
+import RussiaCityInput from '@/components/treabo/RussiaCityInput';
 import {
   MarketplaceFilterGroup,
   MarketplaceFilterOption,
@@ -185,12 +186,13 @@ function SpecialistCard({ specialist }: { specialist: Specialist }) {
               </p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
                 {specialist.services.slice(0, 3).map((service) => (
-                  <span
+                  <Link
                     key={service}
+                    href={`/specialists?service=${encodeURIComponent(service)}`}
                     className="rounded-full border border-[#E6E9EF] bg-white px-2.5 py-1 text-[11px] font-[300] leading-none text-[#3A3D45]"
                   >
                     {service}
-                  </span>
+                  </Link>
                 ))}
               </div>
             </div>
@@ -279,7 +281,13 @@ function SpecialistsFiltersPanel({
 export default function SpecialistsMarketplacePage({ specialists: apiSpecialists = [] }: { specialists?: TreaboSpecialist[] }) {
   const router = useRouter();
   const text = getTreaboText(router.locale);
-  const specialists = buildSpecialists(router.locale, apiSpecialists);
+  const selectedService = typeof router.query.service === 'string' ? router.query.service : '';
+  const selectedCity = typeof router.query.city === 'string' ? router.query.city : '';
+  const specialists = buildSpecialists(router.locale, apiSpecialists).filter((specialist) => {
+    if (!selectedService) return true;
+    return specialist.services.some((service) => service.toLowerCase() === selectedService.toLowerCase());
+  });
+  const [city, setCity] = useState(selectedCity);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [openSections, setOpenSections] = useState<Set<string>>(() => new Set([text.specialists.filters[0]?.title]));
   const [visualSelections, setVisualSelections] = useState<Set<string>>(() => new Set());
@@ -344,12 +352,20 @@ export default function SpecialistsMarketplacePage({ specialists: apiSpecialists
               </label>
               <label className="flex h-11 items-center gap-2.5 rounded-[16px] bg-[#F6F7F5] px-3.5">
                 <MapPin className="h-4 w-4 text-[#777D88]" />
-                <input
-                  className="w-full bg-transparent text-xs font-medium text-[#232323] outline-none placeholder:text-[#777D88] sm:text-[13px]"
-                  placeholder={text.city}
-                />
+                <RussiaCityInput value={city} onChange={setCity} placeholder={text.city} />
               </label>
-              <button className="rounded-[16px] bg-[#232323] px-4 text-xs font-semibold text-white">{text.common.search}</button>
+              <button
+                type="button"
+                onClick={() => {
+                  const params = new URLSearchParams();
+                  if (city.trim()) params.set('city', city.trim());
+                  if (selectedService) params.set('service', selectedService);
+                  router.push(params.toString() ? `/specialists?${params.toString()}` : '/specialists');
+                }}
+                className="rounded-[16px] bg-[#232323] px-4 text-xs font-semibold text-white"
+              >
+                {text.common.search}
+              </button>
             </div>
           </div>
         </section>

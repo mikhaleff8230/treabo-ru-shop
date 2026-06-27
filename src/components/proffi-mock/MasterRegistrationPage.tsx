@@ -94,7 +94,7 @@ function QrMock({ compact = false }: { compact?: boolean }) {
 export default function MasterRegistrationPage() {
   const auth = useTreaboAuth();
   const [authOpen, setAuthOpen] = useState(false);
-  const [phone, setPhone] = useState('373');
+  const [phone, setPhone] = useState('7');
 
   return (
     <div className={treaboMinimal.page}>

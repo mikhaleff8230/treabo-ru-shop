@@ -29,7 +29,7 @@ export default function PhoneInput({
   return (
     <div className={className}>
       <ReactPhone
-        country="md"
+        country="ru"
         value={phoneNumber}
         onChange={(value) => setPhoneNumber(value)}
       />

@@ -467,7 +467,7 @@ export default function RequestWizard() {
             </div>
             <p className="mt-16 text-sm text-[#7d849b]">{text.request.phoneHint}</p>
             <div className="mt-4 flex items-center gap-3 rounded-2xl border border-[#cfd5e6] bg-white px-4 py-4">
-              <span className="text-sm">🇲🇩</span>
+              <span className="text-sm">🇷🇺</span>
               <input value={draft.phone || ''} onChange={(event) => update('phone', event.target.value)} placeholder={text.request.phonePlaceholder} className="w-full bg-transparent text-base text-[#232323] outline-none" />
             </div>
             <button onClick={next} className="mt-4 w-full rounded-2xl bg-[#d9f36b] px-5 py-4 text-base font-black text-[#232323]">{text.request.continue}</button>
