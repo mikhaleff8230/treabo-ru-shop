@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { useState } from 'react';
-import { CircleHelp, ClipboardList, LogOut, Menu, MessageCircle, UserRound, Wallet } from 'lucide-react';
+import { CircleHelp, ClipboardList, LogOut, Map, Menu, MessageCircle, UserRound, Wallet } from 'lucide-react';
 import TreaboAuthModal from '@/components/auth/treabo-auth-modal';
 import TreaboLocationSelector from '@/components/treabo/TreaboLocationSelector';
 import routes from '@/config/routes';
@@ -20,6 +20,24 @@ export function ProffiHeader() {
     setAuthOpen(true);
   }
 
+  const headerLinks = auth.isAuthenticated
+    ? auth.isSpecialist
+      ? [
+          { href: '/treabo/chats', label: 'Чаты' },
+          { href: routes.works, label: 'Задания' },
+          { href: `${routes.works}?map=1`, label: 'Посмотреть на карте', icon: Map },
+        ]
+      : [
+          { href: '/specialists', label: 'Найти специалиста' },
+          { href: '/treabo/tasks', label: 'Мои задания' },
+          { href: '/treabo/chats', label: 'Чаты' },
+        ]
+    : [
+        { href: '/specialists', label: text.header.findSpecialist },
+        { href: routes.works, label: text.header.tasks },
+        { href: '/master-registration', label: text.header.masterLogin },
+      ];
+
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 backdrop-blur">
@@ -36,9 +54,12 @@ export function ProffiHeader() {
           </div>
 
           <nav className="hidden items-center gap-6 text-xs font-medium text-[#232323] md:flex">
-            <Link href="/specialists" className="hover:opacity-75">{text.header.findSpecialist}</Link>
-            <Link href={routes.works} className="hover:opacity-75">{text.header.tasks}</Link>
-            <Link href="/master-registration" className="hover:opacity-75">{text.header.masterLogin}</Link>
+            {headerLinks.map(({ href, label, icon: Icon }) => (
+              <Link key={href} href={href} className="inline-flex items-center gap-1.5 hover:opacity-75">
+                {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
+                {label}
+              </Link>
+            ))}
             {!auth.isAuthenticated ? (
               <button type="button" onClick={() => openAuth('login')} className="hover:opacity-75">
                 {text.header.login}

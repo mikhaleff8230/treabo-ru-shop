@@ -1,15 +1,8 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { CircleHelp, ClipboardList, MessageCircle, Wallet } from 'lucide-react';
+import { BriefcaseBusiness, CircleHelp, ClipboardList, MessageCircle, Wallet } from 'lucide-react';
 import { ProffiHeader } from '@/components/proffi-mock/ProffiShell';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
-
-const items = [
-  { href: '/treabo/profile', label: 'Анкета', icon: ClipboardList },
-  { href: '/treabo/chats', label: 'Чаты', icon: MessageCircle },
-  { href: '/treabo/balance', label: 'Баланс', icon: Wallet },
-  { href: '/treabo/support', label: 'Поддержка', icon: CircleHelp },
-];
 
 type Props = {
   title: string;
@@ -19,6 +12,20 @@ type Props = {
 export default function TreaboAccountShell({ title, children }: Props) {
   const router = useRouter();
   const auth = useTreaboAuth();
+  const items = auth.isSpecialist
+    ? [
+        { href: '/treabo/profile', label: 'Анкета', icon: ClipboardList },
+        { href: '/treabo/chats', label: 'Чаты', icon: MessageCircle },
+        { href: '/works', label: 'Задания', icon: BriefcaseBusiness },
+        { href: '/treabo/balance', label: 'Баланс', icon: Wallet },
+        { href: '/treabo/support', label: 'Поддержка', icon: CircleHelp },
+      ]
+    : [
+        { href: '/treabo/profile', label: 'Профиль', icon: ClipboardList },
+        { href: '/treabo/tasks', label: 'Мои задания', icon: BriefcaseBusiness },
+        { href: '/treabo/chats', label: 'Чаты', icon: MessageCircle },
+        { href: '/treabo/support', label: 'Поддержка', icon: CircleHelp },
+      ];
 
   return (
     <div className="min-h-screen bg-[#f5f6f1] text-[#232323]">
@@ -36,7 +43,7 @@ export default function TreaboAccountShell({ title, children }: Props) {
             <div className="min-w-0">
               <div className="truncate text-base font-black">{auth.user?.name || 'Treabo'}</div>
               <div className="text-sm font-semibold text-[#7d849b]">
-                {auth.isSpecialist ? 'специалист' : auth.isAuthenticated ? 'клиент' : 'гость'}
+                {auth.isSpecialist ? 'специалист' : auth.isAuthenticated ? 'заказчик' : 'гость'}
               </div>
             </div>
           </div>

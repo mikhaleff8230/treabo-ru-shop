@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   ArrowRight,
   ArrowUpDown,
@@ -367,6 +367,12 @@ export default function JobsMarketplacePage({
   const [searchCategoryId, setSearchCategoryId] = useState(initialFilters.category_id || '');
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
   const cardRefs = useMemo(() => new Map<string, HTMLElement>(), []);
+
+  useEffect(() => {
+    if (router.query.map === '1') {
+      setMapOpen(true);
+    }
+  }, [router.query.map]);
 
   const visibleJobs = useMemo(() => buildJobCards(tasks, categories, 'ru'), [tasks, categories]);
   const availableCount = tasks.length || visibleJobs.length;

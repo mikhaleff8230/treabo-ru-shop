@@ -330,6 +330,10 @@ export async function createTreaboTask(token: string, input: Partial<TreaboTask>
   });
 }
 
+export async function fetchMyTreaboTasks(token: string) {
+  return treaboApiRequest<TreaboTask[]>('/tasks/mine', { token });
+}
+
 export async function fetchTreaboTask(id: string) {
   return await fetchJson<TreaboTask>(`/tasks/${encodeURIComponent(id)}`);
 }
