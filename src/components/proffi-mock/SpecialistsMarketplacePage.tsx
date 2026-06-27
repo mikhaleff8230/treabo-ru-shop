@@ -10,7 +10,6 @@ import {
   MessageCircle,
   ShieldCheck,
   Star,
-  Star,
 } from 'lucide-react';
 import team1 from '@/assets/images/team/1.png';
 import team2 from '@/assets/images/team/2.png';
