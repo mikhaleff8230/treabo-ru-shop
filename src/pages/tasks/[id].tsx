@@ -233,8 +233,14 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
   const photos = (data.photos || []).map(photoUrl).filter(Boolean);
   const seo = buildTaskSeo(data, photos, router.locale);
   const jsonLd = buildTaskJsonLd(data, seo, router.locale);
+  const isOwnTask = Boolean(auth.user?.id && data.customer_id && String(auth.user.id) === String(data.customer_id));
 
   async function openApplyModal() {
+    if (isOwnTask) {
+      setApplyError('Это ваша заявка — на неё нельзя откликнуться как специалист.');
+      setApplyOpen(true);
+      return;
+    }
     if (!auth.isSpecialist) {
       setAuthOpen(true);
       return;
@@ -356,10 +362,16 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
         {auth.isSpecialist ? (
           <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-zinc-200 bg-white/95 px-4 py-3 backdrop-blur">
             <div className="mx-auto flex max-w-2xl justify-center">
-              <button type="button" onClick={openApplyModal} disabled={applyLoading} className="flex min-h-[52px] w-full max-w-xl items-center justify-center gap-2 rounded-2xl bg-[#232323] px-5 text-sm font-black text-white">
-                <MessageCircle className="h-5 w-5" />
-                {text.task.writeClient}
-              </button>
+              {isOwnTask ? (
+                <div className="flex min-h-[52px] w-full max-w-xl items-center justify-center rounded-2xl bg-[#f3f5fa] px-5 text-center text-sm font-black text-[#232323]">
+                  Это ваша заявка — специалисты смогут откликнуться на неё из своих аккаунтов.
+                </div>
+              ) : (
+                <button type="button" onClick={openApplyModal} disabled={applyLoading} className="flex min-h-[52px] w-full max-w-xl items-center justify-center gap-2 rounded-2xl bg-[#232323] px-5 text-sm font-black text-white">
+                  <MessageCircle className="h-5 w-5" />
+                  {text.task.writeClient}
+                </button>
+              )}
             </div>
           </div>
         ) : !auth.isAuthenticated ? (

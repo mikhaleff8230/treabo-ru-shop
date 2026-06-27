@@ -28,6 +28,7 @@ export type TreaboTask = {
   user?: { name?: string | null } | null;
   applications_count?: number;
   response_price_mdl?: number | null;
+  customer_id?: string | null;
   photos_count?: number;
   lat?: number | null;
   lng?: number | null;
