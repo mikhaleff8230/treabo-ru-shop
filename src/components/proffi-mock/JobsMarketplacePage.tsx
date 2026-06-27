@@ -15,12 +15,13 @@ import {
 } from 'lucide-react';
 import TreaboAuthModal from '@/components/auth/treabo-auth-modal';
 import TreaboTasksMapModal from '@/components/treabo/TreaboTasksMapModal';
+import TreaboCategorySearchInput from '@/components/treabo/TreaboCategorySearchInput';
 import RussiaCityInput from '@/components/treabo/RussiaCityInput';
 import type { TreaboCategory, TreaboTask, TreaboTaskFilters } from '@/data/treabo';
 import routes from '@/config/routes';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
 import { getTreaboText } from '@/lib/treabo/i18n';
-import { jobCards } from './mock-data';
+import { flattenCategoryOptions } from '@/lib/treabo/categories';
 import {
   MarketplaceFilterGroup,
   MarketplaceFilterOption,
@@ -98,9 +99,6 @@ function mapTaskToCard(task: TreaboTask, categories: TreaboCategory[], locale: s
 }
 
 function buildJobCards(tasks: TreaboTask[], categories: TreaboCategory[], locale: string): UiJobCard[] {
-  if (!tasks.length) {
-    return jobCards.map((card, index) => ({ ...card, id: `mock-${index + 1}`, task: undefined }));
-  }
   return tasks.slice(0, 100).map((task) => mapTaskToCard(task, categories, locale));
 }
 
@@ -217,14 +215,14 @@ function JobCard({
             </div>
           </div>
           <div className="mt-3 flex gap-2">
-            {auth.isSpecialist ? (
-              <button
-                type="button"
+            {auth.isSpecialist && task ? (
+              <Link
+                href={routes.taskUrl(task)}
                 className="inline-flex min-h-[34px] flex-1 items-center justify-between rounded-[11px] bg-[#D9F36B] px-3 text-[12px] font-[300] text-[#20242D] transition hover:bg-[#c7e85a] sm:min-h-[36px] sm:text-[13px]"
               >
                 {text.works.apply}
                 <ArrowRight className="h-4 w-4 stroke-[1.8]" />
-              </button>
+              </Link>
             ) : auth.isAuthenticated ? null : (
               <button
                 type="button"
@@ -357,14 +355,26 @@ export default function JobsMarketplacePage({
     city: initialFilters.city || text.city,
     ...initialFilters,
   });
+  const [serviceQuery, setServiceQuery] = useState(initialFilters.q || '');
+  const [searchCategoryId, setSearchCategoryId] = useState(initialFilters.category_id || '');
 
   const visibleJobs = useMemo(() => buildJobCards(tasks, categories, 'ru'), [tasks, categories]);
   const availableCount = tasks.length || visibleJobs.length;
   const quickTags = ['срочно', 'с фото', 'рядом с домом', 'ремонт', 'плитка', 'сантехника', 'электрика'];
 
   const categoryOptions = categories.length
-    ? categories.map((item) => ({ id: item.id, label: categoryName(item) || item.slug || item.id }))
+    ? flattenCategoryOptions(categories)
     : [];
+
+  function runSearch() {
+    const next: TreaboTaskFilters = {
+      ...filters,
+      q: searchCategoryId ? undefined : serviceQuery.trim() || undefined,
+      category_id: searchCategoryId || undefined,
+    };
+    setFilters(next);
+    applyFilters(next);
+  }
 
   function applyFilters(next: TreaboTaskFilters) {
     const query = buildQuery(next);
@@ -374,14 +384,22 @@ export default function JobsMarketplacePage({
   function resetFilters() {
     const next = { city: text.city };
     setFilters(next);
+    setServiceQuery('');
+    setSearchCategoryId('');
     applyFilters(next);
   }
 
   function toggleCategory(categoryId: string) {
-    setFilters((current) => ({
-      ...current,
-      category_id: current.category_id === categoryId ? undefined : categoryId,
-    }));
+    const nextCategoryId = filters.category_id === categoryId ? undefined : categoryId;
+    const next = {
+      ...filters,
+      category_id: nextCategoryId,
+      q: nextCategoryId ? undefined : filters.q,
+    };
+    setFilters(next);
+    setSearchCategoryId(nextCategoryId || '');
+    if (nextCategoryId) setServiceQuery('');
+    applyFilters(next);
   }
 
   function toggleBudgetPreset(preset: string) {
@@ -471,6 +489,32 @@ export default function JobsMarketplacePage({
             </div>
           </div>
 
+          <div className="mb-8 grid gap-2 rounded-[22px] border border-[#E7E9EC] bg-white p-2 shadow-[0_8px_24px_rgba(24,28,35,0.045)] sm:grid-cols-[1fr_205px_130px]">
+            <TreaboCategorySearchInput
+              categories={categories}
+              value={serviceQuery}
+              categoryId={searchCategoryId}
+              onValueChange={setServiceQuery}
+              onCategoryIdChange={setSearchCategoryId}
+              placeholder={text.common.servicePlaceholder}
+            />
+            <label className="flex h-11 items-center gap-2.5 rounded-[16px] bg-[#F6F7F5] px-3.5">
+              <MapPin className="h-4 w-4 text-[#777D88]" />
+              <RussiaCityInput
+                value={filters.city || ''}
+                onChange={(city) => setFilters((current) => ({ ...current, city }))}
+                placeholder={text.city}
+              />
+            </label>
+            <button
+              type="button"
+              onClick={runSearch}
+              className="rounded-[16px] bg-[#232323] px-4 text-xs font-semibold text-white"
+            >
+              {text.common.search}
+            </button>
+          </div>
+
           <div className="sticky top-14 z-30 -mx-4 mb-5 border-y border-[#E7E9EC] bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
             <div className="flex gap-2 overflow-x-auto">
               <button
@@ -522,7 +566,7 @@ export default function JobsMarketplacePage({
               />
 
               <div className="space-y-5 sm:space-y-6">
-                {visibleJobs.map(({ icon: Icon, task, ...job }) => (
+                {visibleJobs.length ? visibleJobs.map(({ icon: Icon, task, ...job }) => (
                   <JobCard
                     key={job.id}
                     job={job}
@@ -532,7 +576,14 @@ export default function JobsMarketplacePage({
                     auth={auth}
                     onAuthOpen={() => setAuthOpen(true)}
                   />
-                ))}
+                )) : (
+                  <div className="rounded-[28px] border border-[#E7E9EC] bg-white p-8 text-center shadow-sm">
+                    <div className="text-xl font-bold text-[#232323]">Заданий пока нет</div>
+                    <p className="mt-2 text-sm text-[#777D88]">
+                      Когда появятся реальные заявки, они будут показаны здесь.
+                    </p>
+                  </div>
+                )}
               </div>
             </section>
           </div>

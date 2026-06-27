@@ -11,6 +11,8 @@ export type TreaboUser = {
   email?: string | null;
   avatar?: string | null;
   portfolio?: string[];
+  rating?: number;
+  reviews_count?: number;
 };
 
 export type TreaboAuthResponse = {

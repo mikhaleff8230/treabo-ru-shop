@@ -40,26 +40,6 @@ const money = new Intl.NumberFormat('ru-RU');
 const DEFAULT_RESPONSE_PRICE_RUB = 15;
 const siteUrl = (process.env.NEXT_PUBLIC_WEBSITE_URL || 'https://treabo.md').replace(/\/+$/, '');
 
-function mockTask(locale?: string): TreaboTask {
-  const ru = locale === 'ru';
-  return {
-    id: 'mock-1',
-    title: ru ? 'Ремонт санузла' : 'Reparație baie',
-    description: ru
-      ? 'Нужно выполнить ремонт санузла. Требуется укладка плитки, подключение сантехники и аккуратная отделка. Материалы можно уточнить после осмотра.'
-      : 'Este necesară reparația băii: montare gresie/faianță, conectare instalații sanitare și finisare atentă. Materialele pot fi clarificate după măsurare.',
-    category: 'bathroom-renovation',
-    city: ru ? 'Кишинёв' : 'Chișinău',
-    address: ru ? 'Кишинёв, Ботаника, str. Teilor 12' : 'Chișinău, Botanica, str. Teilor 12',
-    budget: 150000,
-    deadline: ru ? 'На этой неделе' : 'Săptămâna aceasta',
-    status: 'open',
-    photos: [],
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
-}
-
 function stripHtml(value?: string | null) {
   return (value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
 }
@@ -247,7 +227,7 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
   const [applyPreview, setApplyPreview] = useState<TreaboApplicationPreview | null>(null);
   const [applyLoading, setApplyLoading] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
-  const data = task || mockTask(router.locale);
+  const data = task as TreaboTask;
   const budget = Number(data.budget || 0);
   const responsePrice = Number(data.response_price_mdl || DEFAULT_RESPONSE_PRICE_RUB);
   const photos = (data.photos || []).map(photoUrl).filter(Boolean);
@@ -417,6 +397,10 @@ export const getServerSideProps: GetServerSideProps<TaskDetailProps> = async ({ 
   const raw = String(params?.id || '');
   const taskId = parseTaskIdFromSlug(raw);
   const task = taskId.startsWith('mock-') ? null : await fetchTreaboTask(taskId);
+
+  if (!task) {
+    return { notFound: true };
+  }
 
   if (task && taskSlugFromTitle(task.title, task.id) !== raw && /^\d+$/.test(raw) === false) {
     return {

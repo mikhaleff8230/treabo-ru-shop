@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Camera, ImagePlus, Pencil, Star, Trash2 } from 'lucide-react';
 import TreaboAccountShell from '@/components/treabo/TreaboAccountShell';
-import { uploadTreaboFile } from '@/data/treabo';
+import { fetchTreaboStats, uploadTreaboFile, type TreaboStats } from '@/data/treabo';
 import { getStoredTreaboToken } from '@/data/treabo-auth';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
 
@@ -10,7 +10,19 @@ export default function TreaboProfilePage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingPortfolio, setUploadingPortfolio] = useState(false);
   const [error, setError] = useState('');
+  const [stats, setStats] = useState<TreaboStats | null>(null);
   const portfolio = auth.user?.portfolio || [];
+  const rating = Number(stats?.rating ?? auth.user?.rating ?? 0);
+  const reviewsCount = Number(stats?.reviews_count ?? auth.user?.reviews_count ?? 0);
+
+  useEffect(() => {
+    const token = getStoredTreaboToken();
+    if (!token) return;
+
+    fetchTreaboStats(token)
+      .then(setStats)
+      .catch(() => undefined);
+  }, []);
 
   async function uploadAvatar(file?: File | null) {
     if (!file) return;
@@ -97,8 +109,8 @@ export default function TreaboProfilePage() {
                 <div>
                   <h2 className="text-3xl font-black leading-tight">{auth.user?.name || 'Специалист Treabo'}</h2>
                   <div className="mt-3 flex flex-wrap gap-3 text-sm font-bold">
-                    <span className="inline-flex items-center gap-1"><Star className="h-4 w-4 fill-[#232323]" /> 4,0</span>
-                    <span>5 отзывов</span>
+                    <span className="inline-flex items-center gap-1"><Star className="h-4 w-4 fill-[#232323]" /> {rating.toFixed(1).replace('.', ',')}</span>
+                    <span>{reviewsCount} отзывов</span>
                     <span className="text-[#7d849b]">Паспорт проверен</span>
                   </div>
                 </div>
@@ -174,10 +186,14 @@ export default function TreaboProfilePage() {
         <section className="rounded-[30px] bg-white p-5 shadow-sm">
           <h2 className="text-xl font-black">Моя статистика</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
-            {['Отклики', 'Чаты', 'Выполнено'].map((label, index) => (
-              <div key={label} className="rounded-2xl bg-[#f5f6f1] p-4">
-                <div className="text-3xl font-black">{[12, 4, 2][index]}</div>
-                <div className="text-sm font-bold text-[#7d849b]">{label}</div>
+            {[
+              { label: 'Отклики', value: Number(stats?.applied || 0) },
+              { label: 'Чаты', value: Number(stats?.active_chats || 0) },
+              { label: 'Выполнено', value: Number(stats?.completed || stats?.accepted || 0) },
+            ].map((item) => (
+              <div key={item.label} className="rounded-2xl bg-[#f5f6f1] p-4">
+                <div className="text-3xl font-black">{item.value}</div>
+                <div className="text-sm font-bold text-[#7d849b]">{item.label}</div>
               </div>
             ))}
           </div>

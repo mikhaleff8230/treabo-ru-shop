@@ -8,8 +8,8 @@ import {
   Filter,
   MapPin,
   MessageCircle,
-  Search,
   ShieldCheck,
+  Star,
   Star,
 } from 'lucide-react';
 import team1 from '@/assets/images/team/1.png';
@@ -18,9 +18,15 @@ import team3 from '@/assets/images/team/3.png';
 import team4 from '@/assets/images/team/4.png';
 import team5 from '@/assets/images/team/5.png';
 import team6 from '@/assets/images/team/6.png';
-import type { TreaboSpecialist } from '@/data/treabo';
+import type { TreaboCategory, TreaboSpecialist } from '@/data/treabo';
 import { getTreaboText } from '@/lib/treabo/i18n';
 import RussiaCityInput from '@/components/treabo/RussiaCityInput';
+import TreaboCategorySearchInput from '@/components/treabo/TreaboCategorySearchInput';
+import {
+  buildMarketplaceSearchQuery,
+  flattenCategoryOptions,
+  resolveServiceLabels,
+} from '@/lib/treabo/categories';
 import {
   MarketplaceFilterGroup,
   MarketplaceFilterOption,
@@ -42,78 +48,45 @@ type Specialist = {
   qualification: string;
   location: string;
   services: string[];
+  serviceIds: string[];
   photos: Array<StaticImageData | string>;
   avatar: StaticImageData | string;
 };
 
-function buildSpecialists(locale?: string, apiSpecialists: TreaboSpecialist[] = []): Specialist[] {
+function buildSpecialists(
+  _locale?: string,
+  apiSpecialists: TreaboSpecialist[] = [],
+  categories: TreaboCategory[] = [],
+): Specialist[] {
   if (apiSpecialists.length) {
     const fallbackAvatars = [team1, team2, team3];
     const fallbackPhotos = [[team2, team3, team4], [team5, team6, team3], [team4, team1, team6]];
 
-    return apiSpecialists.map((item, index) => ({
-      name: item.name || 'Специалист Treabo',
-      online: item.last_seen ? 'Был в сети недавно' : 'Онлайн',
-      rating: String(item.rating || '5,0').replace('.', ','),
-      reviews: `${item.reviews_count || 0} отзывов`,
-      praise: 'Профиль Treabo',
-      team: 'Выезд к клиенту',
-      verified: item.email ? 'Профиль проверен' : 'Анкета заполнена',
-      qualification:
-        item.bio ||
-        'Специалист принимает заявки Treabo. Портфолио и услуги можно заполнить в анкете мастера.',
-      location: item.city || 'Москва',
-      services: item.services?.length ? item.services : ['Ремонт', 'Сантехника', 'Плитка'],
-      photos: item.portfolio?.length ? item.portfolio.slice(0, 3) : fallbackPhotos[index % fallbackPhotos.length],
-      avatar: item.avatar || fallbackAvatars[index % fallbackAvatars.length],
-    }));
+    return apiSpecialists.map((item, index) => {
+      const serviceIds = item.services || [];
+      const serviceLabels = resolveServiceLabels(serviceIds, categories);
+
+      return {
+        name: item.name || 'Специалист Treabo',
+        online: item.last_seen ? 'Был в сети недавно' : 'Онлайн',
+        rating: Number(item.rating || 0).toFixed(1).replace('.', ','),
+        reviews: `${item.reviews_count || 0} отзывов`,
+        praise: 'Профиль Treabo',
+        team: 'Выезд к клиенту',
+        verified: item.email ? 'Профиль проверен' : 'Анкета заполнена',
+        qualification:
+          item.bio ||
+          'Специалист принимает заявки Treabo. Портфолио и услуги можно заполнить в анкете мастера.',
+        location: item.city || 'Москва',
+        services: serviceLabels.length ? serviceLabels : ['Ремонт', 'Сантехника', 'Плитка'],
+        serviceIds: serviceIds.length ? serviceIds : [],
+        photos: item.portfolio?.length ? item.portfolio.slice(0, 3) : fallbackPhotos[index % fallbackPhotos.length],
+        avatar: item.avatar || fallbackAvatars[index % fallbackAvatars.length],
+      };
+    });
   }
 
-  return [
-    {
-      name: 'Дмитрий Е.',
-      online: 'Был в сети сегодня в 06:34',
-      rating: '5,0',
-      reviews: '52 отзыва',
-      praise: 'Очень хвалят',
-      team: 'С командой',
-      verified: 'Паспорт проверен',
-      qualification:
-        'Специалист сдал экзамен по услугам: малярные и штукатурные работы, поклейка обоев.',
-      location: 'Москва, Хамовники',
-      services: ['Ремонт квартир', 'Покраска стен', 'Плитка', 'Штукатурка'],
-      photos: [team2, team3, team4],
-      avatar: team1,
-    },
-    {
-      name: 'Андрей П.',
-      online: 'Онлайн',
-      rating: '4,9',
-      reviews: '38 отзывов',
-      praise: 'Быстро отвечает',
-      team: 'Работает сам',
-      verified: 'Документы проверены',
-      qualification: 'Выполняет сантехнические работы, сборку мебели и мелкий ремонт по дому.',
-      location: 'Москва, Центр',
-      services: ['Сантехника', 'Мелкий ремонт', 'Сборка мебели'],
-      photos: [team5, team6, team3],
-      avatar: team2,
-    },
-    {
-      name: 'Михаил С.',
-      online: 'Был в сети вчера',
-      rating: '4,8',
-      reviews: '71 отзыв',
-      praise: 'Аккуратная работа',
-      team: 'С напарником',
-      verified: 'Профиль подтвержден',
-      qualification: 'Берет заказы по электрике, диагностике, установке розеток и светильников.',
-      location: 'Бельцы',
-      services: ['Электрика', 'Диагностика', 'Светильники'],
-      photos: [team4, team1, team6],
-      avatar: team3,
-    },
-  ];
+  return [];
 }
 
 function interpolate(template: string, values: Record<string, string | number>) {
@@ -185,15 +158,22 @@ function SpecialistCard({ specialist }: { specialist: Specialist }) {
                 {specialist.qualification}
               </p>
               <div className="mt-1.5 flex flex-wrap gap-1.5">
-                {specialist.services.slice(0, 3).map((service) => (
-                  <Link
-                    key={service}
-                    href={`/specialists?service=${encodeURIComponent(service)}`}
-                    className="rounded-full border border-[#E6E9EF] bg-white px-2.5 py-1 text-[11px] font-[300] leading-none text-[#3A3D45]"
-                  >
-                    {service}
-                  </Link>
-                ))}
+                {specialist.services.slice(0, 3).map((service, index) => {
+                  const serviceId = specialist.serviceIds[index] || service;
+                  const href = specialist.serviceIds[index]
+                    ? `/specialists?category_id=${encodeURIComponent(serviceId)}`
+                    : `/specialists?q=${encodeURIComponent(service)}`;
+
+                  return (
+                    <Link
+                      key={`${service}-${index}`}
+                      href={href}
+                      className="rounded-full border border-[#E6E9EF] bg-white px-2.5 py-1 text-[11px] font-[300] leading-none text-[#3A3D45]"
+                    >
+                      {service}
+                    </Link>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -244,12 +224,18 @@ function SpecialistCard({ specialist }: { specialist: Specialist }) {
 
 function SpecialistsFiltersPanel({
   text,
+  categoryOptions,
+  selectedCategoryId,
+  onCategorySelect,
   openSections,
   toggleSection,
   visualSelections,
   toggleVisual,
 }: {
   text: ReturnType<typeof getTreaboText>;
+  categoryOptions: { id: string; label: string; parentLabel?: string }[];
+  selectedCategoryId?: string | null;
+  onCategorySelect: (categoryId: string | null) => void;
   openSections: Set<string>;
   toggleSection: (key: string) => void;
   visualSelections: Set<string>;
@@ -257,6 +243,26 @@ function SpecialistsFiltersPanel({
 }) {
   return (
     <>
+      {categoryOptions.length ? (
+        <MarketplaceFilterGroup
+          title={text.common.category}
+          open={openSections.has('category')}
+          onToggle={() => toggleSection('category')}
+        >
+          <div className="flex flex-wrap gap-2">
+            {categoryOptions.map((option) => (
+              <MarketplaceFilterOption
+                key={option.id}
+                label={option.parentLabel ? `${option.parentLabel} / ${option.label}` : option.label}
+                type="chip"
+                selected={selectedCategoryId === option.id}
+                onClick={() => onCategorySelect(selectedCategoryId === option.id ? null : option.id)}
+              />
+            ))}
+          </div>
+        </MarketplaceFilterGroup>
+      ) : null}
+
       {text.specialists.filters.map((group) => (
         <MarketplaceFilterGroup
           key={group.title}
@@ -278,19 +284,36 @@ function SpecialistsFiltersPanel({
   );
 }
 
-export default function SpecialistsMarketplacePage({ specialists: apiSpecialists = [] }: { specialists?: TreaboSpecialist[] }) {
+export default function SpecialistsMarketplacePage({
+  specialists: apiSpecialists = [],
+  categories = [],
+}: {
+  specialists?: TreaboSpecialist[];
+  categories?: TreaboCategory[];
+}) {
   const router = useRouter();
   const text = getTreaboText(router.locale);
-  const selectedService = typeof router.query.service === 'string' ? router.query.service : '';
+  const selectedCategoryId = typeof router.query.category_id === 'string' ? router.query.category_id : '';
+  const selectedQuery = typeof router.query.q === 'string' ? router.query.q : '';
+  const legacyService = typeof router.query.service === 'string' ? router.query.service : '';
   const selectedCity = typeof router.query.city === 'string' ? router.query.city : '';
-  const specialists = buildSpecialists(router.locale, apiSpecialists).filter((specialist) => {
-    if (!selectedService) return true;
-    return specialist.services.some((service) => service.toLowerCase() === selectedService.toLowerCase());
-  });
-  const [city, setCity] = useState(selectedCity);
+  const specialists = buildSpecialists(router.locale, apiSpecialists, categories);
+  const [serviceQuery, setServiceQuery] = useState(selectedQuery || legacyService);
+  const [categoryId, setCategoryId] = useState(selectedCategoryId);
+  const [city, setCity] = useState(selectedCity || text.city);
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [openSections, setOpenSections] = useState<Set<string>>(() => new Set([text.specialists.filters[0]?.title]));
+  const [openSections, setOpenSections] = useState<Set<string>>(() => new Set(['category', text.specialists.filters[0]?.title]));
   const [visualSelections, setVisualSelections] = useState<Set<string>>(() => new Set());
+  const categoryOptions = flattenCategoryOptions(categories);
+
+  function runSearch(next?: { q?: string; category_id?: string | null; city?: string }) {
+    const query = buildMarketplaceSearchQuery({
+      q: next?.q ?? serviceQuery,
+      category_id: next?.category_id ?? categoryId,
+      city: next?.city ?? city,
+    });
+    router.push(query ? `/specialists?${query}` : '/specialists');
+  }
 
   function toggleSection(key: string) {
     setOpenSections((current) => {
@@ -312,11 +335,20 @@ export default function SpecialistsMarketplacePage({ specialists: apiSpecialists
 
   function resetFilters() {
     setVisualSelections(new Set());
+    setCategoryId(null);
+    setServiceQuery('');
+    router.push(city.trim() ? `/specialists?city=${encodeURIComponent(city.trim())}` : '/specialists');
   }
 
   const filtersPanel = (
     <SpecialistsFiltersPanel
       text={text}
+      categoryOptions={categoryOptions}
+      selectedCategoryId={categoryId}
+      onCategorySelect={(id) => {
+        setCategoryId(id);
+        runSearch({ category_id: id });
+      }}
       openSections={openSections}
       toggleSection={toggleSection}
       visualSelections={visualSelections}
@@ -343,25 +375,21 @@ export default function SpecialistsMarketplacePage({ specialists: apiSpecialists
             </div>
 
             <div className="mt-5 grid gap-2 rounded-[22px] border border-[#E7E9EC] bg-white p-2 shadow-[0_8px_24px_rgba(24,28,35,0.045)] sm:grid-cols-[1fr_205px_130px]">
-              <label className="flex h-11 items-center gap-2.5 rounded-[16px] bg-[#F6F7F5] px-3.5">
-                <Search className="h-4 w-4 text-[#777D88]" />
-                <input
-                  className="w-full bg-transparent text-xs font-medium text-[#232323] outline-none placeholder:text-[#777D88] sm:text-[13px]"
-                  placeholder={text.common.servicePlaceholder}
-                />
-              </label>
+              <TreaboCategorySearchInput
+                categories={categories}
+                value={serviceQuery}
+                categoryId={categoryId}
+                onValueChange={setServiceQuery}
+                onCategoryIdChange={setCategoryId}
+                placeholder={text.common.servicePlaceholder}
+              />
               <label className="flex h-11 items-center gap-2.5 rounded-[16px] bg-[#F6F7F5] px-3.5">
                 <MapPin className="h-4 w-4 text-[#777D88]" />
                 <RussiaCityInput value={city} onChange={setCity} placeholder={text.city} />
               </label>
               <button
                 type="button"
-                onClick={() => {
-                  const params = new URLSearchParams();
-                  if (city.trim()) params.set('city', city.trim());
-                  if (selectedService) params.set('service', selectedService);
-                  router.push(params.toString() ? `/specialists?${params.toString()}` : '/specialists');
-                }}
+                onClick={() => runSearch()}
                 className="rounded-[16px] bg-[#232323] px-4 text-xs font-semibold text-white"
               >
                 {text.common.search}

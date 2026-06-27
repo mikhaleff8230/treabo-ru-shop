@@ -55,7 +55,7 @@ export default function TreaboApplyConfirmModal({
             {isPaid ? (
               <>
                 <div className="text-sm font-bold text-[#7d849b]">Будет списано</div>
-                <div className="mt-1 text-4xl font-black">{fee} MDL</div>
+                <div className="mt-1 text-4xl font-black">{fee} ₽</div>
                 <p className="mt-3 text-sm leading-6 text-[#232323]">
                   Бесплатные отклики на сегодня закончились. После подтверждения будет создан отклик,
                   открыт чат с клиентом и сумма спишется с баланса мастера.

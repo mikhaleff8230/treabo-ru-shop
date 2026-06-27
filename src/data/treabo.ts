@@ -6,6 +6,7 @@ export type TreaboCategory = {
   icon?: string | null;
   name_ru: string;
   name_ro?: string | null;
+  parent_id?: string | null;
   sort_order?: number;
 };
 
@@ -56,7 +57,7 @@ export type TreaboApplicationPreview = {
   is_free: boolean;
   response_fee_mdl: number;
   default_response_price_mdl: number;
-  currency: 'MDL';
+  currency: 'RUB';
 };
 
 export type TreaboChat = {
@@ -89,6 +90,34 @@ export type TreaboBalance = {
   total_spent: number;
 };
 
+export type TreaboBalanceTransaction = {
+  id: string;
+  type: 'deposit' | 'application_fee' | string;
+  title: string;
+  description?: string | null;
+  status?: string | null;
+  amount: number;
+  direction: 'income' | 'expense';
+  currency: 'RUB' | string;
+  task_id?: string | null;
+  task_title?: string | null;
+  created_at?: string | null;
+};
+
+export type TreaboStats = {
+  role: 'specialist' | 'customer';
+  applied?: number;
+  accepted?: number;
+  completed?: number;
+  active_chats?: number;
+  posted?: number;
+  open?: number;
+  open_tasks?: number;
+  in_progress?: number;
+  rating?: number;
+  reviews_count?: number;
+};
+
 export type TreaboManualDeposit = {
   success: boolean;
   message?: string;
@@ -107,7 +136,7 @@ export type TreaboManualDepositReport = {
   data?: {
     deposit_id: number;
     amount: number;
-    currency: 'MDL';
+    currency: 'RUB';
     reported_at?: string | null;
   };
 };
@@ -136,6 +165,13 @@ export type TreaboSpecialist = {
   lat?: number | null;
   lng?: number | null;
   last_seen?: string | null;
+};
+
+export type TreaboSpecialistFilters = {
+  city?: string | null;
+  category_id?: string | null;
+  q?: string | null;
+  service?: string | null;
 };
 
 export type TreaboTaskFilters = {
@@ -275,9 +311,12 @@ export async function fetchTreaboTasks(filters?: TreaboTaskFilters) {
   return (await fetchJson<TreaboTask[]>(`/tasks${buildQuery(filters)}`)) ?? [];
 }
 
-export async function fetchTreaboSpecialists(filters?: { city?: string | null }) {
+export async function fetchTreaboSpecialists(filters?: TreaboSpecialistFilters) {
   const params = new URLSearchParams();
   if (filters?.city) params.set('city', filters.city);
+  if (filters?.category_id) params.set('category_id', filters.category_id);
+  if (filters?.q) params.set('q', filters.q);
+  if (!filters?.q && filters?.service) params.set('service', filters.service);
   const query = params.toString();
   return (await fetchJson<TreaboSpecialist[]>(`/specialists${query ? `?${query}` : ''}`)) ?? [];
 }
@@ -336,6 +375,18 @@ export async function sendTreaboChatMessage(chatId: string, token: string, text:
 export async function fetchTreaboBalance(token: string) {
   const payload = await treaboApiRequest<{ success: boolean; data: TreaboBalance }>('/balance', { token });
   return payload.data;
+}
+
+export async function fetchTreaboBalanceTransactions(token: string) {
+  const payload = await treaboApiRequest<{ success: boolean; data: TreaboBalanceTransaction[] }>(
+    '/balance/transactions',
+    { token },
+  );
+  return payload.data;
+}
+
+export async function fetchTreaboStats(token: string) {
+  return treaboApiRequest<TreaboStats>('/auth/stats', { token });
 }
 
 export async function createTreaboManualBalanceDeposit(token: string, amount: number) {
