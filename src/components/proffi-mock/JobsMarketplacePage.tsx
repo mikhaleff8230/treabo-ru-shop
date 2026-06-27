@@ -366,7 +366,7 @@ export default function JobsMarketplacePage({
   const [serviceQuery, setServiceQuery] = useState(initialFilters.q || '');
   const [searchCategoryId, setSearchCategoryId] = useState(initialFilters.category_id || '');
   const [highlightedTaskId, setHighlightedTaskId] = useState<string | null>(null);
-  const cardRefs = useMemo(() => new Map<string, HTMLElement>(), []);
+  const cardRefs = useMemo(() => new globalThis.Map<string, HTMLElement>(), []);
 
   useEffect(() => {
     if (router.query.map === '1') {
