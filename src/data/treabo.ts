@@ -119,26 +119,23 @@ export type TreaboStats = {
   reviews_count?: number;
 };
 
-export type TreaboManualDeposit = {
+export type TreaboYookassaDeposit = {
   success: boolean;
   message?: string;
-  payment_method?: 'manual';
+  payment_method?: 'yookassa';
   payment_url?: string;
   payment_id?: string;
-  deposit_id?: number;
   amount?: number;
-  currency?: string;
-  expires_at?: string;
 };
 
-export type TreaboManualDepositReport = {
+export type TreaboCheckPendingDeposit = {
   success: boolean;
-  message?: string;
-  data?: {
-    deposit_id: number;
-    amount: number;
-    currency: 'RUB';
-    reported_at?: string | null;
+  data: {
+    has_pending: boolean;
+    processed?: boolean;
+    amount?: number;
+    new_balance?: number;
+    message?: string;
   };
 };
 
@@ -185,14 +182,19 @@ export type TreaboTaskFilters = {
 };
 
 const trimSlash = (value: string) => value.replace(/\/+$/, '');
+const withProffiPrefix = (value: string) => {
+  const trimmed = trimSlash(value);
+  if (trimmed.endsWith('/api/treabo')) return trimmed;
+  return trimmed.endsWith('/proffi') ? trimmed : `${trimmed}/proffi`;
+};
 
 const apiCandidates = () => {
   const explicit = process.env.TREABO_API_ENDPOINT || process.env.NEXT_PUBLIC_TREABO_API_ENDPOINT;
 
   return [
-    explicit,
-    'http://host.docker.internal:8001/api',
-    'http://127.0.0.1:8001/api',
+    explicit ? withProffiPrefix(explicit) : undefined,
+    'http://host.docker.internal:8001/api/proffi',
+    'http://127.0.0.1:8001/api/proffi',
   ].filter(Boolean) as string[];
 };
 
@@ -236,17 +238,17 @@ async function fetchJson<T>(path: string): Promise<T | null> {
 export function getTreaboPublicApiBase(): string {
   if (typeof window !== 'undefined') {
     const explicit = process.env.NEXT_PUBLIC_TREABO_API_ENDPOINT;
-    if (explicit) return trimSlash(explicit);
+    if (explicit) return withProffiPrefix(explicit);
     if (window.location.hostname === 'treabo.ru' || window.location.hostname.endsWith('.treabo.ru')) {
-      return 'https://api.treabo.ru/api';
+      return 'https://api.treabo.ru/api/proffi';
     }
     if (window.location.hostname === 'treabo.md' || window.location.hostname.endsWith('.treabo.md')) {
-      return 'https://api.treabo.md/api';
+      return 'https://api.treabo.md/api/proffi';
     }
     return '/api/treabo';
   }
 
-  return trimSlash(apiCandidates()[0] || 'http://127.0.0.1:8001/api');
+  return trimSlash(apiCandidates()[0] || 'http://127.0.0.1:8001/api/proffi');
 }
 
 export async function uploadTreaboFile(
@@ -394,20 +396,16 @@ export async function fetchTreaboStats(token: string) {
   return treaboApiRequest<TreaboStats>('/auth/stats', { token });
 }
 
-export async function createTreaboManualBalanceDeposit(token: string, amount: number) {
-  return treaboApiRequest<TreaboManualDeposit>('/balance/deposit', {
+export async function createTreaboYookassaBalanceDeposit(token: string, amount: number) {
+  return treaboApiRequest<TreaboYookassaDeposit>('/balance/deposit', {
     method: 'POST',
     token,
-    body: JSON.stringify({ amount, payment_method: 'manual' }),
+    body: JSON.stringify({ amount, payment_method: 'yookassa' }),
   });
 }
 
-export async function reportTreaboManualBalancePayment(token: string, depositId?: number | null) {
-  return treaboApiRequest<TreaboManualDepositReport>('/balance/deposit/report', {
-    method: 'POST',
-    token,
-    body: JSON.stringify({ deposit_id: depositId || undefined }),
-  });
+export async function checkTreaboPendingDeposit(token: string) {
+  return treaboApiRequest<TreaboCheckPendingDeposit>('/balance/check-pending', { token });
 }
 
 export async function fetchTreaboLandingData(filters?: TreaboTaskFilters) {

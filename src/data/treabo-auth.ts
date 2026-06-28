@@ -32,16 +32,22 @@ const TOKEN_KEY = 'treabo_token';
 const USER_KEY = 'treabo_user';
 
 const trimSlash = (value: string) => value.replace(/\/+$/, '');
+const withProffiPrefix = (value: string) => {
+  const trimmed = trimSlash(value);
+  if (trimmed.endsWith('/api/treabo')) return trimmed;
+  return trimmed.endsWith('/proffi') ? trimmed : `${trimmed}/proffi`;
+};
 
 export function getTreaboApiBase(): string {
   if (typeof window !== 'undefined') {
-    return trimSlash(process.env.NEXT_PUBLIC_TREABO_API_ENDPOINT || '/api/treabo');
+    const explicit = process.env.NEXT_PUBLIC_TREABO_API_ENDPOINT;
+    return explicit ? withProffiPrefix(explicit) : '/api/treabo';
   }
 
-  return trimSlash(
+  return withProffiPrefix(
     process.env.TREABO_API_ENDPOINT ||
       process.env.NEXT_PUBLIC_TREABO_API_ENDPOINT ||
-      'http://127.0.0.1:8001/api',
+      'http://127.0.0.1:8001/api/proffi',
   );
 }
 

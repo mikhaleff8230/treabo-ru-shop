@@ -14,6 +14,23 @@ const TRANSPARENT_PIXEL =
 
 let ymapsLoadPromise: Promise<void> | null = null;
 
+function getMapZoom(pointsCount: number) {
+  if (pointsCount === 1) return 13;
+  return pointsCount ? 11 : 10;
+}
+
+function createPlaqueLayout() {
+  return window.ymaps.templateLayoutFactory.createClass(
+    `<div style="background:#232323;color:#fff;padding:10px 12px;border-radius:14px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,0.28);max-width:220px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;{{ properties.active ? 'outline:2px solid #D9F36B;outline-offset:2px;' : '' }}">
+      {{ properties.photoUrl ? '<img src="' + properties.photoUrl + '" style="width:100%;height:64px;object-fit:cover;border-radius:8px;margin-bottom:8px;" />' : '' }}
+      <div style="font-size:12px;font-weight:700;white-space:nowrap;">{{ properties.priceLabel }}</div>
+      <div style="font-size:12px;font-weight:800;margin-top:4px;line-height:1.35;">{{ properties.title }}</div>
+      {{ properties.location ? '<div style="font-size:11px;margin-top:4px;line-height:1.35;opacity:0.9;">' + properties.location + '</div>' : '' }}
+      <div style="font-size:10px;margin-top:6px;opacity:0.75;">Открыть задание →</div>
+    </div>`,
+  );
+}
+
 function loadYmaps(): Promise<void> {
   if (typeof window === 'undefined') return Promise.reject(new Error('no window'));
   if (window.ymaps) {
@@ -42,6 +59,10 @@ export type TreaboTasksMapPoint = {
   lat: number;
   lng: number;
   priceLabel: string;
+  city?: string | null;
+  address?: string | null;
+  category?: string | null;
+  photoUrl?: string | null;
 };
 
 export function formatTaskPriceLabel(task: TreaboTask) {
@@ -51,16 +72,57 @@ export function formatTaskPriceLabel(task: TreaboTask) {
   return 'Цена договорная';
 }
 
+export type TreaboMapBounds = {
+  southWest: [number, number];
+  northEast: [number, number];
+};
+
+export function readYandexMapBounds(map: { getBounds: () => [number, number][] }): TreaboMapBounds {
+  const bounds = map.getBounds();
+  return {
+    southWest: bounds[0],
+    northEast: bounds[1],
+  };
+}
+
+export function isTaskWithinMapBounds(task: TreaboTask, bounds: TreaboMapBounds): boolean {
+  if (task.lat == null || task.lng == null) return false;
+  const lat = Number(task.lat);
+  const lng = Number(task.lng);
+  const [south, west] = bounds.southWest;
+  const [north, east] = bounds.northEast;
+  return lat >= south && lat <= north && lng >= west && lng <= east;
+}
+
+export function filterTasksByMapBounds(tasks: TreaboTask[], bounds: TreaboMapBounds | null): TreaboTask[] {
+  if (!bounds) {
+    return tasks.filter((task) => task.lat != null && task.lng != null);
+  }
+  return tasks.filter((task) => isTaskWithinMapBounds(task, bounds));
+}
+
 export function buildTaskMapPoints(tasks: TreaboTask[]): TreaboTasksMapPoint[] {
   return tasks
     .filter((task) => task.lat != null && task.lng != null)
-    .map((task) => ({
-      id: String(task.id),
-      title: task.title,
-      lat: Number(task.lat),
-      lng: Number(task.lng),
-      priceLabel: formatTaskPriceLabel(task),
-    }));
+    .map((task) => {
+      const firstPhoto = task.photos?.[0];
+      const photoUrl =
+        typeof firstPhoto === 'string'
+          ? firstPhoto
+          : firstPhoto?.url || (firstPhoto?.path ? `/api/treabo/files/${firstPhoto.path}` : null);
+
+      return {
+        id: String(task.id),
+        title: task.title,
+        lat: Number(task.lat),
+        lng: Number(task.lng),
+        priceLabel: formatTaskPriceLabel(task),
+        city: task.city,
+        address: task.address,
+        category: task.category,
+        photoUrl,
+      };
+    });
 }
 
 type TreaboTasksMapProps = {
@@ -70,6 +132,8 @@ type TreaboTasksMapProps = {
   highlightedTaskId?: string | null;
   onTaskClick?: (task: TreaboTask) => void;
   navigateOnClick?: boolean;
+  onBoundsChange?: (bounds: TreaboMapBounds) => void;
+  preserveViewport?: boolean;
 };
 
 export default function TreaboTasksMap({
@@ -79,12 +143,26 @@ export default function TreaboTasksMap({
   highlightedTaskId,
   onTaskClick,
   navigateOnClick = true,
+  onBoundsChange,
+  preserveViewport = false,
 }: TreaboTasksMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const placemarksRef = useRef<Map<string, any>>(new Map());
+  const onBoundsChangeRef = useRef(onBoundsChange);
+  const centerRef = useRef<[number, number]>(MOSCOW_CENTER);
+  const pointsRef = useRef<TreaboTasksMapPoint[]>([]);
+  const tasksRef = useRef<TreaboTask[]>(tasks);
+  const onTaskClickRef = useRef(onTaskClick);
+  const navigateOnClickRef = useRef(navigateOnClick);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [mapReady, setMapReady] = useState(false);
+
+  onBoundsChangeRef.current = onBoundsChange;
+  onTaskClickRef.current = onTaskClick;
+  navigateOnClickRef.current = navigateOnClick;
+  tasksRef.current = tasks;
 
   const points = useMemo(() => buildTaskMapPoints(tasks), [tasks]);
 
@@ -96,82 +174,42 @@ export default function TreaboTasksMap({
   }, [points]);
 
   useEffect(() => {
+    centerRef.current = center;
+  }, [center]);
+
+  useEffect(() => {
+    pointsRef.current = points;
+  }, [points]);
+
+  useEffect(() => {
     let destroyed = false;
 
-    function createPlaqueLayout() {
-      return window.ymaps.templateLayoutFactory.createClass(
-        `<div style="background:#232323;color:#fff;padding:8px 12px;border-radius:12px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,0.28);max-width:200px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;{{ properties.active ? 'outline:2px solid #D9F36B;outline-offset:2px;' : '' }}">
-          <div style="font-size:12px;font-weight:700;white-space:nowrap;">{{ properties.priceLabel }}</div>
-          <div style="font-size:11px;margin-top:4px;line-height:1.35;opacity:0.95;">{{ properties.title }}</div>
-        </div>`,
-      );
-    }
-
-    function renderMap() {
-      if (!mapRef.current || !window.ymaps || destroyed) return;
-
+    function createMap() {
+      if (!mapRef.current || !window.ymaps || destroyed || mapInstanceRef.current) return;
       if (!mapInstanceRef.current) {
         mapInstanceRef.current = new window.ymaps.Map(mapRef.current, {
-          center,
-          zoom: points.length === 1 ? 13 : points.length ? 11 : 10,
+          center: centerRef.current,
+          zoom: getMapZoom(pointsRef.current.length),
           controls: ['zoomControl'],
         });
-      } else {
-        mapInstanceRef.current.setCenter(center, points.length === 1 ? 13 : points.length ? 11 : 10);
+
+        const emitBounds = () => {
+          if (!mapInstanceRef.current || destroyed) return;
+          onBoundsChangeRef.current?.(readYandexMapBounds(mapInstanceRef.current));
+        };
+
+        mapInstanceRef.current.events.add('actionend', emitBounds);
+        emitBounds();
+        setMapReady(true);
+        setLoading(false);
       }
-
-      placemarksRef.current.forEach((placemark) => mapInstanceRef.current.geoObjects.remove(placemark));
-      placemarksRef.current.clear();
-
-      const layout = createPlaqueLayout();
-
-      points.forEach((point) => {
-        const task = tasks.find((item) => String(item.id) === point.id);
-        const active = highlightedTaskId === point.id;
-
-        const placemark = new window.ymaps.Placemark(
-          [point.lat, point.lng],
-          {
-            priceLabel: point.priceLabel,
-            title: point.title,
-            active: active ? '1' : '',
-            hintContent: point.title,
-          },
-          {
-            iconLayout: 'default#imageWithContent',
-            iconImageHref: TRANSPARENT_PIXEL,
-            iconImageSize: [1, 1],
-            iconImageOffset: [0, 0],
-            iconContentLayout: layout,
-            iconContentOffset: [-72, -48],
-            iconContentSize: [144, 48],
-            zIndex: active ? 1000 : 1,
-          },
-        );
-
-        placemark.events.add('click', () => {
-          if (!task) return;
-          if (onTaskClick) {
-            onTaskClick(task);
-            return;
-          }
-          if (navigateOnClick) {
-            window.location.href = routes.taskUrl(task);
-          }
-        });
-
-        mapInstanceRef.current.geoObjects.add(placemark);
-        placemarksRef.current.set(point.id, placemark);
-      });
-
-      setLoading(false);
     }
 
     setLoading(true);
     setLoadError('');
     loadYmaps()
       .then(() => {
-        if (!destroyed) renderMap();
+        if (!destroyed) createMap();
       })
       .catch(() => {
         if (!destroyed) {
@@ -190,9 +228,80 @@ export default function TreaboTasksMap({
         }
         mapInstanceRef.current = null;
         placemarksRef.current.clear();
+        setMapReady(false);
       }
     };
-  }, [center, points, tasks, onTaskClick, navigateOnClick, highlightedTaskId]);
+  }, []);
+
+  useEffect(() => {
+    if (!mapInstanceRef.current || preserveViewport) return;
+    mapInstanceRef.current.setCenter(center, getMapZoom(points.length));
+  }, [center, points.length, preserveViewport]);
+
+  useEffect(() => {
+    if (!mapReady || !mapRef.current || !mapInstanceRef.current || typeof ResizeObserver === 'undefined') return;
+
+    const resizeObserver = new ResizeObserver(() => {
+      window.requestAnimationFrame(() => {
+        if (!mapInstanceRef.current) return;
+        mapInstanceRef.current.container.fitToViewport();
+        onBoundsChangeRef.current?.(readYandexMapBounds(mapInstanceRef.current));
+      });
+    });
+
+    resizeObserver.observe(mapRef.current);
+    return () => resizeObserver.disconnect();
+  }, [mapReady]);
+
+  useEffect(() => {
+    if (!mapReady || !mapInstanceRef.current || !window.ymaps) return;
+
+    placemarksRef.current.forEach((placemark) => mapInstanceRef.current.geoObjects.remove(placemark));
+    placemarksRef.current.clear();
+
+    const layout = createPlaqueLayout();
+
+    points.forEach((point) => {
+      const task = tasksRef.current.find((item) => String(item.id) === point.id);
+      const active = highlightedTaskId === point.id;
+
+      const placemark = new window.ymaps.Placemark(
+        [point.lat, point.lng],
+        {
+          priceLabel: point.priceLabel,
+          title: point.title,
+          location: [point.city, point.address].filter(Boolean).join(', '),
+          photoUrl: point.photoUrl || '',
+          active: active ? '1' : '',
+          hintContent: point.title,
+        },
+        {
+          iconLayout: 'default#imageWithContent',
+          iconImageHref: TRANSPARENT_PIXEL,
+          iconImageSize: [1, 1],
+          iconImageOffset: [0, 0],
+          iconContentLayout: layout,
+          iconContentOffset: [-88, -72],
+          iconContentSize: [176, 120],
+          zIndex: active ? 1000 : 1,
+        },
+      );
+
+      placemark.events.add('click', () => {
+        if (!task) return;
+        if (onTaskClickRef.current) {
+          onTaskClickRef.current(task);
+          return;
+        }
+        if (navigateOnClickRef.current) {
+          window.location.href = routes.taskUrl(task);
+        }
+      });
+
+      mapInstanceRef.current.geoObjects.add(placemark);
+      placemarksRef.current.set(point.id, placemark);
+    });
+  }, [points, highlightedTaskId, mapReady]);
 
   return (
     <div className={`relative overflow-hidden rounded-[24px] border border-[#E7E9EC] bg-[#eef1f7] ${heightClassName} ${className}`}>

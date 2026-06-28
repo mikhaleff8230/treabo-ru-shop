@@ -10,12 +10,14 @@ import {
   Info,
   Map,
   MapPin,
+  Maximize2,
+  Minimize2,
   Paintbrush,
   Wrench,
 } from 'lucide-react';
 import TreaboAuthModal from '@/components/auth/treabo-auth-modal';
-import TreaboTasksMap from '@/components/treabo/TreaboTasksMap';
-import TreaboTasksMapModal from '@/components/treabo/TreaboTasksMapModal';
+import TreaboTasksMap, { filterTasksByMapBounds, type TreaboMapBounds } from '@/components/treabo/TreaboTasksMap';
+import JobsMarketplaceMapLayout from '@/components/proffi-mock/JobsMarketplaceMapLayout';
 import TreaboCategorySearchInput from '@/components/treabo/TreaboCategorySearchInput';
 import RussiaCityInput from '@/components/treabo/RussiaCityInput';
 import type { TreaboCategory, TreaboTask, TreaboTaskFilters } from '@/data/treabo';
@@ -103,7 +105,7 @@ function buildJobCards(tasks: TreaboTask[], categories: TreaboCategory[], locale
   return tasks.slice(0, 100).map((task) => mapTaskToCard(task, categories, locale));
 }
 
-function buildQuery(filters: TreaboTaskFilters) {
+function buildQuery(filters: TreaboTaskFilters, mapViewEnabled = false, mapFullscreen = false) {
   const params = new URLSearchParams();
   if (filters.category_id) params.set('category_id', filters.category_id);
   if (filters.category) params.set('category', filters.category);
@@ -111,6 +113,8 @@ function buildQuery(filters: TreaboTaskFilters) {
   if (filters.q) params.set('q', filters.q);
   if (filters.budget_min != null) params.set('budget_min', String(filters.budget_min));
   if (filters.budget_max != null) params.set('budget_max', String(filters.budget_max));
+  if (mapViewEnabled) params.set('map', '1');
+  if (mapFullscreen) params.set('map_full', '1');
   return params.toString();
 }
 
@@ -274,8 +278,6 @@ function WorksFiltersPanel({
   openSections,
   toggleSection,
   toggleCategory,
-  toggleBudgetPreset,
-  isBudgetSelected,
 }: {
   text: ReturnType<typeof getTreaboText>;
   filters: TreaboTaskFilters;
@@ -284,9 +286,24 @@ function WorksFiltersPanel({
   openSections: Set<string>;
   toggleSection: (key: string) => void;
   toggleCategory: (id: string) => void;
-  toggleBudgetPreset: (preset: string) => void;
-  isBudgetSelected: (option: string) => boolean;
 }) {
+  const [categoryQuery, setCategoryQuery] = useState('');
+  const normalizedCategoryQuery = categoryQuery.trim().toLowerCase();
+  const selectedCategory = categoryOptions.find((option) => option.id === filters.category_id);
+  const categoryMatches = normalizedCategoryQuery.length >= 2
+    ? categoryOptions
+        .filter((option) => option.label.toLowerCase().includes(normalizedCategoryQuery))
+        .slice(0, 10)
+    : [];
+
+  function updateBudget(field: 'budget_min' | 'budget_max', value: string) {
+    const numericValue = value === '' ? undefined : Number(value);
+    setFilters((current) => ({
+      ...current,
+      [field]: Number.isFinite(numericValue) ? numericValue : undefined,
+    }));
+  }
+
   return (
     <>
       {categoryOptions.length ? (
@@ -295,8 +312,23 @@ function WorksFiltersPanel({
           open={openSections.has('category')}
           onToggle={() => toggleSection('category')}
         >
-          <div className="flex flex-wrap gap-2">
-            {categoryOptions.map((option) => (
+          <input
+            value={categoryQuery}
+            onChange={(event) => setCategoryQuery(event.target.value)}
+            placeholder="Найти категорию"
+            className="mb-2 h-9 w-full rounded-[12px] border border-[#E7E9EC] bg-[#F7F7F4] px-3 text-[12px] font-[300] text-[#232323] outline-none transition placeholder:text-[#8B91A0] focus:border-[#D9F36B]"
+          />
+          <div className="flex flex-wrap gap-1.5">
+            {selectedCategory && !categoryMatches.some((option) => option.id === selectedCategory.id) ? (
+              <MarketplaceFilterOption
+                key={selectedCategory.id}
+                label={selectedCategory.label}
+                type="chip"
+                selected
+                onClick={() => toggleCategory(selectedCategory.id)}
+              />
+            ) : null}
+            {categoryMatches.map((option) => (
               <MarketplaceFilterOption
                 key={option.id}
                 label={option.label}
@@ -306,6 +338,15 @@ function WorksFiltersPanel({
               />
             ))}
           </div>
+          {!normalizedCategoryQuery.length ? (
+            <div className="mt-1.5 text-[11px] font-[300] leading-4 text-[#8B91A0]">
+              Начните вводить: ремонт, сантехника, электрика…
+            </div>
+          ) : categoryMatches.length ? null : (
+            <div className="mt-1.5 text-[11px] font-[300] leading-4 text-[#8B91A0]">
+              Категории не найдены
+            </div>
+          )}
         </MarketplaceFilterGroup>
       ) : null}
 
@@ -322,25 +363,38 @@ function WorksFiltersPanel({
         />
       </MarketplaceFilterGroup>
 
-      {text.works.filters.map((group) => (
-        <MarketplaceFilterGroup
-          key={group.title}
-          title={group.title}
-          open={openSections.has(group.title)}
-          onToggle={() => toggleSection(group.title)}
-        >
-          {group.options.map((option) => (
-            <MarketplaceFilterOption
-              key={option}
-              label={option}
-              selected={group.title === text.works.filters[0].title ? isBudgetSelected(option) : false}
-              onClick={() => {
-                if (group.title === text.works.filters[0].title) toggleBudgetPreset(option);
-              }}
+      <MarketplaceFilterGroup
+        title="Стоимость работ"
+        open={openSections.has('budget')}
+        onToggle={() => toggleSection('budget')}
+      >
+        <div className="grid grid-cols-2 gap-2">
+          <label className="block">
+            <span className="mb-1 block text-[10px] font-[300] text-[#8B91A0]">От</span>
+            <input
+              type="number"
+              min="0"
+              inputMode="numeric"
+              value={filters.budget_min ?? ''}
+              onChange={(event) => updateBudget('budget_min', event.target.value)}
+              placeholder="0"
+              className="h-9 w-full rounded-[12px] border border-[#E7E9EC] bg-[#F7F7F4] px-3 text-[12px] font-[300] text-[#232323] outline-none transition placeholder:text-[#A2A7B2] focus:border-[#D9F36B]"
             />
-          ))}
-        </MarketplaceFilterGroup>
-      ))}
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-[10px] font-[300] text-[#8B91A0]">До</span>
+            <input
+              type="number"
+              min="0"
+              inputMode="numeric"
+              value={filters.budget_max ?? ''}
+              onChange={(event) => updateBudget('budget_max', event.target.value)}
+              placeholder="50000"
+              className="h-9 w-full rounded-[12px] border border-[#E7E9EC] bg-[#F7F7F4] px-3 text-[12px] font-[300] text-[#232323] outline-none transition placeholder:text-[#A2A7B2] focus:border-[#D9F36B]"
+            />
+          </label>
+        </div>
+      </MarketplaceFilterGroup>
     </>
   );
 }
@@ -354,10 +408,12 @@ export default function JobsMarketplacePage({
   const text = getTreaboText(router.locale);
   const auth = useTreaboAuth();
   const [authOpen, setAuthOpen] = useState(false);
-  const [mapOpen, setMapOpen] = useState(false);
+  const [mapViewEnabled, setMapViewEnabled] = useState(false);
+  const [mapFullscreen, setMapFullscreen] = useState(false);
+  const [mapBounds, setMapBounds] = useState<TreaboMapBounds | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [openSections, setOpenSections] = useState<Set<string>>(
-    () => new Set(['category', 'city', text.works.filters[0]?.title]),
+    () => new Set(['category', 'city', 'budget']),
   );
   const [filters, setFilters] = useState<TreaboTaskFilters>({
     city: initialFilters.city || text.city,
@@ -369,14 +425,30 @@ export default function JobsMarketplacePage({
   const cardRefs = useMemo(() => new globalThis.Map<string, HTMLElement>(), []);
 
   useEffect(() => {
-    if (router.query.map === '1') {
-      setMapOpen(true);
-    }
-  }, [router.query.map]);
+    const nextMapViewEnabled = router.query.map === '1';
+    setMapViewEnabled(nextMapViewEnabled);
+    setMapFullscreen(nextMapViewEnabled && router.query.map_full === '1');
+  }, [router.query.map, router.query.map_full]);
 
+  useEffect(() => {
+    if (!mapFullscreen) return undefined;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [mapFullscreen]);
+
+  const mapVisibleTasks = useMemo(
+    () => filterTasksByMapBounds(tasks, mapBounds),
+    [tasks, mapBounds],
+  );
   const visibleJobs = useMemo(() => buildJobCards(tasks, categories, 'ru'), [tasks, categories]);
+  const mapVisibleJobs = useMemo(
+    () => buildJobCards(mapVisibleTasks, categories, 'ru'),
+    [mapVisibleTasks, categories],
+  );
   const availableCount = tasks.length || visibleJobs.length;
-  const quickTags = ['срочно', 'с фото', 'рядом с домом', 'ремонт', 'плитка', 'сантехника', 'электрика'];
 
   const categoryOptions = categories.length
     ? flattenCategoryOptions(categories)
@@ -391,18 +463,6 @@ export default function JobsMarketplacePage({
     }
   }
 
-  function runQuickTagSearch(tag: string) {
-    setServiceQuery(tag);
-    setSearchCategoryId('');
-    const next: TreaboTaskFilters = {
-      ...filters,
-      q: tag,
-      category_id: undefined,
-    };
-    setFilters(next);
-    applyFilters(next);
-  }
-
   function runSearch() {
     const next: TreaboTaskFilters = {
       ...filters,
@@ -413,9 +473,26 @@ export default function JobsMarketplacePage({
     applyFilters(next);
   }
 
-  function applyFilters(next: TreaboTaskFilters) {
-    const query = buildQuery(next);
+  function applyFilters(next: TreaboTaskFilters, nextMapView = mapViewEnabled, nextMapFullscreen = mapFullscreen) {
+    const query = buildQuery(next, nextMapView, nextMapFullscreen);
     router.push(query ? `${routes.works}?${query}` : routes.works);
+  }
+
+  function openMapView() {
+    setMapViewEnabled(true);
+    applyFilters(filters, true, mapFullscreen);
+  }
+
+  function closeMapView() {
+    setMapViewEnabled(false);
+    setMapFullscreen(false);
+    applyFilters(filters, false, false);
+  }
+
+  function toggleMapFullscreen() {
+    const next = !mapFullscreen;
+    setMapFullscreen(next);
+    applyFilters(filters, true, next);
   }
 
   function resetFilters() {
@@ -439,29 +516,6 @@ export default function JobsMarketplacePage({
     applyFilters(next);
   }
 
-  function toggleBudgetPreset(preset: string) {
-    const first = text.works.filters[0].options;
-    if (preset === first[0]) {
-      setFilters((current) => ({ ...current, budget_min: undefined, budget_max: undefined, q: undefined }));
-      return;
-    }
-    if (preset === first[1]) {
-      setFilters((current) => ({ ...current, budget_min: 5000, budget_max: undefined, q: undefined }));
-      return;
-    }
-    if (preset === first[2]) {
-      setFilters((current) => ({ ...current, q: 'срочно' }));
-    }
-  }
-
-  function isBudgetSelected(option: string) {
-    const first = text.works.filters[0].options;
-    if (option === first[0]) return filters.budget_min == null && filters.budget_max == null && !filters.q;
-    if (option === first[1]) return filters.budget_min === 5000;
-    if (option === first[2]) return filters.q === 'срочно';
-    return false;
-  }
-
   function toggleSection(key: string) {
     setOpenSections((current) => {
       const next = new Set(current);
@@ -480,15 +534,81 @@ export default function JobsMarketplacePage({
       openSections={openSections}
       toggleSection={toggleSection}
       toggleCategory={toggleCategory}
-      toggleBudgetPreset={toggleBudgetPreset}
-      isBudgetSelected={isBudgetSelected}
     />
+  );
+
+  function renderJobCards(jobs: UiJobCard[]) {
+    if (!jobs.length) {
+      return (
+        <div className="rounded-[28px] border border-[#E7E9EC] bg-white p-8 text-center shadow-sm">
+          <div className="text-xl font-bold text-[#232323]">Заданий в этой области нет</div>
+          <p className="mt-2 text-sm text-[#777D88]">
+            Сдвиньте или уменьшите масштаб карты, чтобы увидеть другие задания.
+          </p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-4 sm:space-y-5">
+        {jobs.map(({ icon: Icon, task, ...job }) => (
+          <JobCard
+            key={job.id}
+            job={job}
+            task={task}
+            Icon={Icon}
+            text={text}
+            auth={auth}
+            onAuthOpen={() => setAuthOpen(true)}
+            highlighted={highlightedTaskId === job.id}
+            cardRef={(node) => {
+              if (node) cardRefs.set(job.id, node);
+              else cardRefs.delete(job.id);
+            }}
+          />
+        ))}
+      </div>
+    );
+  }
+
+  const mapControls = (
+    <div className="flex flex-wrap items-center gap-2">
+      <button
+        type="button"
+        onClick={mapViewEnabled ? closeMapView : openMapView}
+        aria-pressed={mapViewEnabled}
+        className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition ${
+          mapViewEnabled
+            ? 'border-[#232323] bg-[#232323] text-white'
+            : 'border-[#E7E9EC] bg-white text-[#232323] hover:bg-[#FAFAFA]'
+        }`}
+      >
+        <Map className="h-4 w-4" />
+        {text.common.viewOnMap}
+      </button>
+      {mapViewEnabled ? (
+        <button
+          type="button"
+          onClick={toggleMapFullscreen}
+          aria-pressed={mapFullscreen}
+          className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition ${
+            mapFullscreen
+              ? 'border-[#232323] bg-[#232323] text-white'
+              : 'border-[#E7E9EC] bg-white text-[#232323] hover:bg-[#FAFAFA]'
+          }`}
+        >
+          {mapFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+          {text.common.mapFullWidth}
+        </button>
+      ) : null}
+    </div>
   );
 
   return (
     <div className={`min-h-screen max-w-full overflow-x-hidden ${marketplace.pageBg} ${marketplace.text}`}>
       <ProffiHeader />
       <main className="overflow-hidden">
+        {!mapFullscreen ? (
         <section className="border-b border-[#E7E9EC] bg-white">
           <div className={`mx-auto ${marketplace.maxWidth} px-4 py-5 sm:px-6 lg:px-8`}>
             <div className="grid gap-4 lg:grid-cols-[1fr_320px] lg:items-end">
@@ -541,32 +661,29 @@ export default function JobsMarketplacePage({
             </div>
           </div>
         </section>
+        ) : null}
 
-        <section className={`mx-auto ${marketplace.maxWidth} px-4 py-6 sm:px-6 lg:px-8`}>
-          <div className="mb-6">
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div>
-                <div className="text-sm font-bold text-[#232323]">{text.common.map}</div>
-                <div className="text-xs text-[#777D88]">Чёрные плашки — цена и название задания</div>
+        <section className={`mx-auto ${marketplace.maxWidth} px-4 py-6 sm:px-6 lg:px-8 ${mapFullscreen ? 'py-0' : ''}`}>
+          {!mapViewEnabled ? (
+            <div className="mb-6">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-bold text-[#232323]">{text.common.map}</div>
+                  <div className="text-xs text-[#777D88]">Чёрные плашки — цена и название задания</div>
+                </div>
+                {mapControls}
               </div>
-              <button
-                type="button"
-                onClick={() => setMapOpen(true)}
-                className="inline-flex items-center gap-2 rounded-full border border-[#E7E9EC] bg-white px-4 py-2 text-xs font-semibold text-[#232323]"
-              >
-                <Map className="h-4 w-4" />
-                {text.common.viewOnMap}
-              </button>
+              <TreaboTasksMap
+                tasks={tasks}
+                heightClassName="h-[320px] sm:h-[380px]"
+                highlightedTaskId={highlightedTaskId}
+                onTaskClick={handleTaskMapClick}
+                navigateOnClick={false}
+              />
             </div>
-            <TreaboTasksMap
-              tasks={tasks}
-              heightClassName="h-[320px] sm:h-[380px]"
-              highlightedTaskId={highlightedTaskId}
-              onTaskClick={handleTaskMapClick}
-              navigateOnClick={false}
-            />
-          </div>
+          ) : null}
 
+          {!mapViewEnabled ? (
           <div className="sticky top-14 z-30 -mx-4 mb-5 border-y border-[#E7E9EC] bg-white/95 px-4 py-3 backdrop-blur lg:hidden">
             <div className="flex gap-2 overflow-x-auto">
               <button
@@ -579,12 +696,32 @@ export default function JobsMarketplacePage({
               </button>
               <button
                 type="button"
-                onClick={() => setMapOpen(true)}
-                className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[#E7E9EC] bg-white px-4 py-2.5 text-sm font-semibold"
+                onClick={mapViewEnabled ? closeMapView : openMapView}
+                aria-pressed={mapViewEnabled}
+                className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-semibold ${
+                  mapViewEnabled
+                    ? 'border-[#232323] bg-[#232323] text-white'
+                    : 'border-[#E7E9EC] bg-white'
+                }`}
               >
                 <Map className="h-4 w-4" />
-                {text.common.map}
+                {mapViewEnabled ? text.common.backToList : text.common.map}
               </button>
+              {mapViewEnabled ? (
+                <button
+                  type="button"
+                  onClick={toggleMapFullscreen}
+                  aria-pressed={mapFullscreen}
+                  className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-semibold ${
+                    mapFullscreen
+                      ? 'border-[#232323] bg-[#232323] text-white'
+                      : 'border-[#E7E9EC] bg-white'
+                  }`}
+                >
+                  {mapFullscreen ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                  {text.common.mapFullWidth}
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="inline-flex shrink-0 items-center gap-2 rounded-full border border-[#E7E9EC] bg-white px-4 py-2.5 text-sm font-semibold"
@@ -594,74 +731,65 @@ export default function JobsMarketplacePage({
               </button>
             </div>
           </div>
+          ) : null}
 
-          <div className="grid gap-6 lg:grid-cols-[290px_minmax(0,1fr)]">
-            <aside className="hidden lg:block">
-              <MarketplaceFilterSidebar
-                title={text.common.filters}
-                resetLabel={text.common.reset}
-                onReset={resetFilters}
-                applyLabel={text.common.apply}
-                onApply={() => applyFilters(filters)}
-                viewOnMapLabel={text.common.viewOnMap}
-                onViewMap={() => setMapOpen(true)}
-              >
-                {filtersPanel}
-              </MarketplaceFilterSidebar>
-            </aside>
+          {mapViewEnabled ? (
+            <JobsMarketplaceMapLayout
+              tasks={tasks}
+              mapFullscreen={mapFullscreen}
+              onToggleFullscreen={toggleMapFullscreen}
+              onExitMap={closeMapView}
+              highlightedTaskId={highlightedTaskId}
+              onTaskMapClick={handleTaskMapClick}
+              onBoundsChange={setMapBounds}
+              viewOnMapLabel={text.common.viewOnMap}
+              mapFullWidthLabel={text.common.mapFullWidth}
+              backToListLabel={text.common.backToList}
+              tasksInViewLabel={text.common.tasksInView}
+              emptyLabel="Заданий в этой области нет"
+              visibleTasksCount={mapVisibleJobs.length}
+              listContent={renderJobCards(mapVisibleJobs)}
+            />
+          ) : (
+            <div className="grid gap-6 lg:grid-cols-[290px_minmax(0,1fr)]">
+              <aside className="hidden lg:block">
+                <MarketplaceFilterSidebar
+                  title={text.common.filters}
+                  resetLabel={text.common.reset}
+                  onReset={resetFilters}
+                  applyLabel={text.common.apply}
+                  onApply={() => applyFilters(filters)}
+                  showMapButton={false}
+                >
+                  {filtersPanel}
+                </MarketplaceFilterSidebar>
+              </aside>
 
-            <section>
-              <MarketplaceResultsBar
-                foundLabel={text.common.found}
-                countLabel={interpolate(text.works.matchedTasks, { count: visibleJobs.length })}
-                sortLabel={text.common.newestFirst}
-              />
+              <section>
+                <div className="mb-4 hidden lg:block">{mapControls}</div>
+                <MarketplaceResultsBar
+                  foundLabel={text.common.found}
+                  countLabel={interpolate(text.works.matchedTasks, { count: visibleJobs.length })}
+                  sortLabel={text.common.newestFirst}
+                />
 
-              <div className="space-y-5 sm:space-y-6">
-                {visibleJobs.length ? visibleJobs.map(({ icon: Icon, task, ...job }) => (
-                  <JobCard
-                    key={job.id}
-                    job={job}
-                    task={task}
-                    Icon={Icon}
-                    text={text}
-                    auth={auth}
-                    onAuthOpen={() => setAuthOpen(true)}
-                    highlighted={highlightedTaskId === job.id}
-                    cardRef={(node) => {
-                      if (node) cardRefs.set(job.id, node);
-                      else cardRefs.delete(job.id);
-                    }}
-                  />
-                )) : (
-                  <div className="rounded-[28px] border border-[#E7E9EC] bg-white p-8 text-center shadow-sm">
-                    <div className="text-xl font-bold text-[#232323]">Заданий пока нет</div>
-                    <p className="mt-2 text-sm text-[#777D88]">
-                      Когда появятся реальные заявки, они будут показаны здесь.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </section>
-          </div>
+                <div className="space-y-5 sm:space-y-6">
+                  {visibleJobs.length ? renderJobCards(visibleJobs) : (
+                    <div className="rounded-[28px] border border-[#E7E9EC] bg-white p-8 text-center shadow-sm">
+                      <div className="text-xl font-bold text-[#232323]">Заданий пока нет</div>
+                      <p className="mt-2 text-sm text-[#777D88]">
+                        Когда появятся реальные заявки, они будут показаны здесь.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </section>
+            </div>
+          )}
         </section>
 
-        <section className={`mx-auto ${marketplace.maxWidth} px-4 pb-6 sm:px-6 lg:px-8`}>
-          <div className="flex flex-wrap gap-2">
-            {quickTags.map((tag) => (
-              <button key={tag} type="button" className={marketplace.chip} onClick={() => runQuickTagSearch(tag)}>
-                {tag}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        <section className={`mx-auto ${marketplace.maxWidth} px-4 py-12 sm:px-6 lg:px-8`}>
-          <h2 className="text-3xl font-bold tracking-tight text-[#232323]">{text.works.faqTitle}</h2>
-          <p className="mt-3 text-[#777D88]">{text.works.faqText}</p>
-        </section>
       </main>
-      <ProffiFooter />
+      {!mapFullscreen ? <ProffiFooter /> : null}
 
       <MarketplaceMobileFiltersDrawer
         open={filtersOpen}
@@ -675,13 +803,6 @@ export default function JobsMarketplacePage({
         {filtersPanel}
       </MarketplaceMobileFiltersDrawer>
 
-      <TreaboTasksMapModal
-        open={mapOpen}
-        onClose={() => setMapOpen(false)}
-        tasks={tasks}
-        highlightedTaskId={highlightedTaskId}
-        onTaskClick={handleTaskMapClick}
-      />
       <TreaboAuthModal
         open={authOpen}
         onClose={() => setAuthOpen(false)}

@@ -1,12 +1,17 @@
 import type { NextApiRequest, NextApiResponse } from 'next';
 
 const trimSlash = (value: string) => value.replace(/\/+$/, '');
+const withProffiPrefix = (value: string) => {
+  const trimmed = trimSlash(value);
+  if (trimmed.endsWith('/api/treabo')) return trimmed;
+  return trimmed.endsWith('/proffi') ? trimmed : `${trimmed}/proffi`;
+};
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
   const baseUrl =
     process.env.TREABO_API_ENDPOINT ||
     process.env.NEXT_PUBLIC_TREABO_API_ENDPOINT ||
-    'http://127.0.0.1:8001/api';
+    'http://127.0.0.1:8001/api/proffi';
 
   const pathParts = Array.isArray(req.query.path)
     ? req.query.path
@@ -26,7 +31,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   });
 
   const queryString = query.toString();
-  const targetUrl = `${trimSlash(baseUrl)}/${path}${queryString ? `?${queryString}` : ''}`;
+  const targetUrl = `${withProffiPrefix(baseUrl)}/${path}${queryString ? `?${queryString}` : ''}`;
 
   try {
     const response = await fetch(targetUrl, {

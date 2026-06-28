@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useState } from 'react';
 import { CircleHelp, ClipboardList, LogOut, Map, Menu, MessageCircle, UserRound, Wallet } from 'lucide-react';
@@ -41,27 +42,39 @@ export function ProffiHeader() {
   return (
     <>
       <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-[1516px] items-center justify-between px-4 sm:px-6 lg:px-8">
-          <Link href="/" className="flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-[11px] bg-zinc-950 text-xs font-semibold text-white">
-              T
-            </span>
-            <span className="text-lg font-semibold tracking-tight text-[#232323]">Treabo</span>
+        <div className="mx-auto flex h-14 max-w-[1160px] items-center justify-between px-4 sm:px-6 lg:px-8">
+          <Link href="/" className="flex shrink-0 items-center">
+            <Image
+              src="/treabo-logo.png"
+              alt="Treabo"
+              width={150}
+              height={30}
+              priority
+              className="h-8 w-auto object-contain"
+            />
           </Link>
 
           <div className="hidden lg:block">
             <TreaboLocationSelector />
           </div>
 
-          <nav className="hidden items-center gap-6 text-xs font-medium text-[#232323] md:flex">
+          <nav className="hidden items-center gap-2 text-sm font-semibold text-[#232323] md:flex">
             {headerLinks.map(({ href, label, icon: Icon }) => (
-              <Link key={href} href={href} className="inline-flex items-center gap-1.5 hover:opacity-75">
+              <Link
+                key={href}
+                href={href}
+                className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 transition hover:bg-[#d9f36b] hover:text-[#232323]"
+              >
                 {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
                 {label}
               </Link>
             ))}
             {!auth.isAuthenticated ? (
-              <button type="button" onClick={() => openAuth('login')} className="hover:opacity-75">
+              <button
+                type="button"
+                onClick={() => openAuth('login')}
+                className="rounded-xl px-3 py-2 transition hover:bg-[#d9f36b] hover:text-[#232323]"
+              >
                 {text.header.login}
               </button>
             ) : null}
@@ -171,13 +184,16 @@ export function ProffiFooter() {
 
   return (
     <footer className="border-t border-zinc-200 bg-white">
-      <div className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 md:grid-cols-[1fr_2fr] lg:px-8">
+      <div className="mx-auto grid max-w-[1160px] gap-6 px-4 py-6 sm:px-6 md:grid-cols-[1fr_2fr] lg:px-8">
         <div>
-          <div className="mb-2 flex items-center gap-2">
-            <span className="flex h-8 w-8 items-center justify-center rounded-[11px] bg-zinc-950 text-xs font-black text-white">
-              T
-            </span>
-            <span className="text-lg font-semibold tracking-tight text-[#232323]">Treabo</span>
+          <div className="mb-2 flex items-center">
+            <Image
+              src="/treabo-logo.png"
+              alt="Treabo"
+              width={142}
+              height={28}
+              className="h-7 w-auto object-contain"
+            />
           </div>
           <p className="max-w-sm text-xs leading-5 text-[#777D88]">
             Treabo соединяет клиентов и специалистов: заявки, отклики, чаты и заказы в одном месте.

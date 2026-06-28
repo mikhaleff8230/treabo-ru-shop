@@ -8,14 +8,14 @@ export const marketplace = {
   border: 'border-[#E7E9EC]',
   accent: 'bg-[#D9F36B]',
   accentText: 'text-[#232323]',
-  maxWidth: 'max-w-[1516px]',
+  maxWidth: 'max-w-[1160px]',
   card: 'rounded-[24px] border border-white/80 bg-white shadow-[0_8px_24px_rgba(25,31,42,0.055)] transition-shadow hover:shadow-[0_12px_30px_rgba(25,31,42,0.075)]',
   chip: 'rounded-full border border-[#E6E9EF] bg-white px-3 py-1.5 text-[11px] font-[300] leading-none text-[#3A3D45] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.72)] sm:text-[12px]',
 } as const;
 
 export const treaboMinimal = {
   page: 'min-h-screen max-w-full overflow-x-hidden bg-[#F7F7F4] text-[#232323]',
-  section: 'mx-auto max-w-[1516px] px-4 sm:px-6 lg:px-8',
+  section: 'mx-auto max-w-[1160px] px-4 sm:px-6 lg:px-8',
   sectionY: 'py-8 sm:py-10',
   eyebrow:
     'inline-flex w-fit items-center gap-2 rounded-full border border-[#E7E9EC] bg-white px-3 py-1.5 text-[11px] font-medium text-[#777D88] shadow-[0_6px_18px_rgba(25,31,42,0.045)]',

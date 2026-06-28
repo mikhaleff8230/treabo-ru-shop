@@ -1,6 +1,34 @@
-// import axios from 'axios';
+import { getTreaboPublicApiBase } from '@/data/treabo';
 
-// Типы для геолокации
+export type GeoAddressResult = {
+  city: string | null;
+  region: string | null;
+  country: string | null;
+  address: string | null;
+  full_address: string | null;
+  lat: number | null;
+  lng: number | null;
+  fias_id?: string | null;
+  kladr_id?: string | null;
+  source: 'browser' | 'dadata' | 'maxmind' | 'yandex' | 'manual' | 'cache' | string;
+  provider?: 'dadata' | 'maxmind' | 'yandex' | 'browser' | null;
+  accuracy?: number | null;
+  needs_confirmation: boolean;
+};
+
+export type SaveAddressPayload = {
+  city?: string | null;
+  region?: string | null;
+  country?: string | null;
+  address?: string | null;
+  full_address?: string | null;
+  lat?: number | null;
+  lng?: number | null;
+  fias_id?: string | null;
+  kladr_id?: string | null;
+  source?: string;
+};
+
 export interface GeoLocationData {
   ip: string;
   location: {
@@ -27,7 +55,7 @@ export interface CountryInfo {
 
 export interface UserLocation {
   id?: number;
-  user_id: number;
+  user_id?: number;
   city: string;
   region: string;
   country: string;
@@ -40,281 +68,304 @@ export interface UserLocation {
   updated_at?: string;
 }
 
-class GeoLocationService {
-  private apiBaseUrl: string;
+function apiBase(): string {
+  return getTreaboPublicApiBase();
+}
 
-  constructor() {
-    this.apiBaseUrl = (typeof window !== 'undefined' && (window as any).process?.env?.NEXT_PUBLIC_API_URL) || 'https://api.treabo.md';
+async function geoFetch<T>(path: string, init?: RequestInit & { token?: string | null }): Promise<T> {
+  const { token, headers, ...rest } = init || {};
+  const response = await fetch(`${apiBase()}${path}`, {
+    ...rest,
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...(headers || {}),
+    },
+  });
+
+  const payload = await response.json().catch(() => ({}));
+
+  if (!response.ok) {
+    const detail = payload?.error || payload?.message || 'Geo API request failed';
+    throw new Error(typeof detail === 'string' ? detail : 'Geo API request failed');
   }
 
-  /**
-   * Получить полную информацию о местоположении
-   */
-  async getCurrentLocation(): Promise<GeoLocationData> {
-    try {
-      const response = await fetch(`${this.apiBaseUrl}/api/geoip/location`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Ошибка получения местоположения:', error);
-      throw new Error('Не удалось определить местоположение');
+  return payload as T;
+}
+
+export function getBrowserCoordinates(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    if (typeof navigator === 'undefined' || !navigator.geolocation) {
+      reject(new Error('Геолокация недоступна в браузере'));
+      return;
     }
+
+    navigator.geolocation.getCurrentPosition(resolve, reject, {
+      enableHighAccuracy: true,
+      timeout: 15000,
+      maximumAge: 60000,
+    });
+  });
+}
+
+export async function detectByIp(): Promise<GeoAddressResult> {
+  return geoFetch<GeoAddressResult>('/geo/detect', { method: 'GET' });
+}
+
+export async function reverseGeocode(
+  lat: number,
+  lng: number,
+  accuracy?: number | null,
+): Promise<GeoAddressResult> {
+  const params = new URLSearchParams({
+    lat: String(lat),
+    lng: String(lng),
+  });
+  if (accuracy != null) {
+    params.set('accuracy', String(accuracy));
   }
 
-  /**
-   * Получить информацию о стране
-   */
-  async getCountryInfo(): Promise<CountryInfo> {
-    try {
-      const response = await fetch(`${this.apiBaseUrl}/api/geoip/country`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Ошибка получения информации о стране:', error);
-      throw new Error('Не удалось определить страну');
-    }
-  }
+  return geoFetch<GeoAddressResult>(`/geo/reverse?${params.toString()}`, { method: 'GET' });
+}
 
-  /**
-   * Проверить, является ли пользователь из России
-   */
-  async isRussianUser(): Promise<boolean> {
-    try {
-      const countryInfo = await this.getCountryInfo();
-      return countryInfo.is_russian;
-    } catch (error) {
-      console.error('Ошибка проверки российского IP:', error);
-      return false;
-    }
-  }
+export async function suggestAddresses(
+  query: string,
+  options?: { city?: string; count?: number },
+): Promise<GeoAddressResult[]> {
+  const params = new URLSearchParams({ query });
+  if (options?.city) params.set('city', options.city);
+  if (options?.count) params.set('count', String(options.count));
 
-  /**
-   * Получить город пользователя (только для России)
-   */
-  async getRussianCity(): Promise<string | null> {
-    try {
-      const isRussian = await this.isRussianUser();
-      
-      if (!isRussian) {
-        console.log('Пользователь не из России');
-        return null;
-      }
+  const payload = await geoFetch<{ addresses?: GeoAddressResult[] }>(
+    `/addresses/search?${params.toString()}`,
+    { method: 'GET' },
+  );
 
-      const location = await this.getCurrentLocation();
-      return location.location.city || null;
-    } catch (error) {
-      console.error('Ошибка получения города:', error);
-      return null;
-    }
-  }
+  return payload.addresses || [];
+}
 
-  /**
-   * Получить координаты пользователя
-   */
-  async getCoordinates(): Promise<{ lat: number; lon: number } | null> {
-    try {
-      const location = await this.getCurrentLocation();
-      return {
-        lat: location.location.lat,
-        lon: location.location.lon
-      };
-    } catch (error) {
-      console.error('Ошибка получения координат:', error);
-      return null;
-    }
-  }
+export async function saveConfirmedAddress(
+  payload: SaveAddressPayload,
+  token?: string | null,
+): Promise<GeoAddressResult> {
+  const result = await geoFetch<{ address: GeoAddressResult }>('/address/save', {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ ...payload, source: payload.source || 'manual' }),
+  });
 
-  /**
-   * Сохранить местоположение пользователя в профиль
-   */
-  async saveUserLocation(userId: number, locationData: Partial<UserLocation>): Promise<UserLocation> {
-    try {
-      const response = await fetch(`${this.apiBaseUrl}/api/user-location`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          ...locationData
-        })
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Ошибка сохранения местоположения:', error);
-      throw new Error('Не удалось сохранить местоположение');
-    }
-  }
+  return result.address;
+}
 
-  /**
-   * Получить сохраненное местоположение пользователя
-   */
-  async getUserLocation(userId: number): Promise<UserLocation | null> {
-    try {
-      const response = await fetch(`${this.apiBaseUrl}/api/user-location/${userId}`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Ошибка получения местоположения пользователя:', error);
-      return null;
-    }
-  }
+export async function getSavedAddress(token?: string | null): Promise<GeoAddressResult | null> {
+  const result = await geoFetch<{ address: GeoAddressResult | null }>('/address/saved', {
+    method: 'GET',
+    token,
+  });
 
-  /**
-   * Обновить местоположение пользователя
-   */
-  async updateUserLocation(userId: number, locationData: Partial<UserLocation>): Promise<UserLocation> {
-    try {
-      const response = await fetch(`${this.apiBaseUrl}/api/user-location/${userId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(locationData)
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Ошибка обновления местоположения:', error);
-      throw new Error('Не удалось обновить местоположение');
-    }
-  }
+  return result.address;
+}
 
-  /**
-   * Автоматически определить и сохранить местоположение пользователя
-   */
-  async autoDetectAndSaveLocation(userId: number): Promise<UserLocation | null> {
-    try {
-      const isRussian = await this.isRussianUser();
-      
-      if (!isRussian) {
-        console.log('Пользователь не из России, местоположение не сохраняется');
-        return null;
-      }
+function toUserLocation(result: GeoAddressResult | null, autoDetected = false): UserLocation | null {
+  if (!result) return null;
 
-      const location = await this.getCurrentLocation();
-      const coordinates = await this.getCoordinates();
+  return {
+    city: result.city || 'Москва',
+    region: result.region || '',
+    country: result.country || 'Россия',
+    latitude: result.lat ?? 55.7558,
+    longitude: result.lng ?? 37.6176,
+    timezone: 'Europe/Moscow',
+    ip_address: '',
+    is_auto_detected: autoDetected,
+  };
+}
 
-      if (!coordinates) {
-        throw new Error('Не удалось получить координаты');
-      }
+export async function getCurrentLocation(): Promise<GeoLocationData> {
+  const result = await detectByIp();
 
-      const locationData: Partial<UserLocation> = {
-        user_id: userId,
-        city: location.location.city || 'Неизвестно',
-        region: location.location.state_name || 'Неизвестно',
-        country: location.location.country,
-        latitude: coordinates.lat,
-        longitude: coordinates.lon,
-        timezone: location.location.timezone,
-        ip_address: location.ip,
-        is_auto_detected: true
-      };
+  return {
+    ip: '',
+    location: {
+      ip: '',
+      country: result.country || 'Россия',
+      iso_code: 'RU',
+      city: result.city,
+      state: result.region,
+      state_name: result.region,
+      postal_code: null,
+      lat: result.lat ?? 55.7558,
+      lon: result.lng ?? 37.6176,
+      timezone: 'Europe/Moscow',
+      continent: 'Europe',
+      currency: 'RUB',
+    },
+  };
+}
 
-      // Проверяем, есть ли уже сохраненное местоположение
-      const existingLocation = await this.getUserLocation(userId);
-      
-      if (existingLocation) {
-        return await this.updateUserLocation(userId, locationData);
-      } else {
-        return await this.saveUserLocation(userId, locationData);
-      }
-    } catch (error) {
-      console.error('Ошибка автоматического определения местоположения:', error);
-      return null;
-    }
-  }
+export async function getCountryInfo(): Promise<CountryInfo> {
+  const result = await detectByIp();
+  const country = result.country || 'Россия';
 
-  /**
-   * Получить местоположение для карты (начальная точка для поиска ПВЗ)
-   */
-  async getLocationForMap(userId: number): Promise<{ lat: number; lon: number; city: string } | null> {
-    try {
-      // Сначала пытаемся получить сохраненное местоположение
-      let userLocation = await this.getUserLocation(userId);
-      
-      // Если нет сохраненного местоположения, пытаемся определить автоматически
-      if (!userLocation) {
-        userLocation = await this.autoDetectAndSaveLocation(userId);
-      }
+  return {
+    country,
+    is_russian: country.toLowerCase().includes('рос') || country.toLowerCase().includes('russia'),
+    ip: '',
+  };
+}
 
-      if (userLocation && userLocation.latitude && userLocation.longitude) {
-        return {
-          lat: userLocation.latitude,
-          lon: userLocation.longitude,
-          city: userLocation.city
-        };
-      }
+export async function isRussianUser(): Promise<boolean> {
+  return getCountryInfo()
+    .then((info) => info.is_russian)
+    .catch(() => true);
+}
 
-      // Если ничего не получилось, возвращаем координаты Москвы по умолчанию
-      return {
-        lat: 55.7558,
-        lon: 37.6176,
-        city: 'Москва'
-      };
-    } catch (error) {
-      console.error('Ошибка получения местоположения для карты:', error);
-      // Возвращаем координаты Москвы по умолчанию
-      return {
-        lat: 55.7558,
-        lon: 37.6176,
-        city: 'Москва'
-      };
-    }
-  }
+export async function getRussianCity(): Promise<string | null> {
+  return detectByIp()
+    .then((result) => result.city)
+    .catch(() => null);
+}
 
-  /**
-   * Получить список российских городов для выбора
-   */
-  async getRussianCities(): Promise<Array<{ id: string; name: string; region: string }>> {
-    try {
-      const response = await fetch(`${this.apiBaseUrl}/api/russian-cities`);
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      return await response.json();
-    } catch (error) {
-      console.error('Ошибка получения списка городов:', error);
-      return [];
-    }
-  }
+export async function getCoordinates(): Promise<{ lat: number; lon: number } | null> {
+  return detectByIp()
+    .then((result) => (
+      result.lat != null && result.lng != null
+        ? { lat: result.lat, lon: result.lng }
+        : null
+    ))
+    .catch(() => null);
+}
 
-  /**
-   * Ручной выбор города пользователем
-   */
-  async setUserCity(userId: number, cityId: string, cityName: string, region: string): Promise<UserLocation> {
-    try {
-      const locationData: Partial<UserLocation> = {
-        user_id: userId,
-        city: cityName,
-        region: region,
-        country: 'Russia',
-        latitude: 0, // Будет определено по городу
-        longitude: 0, // Будет определено по городу
-        timezone: 'Europe/Moscow',
-        ip_address: '',
-        is_auto_detected: false
-      };
+export async function getUserLocation(_userId: number): Promise<UserLocation | null> {
+  const saved = await getSavedAddress().catch(() => null);
+  return toUserLocation(saved, false);
+}
 
-      return await this.saveUserLocation(userId, locationData);
-    } catch (error) {
-      console.error('Ошибка установки города:', error);
-      throw new Error('Не удалось установить город');
-    }
+export async function autoDetectAndSaveLocation(_userId: number): Promise<UserLocation | null> {
+  const { result, gpsUsed } = await autoDetectAddress();
+
+  await saveConfirmedAddress({
+    city: result.city,
+    region: result.region,
+    country: result.country,
+    address: result.address,
+    full_address: result.full_address,
+    lat: result.lat,
+    lng: result.lng,
+    fias_id: result.fias_id,
+    kladr_id: result.kladr_id,
+    source: gpsUsed ? 'browser' : 'manual',
+  }).catch(() => null);
+
+  return toUserLocation(result, true);
+}
+
+export async function getLocationForMap(userId: number): Promise<{ lat: number; lon: number; city: string } | null> {
+  const location = await getUserLocation(userId)
+    .catch(() => null)
+    || await autoDetectAndSaveLocation(userId).catch(() => null);
+
+  return {
+    lat: location?.latitude ?? 55.7558,
+    lon: location?.longitude ?? 37.6176,
+    city: location?.city || 'Москва',
+  };
+}
+
+export async function setUserCity(
+  _userId: number,
+  _cityId: string,
+  cityName: string,
+  region: string,
+): Promise<UserLocation> {
+  const saved = await saveConfirmedAddress({
+    city: cityName,
+    region,
+    country: 'Россия',
+    source: 'manual',
+  }).catch(() => null);
+
+  return toUserLocation(saved || {
+    city: cityName,
+    region,
+    country: 'Россия',
+    address: null,
+    full_address: null,
+    lat: null,
+    lng: null,
+    source: 'manual',
+    needs_confirmation: false,
+  }, false)!;
+}
+
+/**
+ * Полный flow: IP → GPS → reverse geocode.
+ * При отказе в GPS возвращает IP-подсказку (город/регион).
+ */
+export async function autoDetectAddress(): Promise<{
+  result: GeoAddressResult;
+  gpsUsed: boolean;
+}> {
+  const ipHint = await detectByIp().catch(() => ({
+    city: null,
+    region: null,
+    country: 'Россия',
+    address: null,
+    full_address: null,
+    lat: null,
+    lng: null,
+    source: 'maxmind' as const,
+    needs_confirmation: true,
+  }));
+
+  try {
+    const position = await getBrowserCoordinates();
+    const { latitude, longitude, accuracy } = position.coords;
+    const reversed = await reverseGeocode(latitude, longitude, accuracy);
+
+    return {
+      result: {
+        ...reversed,
+        city: reversed.city || ipHint.city,
+        region: reversed.region || ipHint.region,
+        country: reversed.country || ipHint.country,
+        source: 'browser',
+        provider: reversed.provider || 'dadata',
+        accuracy: accuracy ?? reversed.accuracy ?? null,
+        needs_confirmation: true,
+      },
+      gpsUsed: true,
+    };
+  } catch {
+    return {
+      result: {
+        ...ipHint,
+        needs_confirmation: true,
+      },
+      gpsUsed: false,
+    };
   }
 }
 
-// Экспортируем singleton instance
-export const geoLocationService = new GeoLocationService();
+// Legacy exports for совместимости
+export const geoLocationService = {
+  detectByIp,
+  reverseGeocode,
+  suggestAddresses,
+  saveConfirmedAddress,
+  getSavedAddress,
+  autoDetectAddress,
+  getBrowserCoordinates,
+  getCurrentLocation,
+  getCountryInfo,
+  isRussianUser,
+  getRussianCity,
+  getCoordinates,
+  getUserLocation,
+  autoDetectAndSaveLocation,
+  getLocationForMap,
+  setUserCity,
+};
+
 export default geoLocationService;

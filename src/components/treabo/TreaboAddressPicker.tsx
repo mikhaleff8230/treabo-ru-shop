@@ -1,5 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import RussiaCityInput from '@/components/treabo/RussiaCityInput';
+import {
+  autoDetectAddress,
+  type GeoAddressResult,
+  saveConfirmedAddress,
+  suggestAddresses,
+} from '@/services/geoLocationService';
+import { getStoredTreaboToken } from '@/data/treabo-auth';
 
 declare global {
   interface Window {
@@ -20,7 +27,6 @@ function loadYmaps(apiKey: string): Promise<void> {
     const script = document.createElement('script');
     script.src = `https://api-maps.yandex.ru/2.1/?apikey=${encodeURIComponent(apiKey)}&lang=ru_RU&coordorder=latlong`;
     script.async = true;
-    script.dataset.yandexMapsApi = '2.1';
     script.onload = () => {
       if (window.ymaps) window.ymaps.ready(() => resolve());
       else reject(new Error('ymaps not defined'));
@@ -45,9 +51,16 @@ type TreaboAddressPickerProps = {
   onCityChange: (city: string) => void;
   onAddressChange: (address: string) => void;
   onCoordinatesChange: (lat: number, lng: number) => void;
+  onConfirmedChange?: (confirmed: boolean) => void;
   addressPlaceholder?: string;
   mapHint?: string;
 };
+
+function formatDetectedLabel(result: GeoAddressResult): string {
+  if (result.full_address) return result.full_address;
+  const parts = [result.city, result.address, result.region].filter(Boolean);
+  return parts.join(', ') || 'Адрес не определён';
+}
 
 export default function TreaboAddressPicker({
   city,
@@ -57,6 +70,7 @@ export default function TreaboAddressPicker({
   onCityChange,
   onAddressChange,
   onCoordinatesChange,
+  onConfirmedChange,
   addressPlaceholder = 'Улица и номер дома',
   mapHint = 'Перетащите маркер или выберите адрес из подсказок',
 }: TreaboAddressPickerProps) {
@@ -65,12 +79,59 @@ export default function TreaboAddressPicker({
   const mapInstanceRef = useRef<any>(null);
   const placemarkRef = useRef<any>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
+  const detectStarted = useRef(false);
 
   const [ready, setReady] = useState(false);
-  const [suggestions, setSuggestions] = useState<any[]>([]);
+  const [suggestions, setSuggestions] = useState<GeoAddressResult[]>([]);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [detecting, setDetecting] = useState(true);
+  const [detected, setDetected] = useState<GeoAddressResult | null>(null);
+  const [gpsUsed, setGpsUsed] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [confirmed, setConfirmed] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const applyResult = useCallback(
+    (result: GeoAddressResult) => {
+      if (result.city) onCityChange(result.city);
+      if (result.address || result.full_address) {
+        onAddressChange(result.address || result.full_address || '');
+      }
+      if (result.lat != null && result.lng != null) {
+        onCoordinatesChange(result.lat, result.lng);
+      }
+    },
+    [onAddressChange, onCityChange, onCoordinatesChange],
+  );
+
+  const setConfirmedState = useCallback(
+    (value: boolean) => {
+      setConfirmed(value);
+      onConfirmedChange?.(value);
+    },
+    [onConfirmedChange],
+  );
+
+  useEffect(() => {
+    if (detectStarted.current) return;
+    detectStarted.current = true;
+
+    autoDetectAddress()
+      .then(({ result, gpsUsed: usedGps }) => {
+        setDetected(result);
+        setGpsUsed(usedGps);
+        if (usedGps && result.full_address) {
+          applyResult(result);
+        } else if (result.city) {
+          onCityChange(result.city);
+        }
+      })
+      .catch(() => {
+        setDetected(null);
+      })
+      .finally(() => setDetecting(false));
+  }, [applyResult, onCityChange]);
 
   useEffect(() => {
     if (!apiKey) return;
@@ -85,68 +146,47 @@ export default function TreaboAddressPicker({
     };
   }, [apiKey]);
 
-  const geocodeQuery = useCallback(
-    (query: string) => {
-      if (!window.ymaps || !query.trim()) return;
-      const fullQuery = query.includes(city) ? query : `${city}, ${query}`;
-      setLoading(true);
-      window.ymaps
-        .geocode(fullQuery, { results: 1 })
-        .then((res: any) => {
-          const first = res?.geoObjects?.get?.(0);
-          if (!first) return;
-          const coords = first.geometry?.getCoordinates?.();
-          if (!coords || coords.length < 2) return;
-          const nextLat = Number(coords[0]);
-          const nextLng = Number(coords[1]);
-          if (!Number.isFinite(nextLat) || !Number.isFinite(nextLng)) return;
-          const line =
-            first.getAddressLine?.() || first.properties?.get?.('text') || query;
-          onAddressChange(String(line));
-          onCoordinatesChange(nextLat, nextLng);
-        })
-        .finally(() => setLoading(false));
-    },
-    [city, onAddressChange, onCoordinatesChange],
-  );
-
   const pickSuggestion = useCallback(
-    (item: any) => {
-      const query = item?.value || item?.displayName || String(item);
-      if (!query) return;
+    (item: GeoAddressResult) => {
+      const label = item.full_address || item.address || '';
+      if (!label) return;
       setSuggestOpen(false);
-      geocodeQuery(query);
+      setEditMode(true);
+      applyResult(item);
+      setDetected(item);
+      setConfirmedState(false);
     },
-    [geocodeQuery],
+    [applyResult, setConfirmedState],
   );
 
   const runSuggest = useCallback(
-    (text: string) => {
-      if (!ready || !window.ymaps || text.trim().length < 2) {
+    async (text: string) => {
+      if (text.trim().length < 2) {
         setSuggestions([]);
         return;
       }
-      const suggestFn = window.ymaps.suggest;
-      if (typeof suggestFn !== 'function') return;
-      const query = `${city}, ${text.trim()}`;
-      suggestFn
-        .call(window.ymaps, query, { results: 8 })
-        .then((items: any[]) => {
-          setSuggestions(Array.isArray(items) ? items : []);
-          setSuggestOpen(true);
-        })
-        .catch(() => setSuggestions([]));
+      setLoading(true);
+      try {
+        const items = await suggestAddresses(text, { city, count: 8 });
+        setSuggestions(items);
+        setSuggestOpen(true);
+      } catch {
+        setSuggestions([]);
+      } finally {
+        setLoading(false);
+      }
     },
-    [ready, city],
+    [city],
   );
 
   useEffect(() => {
+    if (!editMode) return;
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => runSuggest(address), 350);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
-  }, [address, runSuggest]);
+  }, [address, editMode, runSuggest]);
 
   useEffect(() => {
     const onDoc = (e: MouseEvent) => {
@@ -162,9 +202,7 @@ export default function TreaboAddressPicker({
     if (!ready || !mapRef.current || !window.ymaps) return;
 
     const center: [number, number] =
-      lat != null && lng != null
-        ? [lat, lng]
-        : CITY_CENTERS[city] || CITY_CENTERS['Москва'];
+      lat != null && lng != null ? [lat, lng] : CITY_CENTERS[city] || CITY_CENTERS['Москва'];
 
     if (!mapInstanceRef.current) {
       mapInstanceRef.current = new window.ymaps.Map(mapRef.current, {
@@ -183,14 +221,7 @@ export default function TreaboAddressPicker({
         const coords = placemarkRef.current.geometry.getCoordinates();
         if (coords?.length >= 2) {
           onCoordinatesChange(Number(coords[0]), Number(coords[1]));
-          window.ymaps
-            .geocode(coords, { kind: 'house' })
-            .then((res: any) => {
-              const first = res?.geoObjects?.get?.(0);
-              const line = first?.getAddressLine?.();
-              if (line) onAddressChange(String(line));
-            })
-            .catch(() => {});
+          setConfirmedState(false);
         }
       });
 
@@ -201,14 +232,7 @@ export default function TreaboAddressPicker({
         if (!coords) return;
         placemarkRef.current.geometry.setCoordinates(coords);
         onCoordinatesChange(Number(coords[0]), Number(coords[1]));
-        window.ymaps
-          .geocode(coords, { kind: 'house' })
-          .then((res: any) => {
-            const first = res?.geoObjects?.get?.(0);
-            const line = first?.getAddressLine?.();
-            if (line) onAddressChange(String(line));
-          })
-          .catch(() => {});
+        setConfirmedState(false);
       });
     } else {
       const nextCenter =
@@ -216,7 +240,7 @@ export default function TreaboAddressPicker({
       mapInstanceRef.current.setCenter(nextCenter, lat != null && lng != null ? 16 : 11);
       placemarkRef.current.geometry.setCoordinates(nextCenter);
     }
-  }, [ready, city, lat, lng, onAddressChange, onCoordinatesChange]);
+  }, [ready, city, lat, lng, onCoordinatesChange, setConfirmedState]);
 
   useEffect(() => {
     return () => {
@@ -232,62 +256,167 @@ export default function TreaboAddressPicker({
     };
   }, []);
 
+  const handleConfirm = async () => {
+    const payload: GeoAddressResult = {
+      city: city || detected?.city || null,
+      region: detected?.region || null,
+      country: detected?.country || 'Россия',
+      address: address || detected?.address || null,
+      full_address: detected?.full_address || address || null,
+      lat: lat ?? detected?.lat ?? null,
+      lng: lng ?? detected?.lng ?? null,
+      fias_id: detected?.fias_id,
+      kladr_id: detected?.kladr_id,
+      source: gpsUsed ? 'browser' : 'manual',
+      needs_confirmation: false,
+    };
+
+    applyResult(payload);
+    setConfirmedState(true);
+    setEditMode(false);
+
+    try {
+      const token = getStoredTreaboToken();
+      await saveConfirmedAddress(payload, token);
+    } catch {
+      // сохранение опционально — задание всё равно создастся с координатами
+    }
+  };
+
   const inputClass =
     'w-full rounded-2xl bg-[#eef1f7] px-4 py-4 text-base text-[#232323] outline-none placeholder:text-[#7d849b] focus:ring-2 focus:ring-[#d9f36b]';
 
+  const showConfirmBlock = !editMode && !confirmed && detected && (detected.full_address || detected.city);
+
   return (
     <div className="mt-8 space-y-4">
-      <div>
-        <div className="mb-2 text-sm font-bold text-[#232323]">Город</div>
-        <div className={`${inputClass} !py-3`}>
-          <RussiaCityInput
-            value={city}
-            onChange={onCityChange}
-            inputClassName="w-full bg-transparent text-base text-[#232323] outline-none"
-          />
+      {detecting ? (
+        <div className="rounded-2xl bg-[#f3f5fa] px-5 py-4 text-sm font-semibold text-[#7d849b]">
+          Определяем ваш адрес…
         </div>
-      </div>
+      ) : null}
 
-      <div ref={wrapRef} className="relative">
-        <div className="mb-2 text-sm font-bold text-[#232323]">Адрес</div>
-        <input
-          value={address}
-          onChange={(event) => {
-            onAddressChange(event.target.value);
-            setSuggestOpen(true);
-          }}
-          onFocus={() => address.trim().length >= 2 && setSuggestOpen(true)}
-          onBlur={() => {
-            window.setTimeout(() => {
-              if (address.trim().length >= 3) geocodeQuery(address);
-            }, 200);
-          }}
-          placeholder={addressPlaceholder}
-          className={inputClass}
-        />
-        {loading ? (
-          <div className="mt-2 text-xs font-semibold text-[#7d849b]">Определяем координаты…</div>
-        ) : null}
-        {suggestOpen && suggestions.length > 0 ? (
-          <ul className="absolute left-0 right-0 z-20 mt-1 max-h-56 overflow-auto rounded-2xl border border-[#dfe4ee] bg-white py-1 shadow-lg">
-            {suggestions.map((item, idx) => {
-              const label = item?.displayName || item?.value || String(item);
-              return (
-                <li key={`${idx}-${label}`}>
-                  <button
-                    type="button"
-                    className="w-full px-4 py-3 text-left text-sm hover:bg-[#f3f5fa]"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => pickSuggestion(item)}
-                  >
-                    {label}
-                  </button>
-                </li>
-              );
-            })}
-          </ul>
-        ) : null}
-      </div>
+      {showConfirmBlock ? (
+        <div className="rounded-2xl border border-[#dfe4ee] bg-[#f8f9fb] p-5">
+          <div className="text-sm font-black uppercase tracking-wide text-[#7d849b]">
+            {gpsUsed ? 'Мы определили адрес' : 'Мы определили ваш город'}
+          </div>
+          <p className="mt-2 text-base font-semibold leading-7 text-[#232323]">
+            {formatDetectedLabel(detected)}
+          </p>
+          {!gpsUsed ? (
+            <p className="mt-2 text-sm text-[#7d849b]">
+              Уточните точный адрес — так специалисты быстрее найдут вас на карте.
+            </p>
+          ) : null}
+          <div className="mt-4 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={handleConfirm}
+              className="inline-flex h-11 items-center rounded-xl bg-[#d9f36b] px-5 text-sm font-black text-[#232323]"
+            >
+              Подтвердить
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEditMode(true);
+                setConfirmedState(false);
+                if (!address && detected?.city) {
+                  onCityChange(detected.city);
+                }
+              }}
+              className="inline-flex h-11 items-center rounded-xl bg-[#eef1f7] px-5 text-sm font-bold text-[#232323]"
+            >
+              Изменить
+            </button>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmed && !editMode ? (
+        <div className="rounded-2xl border border-[#d9f36b] bg-[#f8fce8] px-5 py-4">
+          <div className="text-sm font-bold text-[#232323]">Адрес подтверждён</div>
+          <p className="mt-1 text-sm text-[#5a6070]">
+            {[city, address].filter(Boolean).join(', ') || formatDetectedLabel(detected || { needs_confirmation: false, source: 'manual', city, region: null, country: null, address, full_address: null, lat: lat ?? null, lng: lng ?? null })}
+          </p>
+          <button
+            type="button"
+            onClick={() => {
+              setEditMode(true);
+              setConfirmedState(false);
+            }}
+            className="mt-3 text-sm font-bold text-[#232323] underline"
+          >
+            Изменить адрес
+          </button>
+        </div>
+      ) : null}
+
+      {(editMode || !showConfirmBlock) && !confirmed ? (
+        <>
+          <div>
+            <div className="mb-2 text-sm font-bold text-[#232323]">Город</div>
+            <div className={`${inputClass} !py-3`}>
+              <RussiaCityInput
+                value={city}
+                onChange={(nextCity) => {
+                  onCityChange(nextCity);
+                  setConfirmedState(false);
+                }}
+                inputClassName="w-full bg-transparent text-base text-[#232323] outline-none"
+              />
+            </div>
+          </div>
+
+          <div ref={wrapRef} className="relative">
+            <div className="mb-2 text-sm font-bold text-[#232323]">Адрес</div>
+            <input
+              value={address}
+              onChange={(event) => {
+                onAddressChange(event.target.value);
+                setSuggestOpen(true);
+                setConfirmedState(false);
+              }}
+              onFocus={() => address.trim().length >= 2 && setSuggestOpen(true)}
+              placeholder={addressPlaceholder}
+              className={inputClass}
+            />
+            {loading ? (
+              <div className="mt-2 text-xs font-semibold text-[#7d849b]">Ищем адреса…</div>
+            ) : null}
+            {suggestOpen && suggestions.length > 0 ? (
+              <ul className="absolute left-0 right-0 z-20 mt-1 max-h-56 overflow-auto rounded-2xl border border-[#dfe4ee] bg-white py-1 shadow-lg">
+                {suggestions.map((item, idx) => {
+                  const label = item.full_address || item.address || '';
+                  return (
+                    <li key={`${idx}-${label}`}>
+                      <button
+                        type="button"
+                        className="w-full px-4 py-3 text-left text-sm hover:bg-[#f3f5fa]"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => pickSuggestion(item)}
+                      >
+                        {label}
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
+          </div>
+
+          {address.trim().length >= 3 ? (
+            <button
+              type="button"
+              onClick={handleConfirm}
+              className="inline-flex h-11 items-center rounded-xl bg-[#d9f36b] px-5 text-sm font-black text-[#232323]"
+            >
+              Подтвердить адрес
+            </button>
+          ) : null}
+        </>
+      ) : null}
 
       <div className="relative h-[360px] overflow-hidden rounded-2xl border border-[#dfe4ee] md:h-[420px]">
         {!apiKey ? (

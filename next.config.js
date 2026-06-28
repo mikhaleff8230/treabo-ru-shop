@@ -10,6 +10,17 @@ const withPWA = require('next-pwa')({
   cacheStartUrl: false,
 });
 
+const trimSlash = (value) => value.replace(/\/+$/, '');
+const treaboApiEndpoint = trimSlash(
+  process.env.TREABO_API_ENDPOINT ||
+    process.env.NEXT_PUBLIC_TREABO_API_ENDPOINT ||
+    'http://127.0.0.1:8001/api/proffi',
+);
+const treaboProffiApiEndpoint = treaboApiEndpoint.endsWith('/proffi')
+  || treaboApiEndpoint.endsWith('/api/treabo')
+  ? treaboApiEndpoint
+  : `${treaboApiEndpoint}/proffi`;
+
 module.exports = withPWA({
   reactStrictMode: true,
   i18n,
@@ -29,7 +40,7 @@ module.exports = withPWA({
     return [
       {
         source: '/api/treabo/:path*',
-        destination: `${process.env.TREABO_API_ENDPOINT || process.env.NEXT_PUBLIC_TREABO_API_ENDPOINT || 'http://127.0.0.1:8001/api'}/:path*`,
+        destination: `${treaboProffiApiEndpoint}/:path*`,
       },
       {
         source: '/api/:path*',

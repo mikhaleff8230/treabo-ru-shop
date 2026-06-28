@@ -1,17 +1,18 @@
-import { ExternalLink, Loader2, MoreHorizontal } from 'lucide-react';
+import { Loader2, MoreHorizontal } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { useRouter } from 'next/router';
 import TreaboAccountShell from '@/components/treabo/TreaboAccountShell';
 import {
-  createTreaboManualBalanceDeposit,
+  checkTreaboPendingDeposit,
+  createTreaboYookassaBalanceDeposit,
   fetchTreaboBalance,
   fetchTreaboBalanceTransactions,
-  reportTreaboManualBalancePayment,
   type TreaboBalance,
   type TreaboBalanceTransaction,
-  type TreaboManualDeposit,
 } from '@/data/treabo';
 
 const money = new Intl.NumberFormat('ru-RU');
+const DEPOSIT_AMOUNT = 100;
 
 function formatRub(value: number) {
   const sign = value > 0 ? '+' : '';
@@ -29,12 +30,11 @@ function formatDate(value?: string | null) {
 }
 
 export default function TreaboBalancePage() {
+  const router = useRouter();
   const [balance, setBalance] = useState<TreaboBalance | null>(null);
   const [transactions, setTransactions] = useState<TreaboBalanceTransaction[]>([]);
-  const [deposit, setDeposit] = useState<TreaboManualDeposit | null>(null);
   const [loading, setLoading] = useState(true);
   const [depositLoading, setDepositLoading] = useState(false);
-  const [reportLoading, setReportLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   async function loadBalance(token: string) {
@@ -57,7 +57,21 @@ export default function TreaboBalancePage() {
     loadBalance(token)
       .catch((error) => setMessage(error instanceof Error ? error.message : 'Не удалось загрузить баланс'))
       .finally(() => setLoading(false));
-  }, []);
+
+    if (router.query.deposit === 'success') {
+      checkTreaboPendingDeposit(token)
+        .then((response) => {
+          if (response.data?.processed) {
+            setMessage(`Баланс пополнен на ${money.format(response.data.amount || 0)} ₽`);
+            return loadBalance(token);
+          }
+          if (response.data?.has_pending) {
+            setMessage('Платёж обрабатывается. Баланс обновится в течение нескольких минут.');
+          }
+        })
+        .catch(() => undefined);
+    }
+  }, [router.query.deposit]);
 
   async function handleDeposit() {
     const token = typeof window !== 'undefined' ? window.localStorage.getItem('treabo_token') : null;
@@ -70,40 +84,16 @@ export default function TreaboBalancePage() {
     setMessage(null);
 
     try {
-      const response = await createTreaboManualBalanceDeposit(token, 100);
-      setDeposit(response);
+      const response = await createTreaboYookassaBalanceDeposit(token, DEPOSIT_AMOUNT);
       if (!response.payment_url) {
-        setMessage(response.message || 'QR-ссылка пополнения пока не настроена.');
+        setMessage(response.message || 'Не удалось создать платёж. Попробуйте позже.');
         return;
       }
-      window.open(response.payment_url, '_blank', 'noopener,noreferrer');
-      setMessage(`Открыли QR-ссылку для пополнения ${money.format(Number(response.amount || 100))} ₽. После оплаты нажмите кнопку ниже.`);
-      await loadBalance(token);
+      window.location.href = response.payment_url;
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'Не удалось создать пополнение');
     } finally {
       setDepositLoading(false);
-    }
-  }
-
-  async function handleReportPayment() {
-    const token = typeof window !== 'undefined' ? window.localStorage.getItem('treabo_token') : null;
-    if (!token) {
-      setMessage('Войдите как мастер, чтобы сообщить об оплате.');
-      return;
-    }
-
-    setReportLoading(true);
-    setMessage(null);
-
-    try {
-      const response = await reportTreaboManualBalancePayment(token, deposit?.deposit_id);
-      setMessage(response.message || 'Спасибо. Администрация проверит оплату и пополнит баланс.');
-      await loadBalance(token);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : 'Не удалось отправить сообщение об оплате');
-    } finally {
-      setReportLoading(false);
     }
   }
 
@@ -125,9 +115,9 @@ export default function TreaboBalancePage() {
 
           <div className="mt-6 rounded-[24px] bg-[#f5f6f1] p-4">
             <div className="text-sm font-bold text-[#7d849b]">Сумма пополнения</div>
-            <div className="mt-1 text-3xl font-black">100 ₽</div>
+            <div className="mt-1 text-3xl font-black">{money.format(DEPOSIT_AMOUNT)} ₽</div>
             <p className="mt-2 text-sm font-semibold leading-6 text-[#7d849b]">
-              Временный ручной способ: откройте QR-ссылку, оплатите и сообщите администрации.
+              Оплата через ЮKassa. После успешной оплаты баланс обновится автоматически.
             </p>
           </div>
 
@@ -141,20 +131,10 @@ export default function TreaboBalancePage() {
             type="button"
             onClick={handleDeposit}
             disabled={depositLoading}
-            className="mt-5 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-[#232323] px-5 text-sm font-black text-white disabled:opacity-60"
+            className="mt-5 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-[#d9f36b] px-5 text-sm font-black text-[#232323] disabled:opacity-60"
           >
-            {depositLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <ExternalLink className="h-4 w-4" />}
-            Открыть QR для оплаты
-          </button>
-
-          <button
-            type="button"
-            onClick={handleReportPayment}
-            disabled={reportLoading}
-            className="mt-3 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-[#d9f36b] px-5 text-sm font-black text-[#232323] disabled:opacity-60"
-          >
-            {reportLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
-            Сообщить об оплате администрации
+            {depositLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Пополнить баланс
           </button>
         </section>
 

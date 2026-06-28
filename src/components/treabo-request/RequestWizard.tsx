@@ -99,6 +99,7 @@ export default function RequestWizard() {
   const [submitError, setSubmitError] = useState('');
   const [taskCreated, setTaskCreated] = useState(false);
   const [createdTaskId, setCreatedTaskId] = useState<string | null>(null);
+  const [addressConfirmed, setAddressConfirmed] = useState(false);
 
   const [phone, setPhone] = useState('7');
   const [password, setPassword] = useState('');
@@ -305,7 +306,12 @@ export default function RequestWizard() {
 
   function next() {
     ensureDraftId();
+    if (step?.key === 'address' && !addressConfirmed) {
+      setSubmitError('Подтвердите адрес перед продолжением');
+      return;
+    }
     if (stepIndex >= steps.length - 1) return;
+    setSubmitError('');
     setStepIndex((value) => value + 1);
   }
 
@@ -699,8 +705,12 @@ export default function RequestWizard() {
               onCityChange={(city) => update('city', city)}
               onAddressChange={(address) => update('address', address)}
               onCoordinatesChange={(lat, lng) => setDraft((current) => ({ ...current, lat, lng }))}
+              onConfirmedChange={setAddressConfirmed}
               addressPlaceholder={text.request.streetPlaceholder}
             />
+            {submitError && step.key === 'address' ? (
+              <div className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{submitError}</div>
+            ) : null}
           </>
         );
       case 'budget':
