@@ -38,6 +38,8 @@ export function usePusher(
     const pusherCluster = process.env.NEXT_PUBLIC_PUSHER_APP_CLUSTER || 'mt1';
     const pusherHost = process.env.NEXT_PUBLIC_PUSHER_HOST || 'localhost';
     const pusherPort = process.env.NEXT_PUBLIC_PUSHER_PORT || '6001';
+    const pusherScheme = process.env.NEXT_PUBLIC_PUSHER_SCHEME || 'http';
+    const forceTLS = pusherScheme === 'https' || pusherPort === '443';
 
     if (!pusherKey) {
       console.warn('Pusher key not found. Real-time updates will not work.');
@@ -55,8 +57,9 @@ export function usePusher(
       },
       wsHost: pusherHost,
       wsPort: parseInt(pusherPort),
-      forceTLS: false,
-      enabledTransports: ['ws', 'wss'],
+      wssPort: parseInt(pusherPort),
+      forceTLS,
+      enabledTransports: forceTLS ? ['wss'] : ['ws', 'wss'],
     });
 
     pusherRef.current = pusher;
