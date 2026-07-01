@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Camera, CheckCheck, Loader2, Mic, MoreHorizontal, Phone, Plus, Search, Send } from 'lucide-react';
+import { ArrowLeft, CheckCheck, Loader2, MoreHorizontal, Plus, Search, Send } from 'lucide-react';
 import Pusher from 'pusher-js';
 import TreaboAccountShell from '@/components/treabo/TreaboAccountShell';
 import {
@@ -10,6 +10,7 @@ import {
   sendTreaboChatMessage,
   sendTreaboChatTyping,
   sendTreaboPresenceHeartbeat,
+  uploadTreaboFile,
   type TreaboChat,
   type TreaboMessage,
 } from '@/data/treabo';
@@ -80,9 +81,11 @@ export default function TreaboChatsPage() {
   const [loading, setLoading] = useState(true);
   const [messagesLoading, setMessagesLoading] = useState(false);
   const [sending, setSending] = useState(false);
+  const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [typing, setTyping] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const stopTypingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -279,6 +282,45 @@ export default function TreaboChatsPage() {
     }
   }
 
+  async function sendAttachment(file?: File | null) {
+    const token = getToken();
+    if (!token) {
+      setError('Войдите, чтобы отправить фото.');
+      return;
+    }
+    if (!selectedId || !file || uploadingAttachment) return;
+
+    setUploadingAttachment(true);
+    setError(null);
+    try {
+      const uploaded = await uploadTreaboFile(file, { token, folder: 'chat' });
+      const label = file.type.startsWith('image/') ? 'Фото' : file.name || 'Файл';
+      const message = await sendTreaboChatMessage(selectedId, token, label, {
+        type: file.type.startsWith('image/') ? 'image' : 'file',
+        metadata: {
+          url: uploaded.url,
+          path: uploaded.path,
+          mime: uploaded.mime || file.type,
+          size: uploaded.size || file.size,
+          name: file.name,
+        },
+      });
+      setMessages((current) => (current.some((item) => String(item.id) === String(message.id)) ? current : [...current, message]));
+      setChats((current) =>
+        current.map((chat) =>
+          String(chat.id) === String(selectedId)
+            ? { ...chat, last_message: label, last_message_at: message.created_at || new Date().toISOString() }
+            : chat,
+        ),
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось прикрепить файл');
+    } finally {
+      setUploadingAttachment(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  }
+
   return (
     <TreaboAccountShell title="Чаты">
       {!chatOpen ? (
@@ -362,7 +404,6 @@ export default function TreaboChatsPage() {
                 {typing ? 'печатает...' : `${status}${selectedChat?.task_title ? ` · ${selectedChat.task_title}` : ''}`}
               </div>
             </div>
-            <button className="hidden h-11 w-11 items-center justify-center rounded-full hover:bg-[#f5f6f1] sm:flex"><Phone className="h-5 w-5" /></button>
             <button className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-[#f5f6f1]"><MoreHorizontal className="h-6 w-6" /></button>
           </header>
 
@@ -382,11 +423,23 @@ export default function TreaboChatsPage() {
             ) : null}
             {messages.map((message) => {
               const isOwn = String(message.sender_id) === String(auth.user?.id);
+              const attachmentUrl = typeof message.metadata?.url === 'string' ? message.metadata.url : '';
+              const isImage = message.type === 'image' || String(message.metadata?.mime || '').startsWith('image/');
               return (
                 <div key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`max-w-[82%] rounded-[22px] px-4 py-3 text-[15px] font-semibold leading-snug shadow-sm sm:max-w-[66%] ${
+                  <div className={`max-w-[82%] rounded-[22px] px-4 py-3 text-[15px] font-normal leading-snug shadow-sm sm:max-w-[66%] ${
                     isOwn ? 'rounded-br-md bg-[#e4f5ff] text-[#111]' : 'rounded-bl-md bg-[#f1f1ef] text-[#111]'
                   }`}>
+                    {attachmentUrl && isImage ? (
+                      <a href={attachmentUrl} target="_blank" rel="noreferrer" className="mb-2 block overflow-hidden rounded-2xl bg-white">
+                        <img src={attachmentUrl} alt={message.text || 'Фото'} className="max-h-72 w-full object-cover" />
+                      </a>
+                    ) : null}
+                    {attachmentUrl && !isImage ? (
+                      <a href={attachmentUrl} target="_blank" rel="noreferrer" className="mb-2 block rounded-2xl bg-white px-3 py-2 text-sm text-sky-700">
+                        {message.metadata?.name || message.text || 'Файл'}
+                      </a>
+                    ) : null}
                     <div className="whitespace-pre-wrap break-words">{message.text}</div>
                     <div className="mt-1 flex items-center justify-end gap-1 text-[11px] text-[#7d849b]">
                       {isOwn ? <CheckCheck className="h-3 w-3 text-sky-500" /> : null}
@@ -405,14 +458,27 @@ export default function TreaboChatsPage() {
           </div>
 
           <form onSubmit={submitMessage} className="flex items-center gap-2 border-t border-zinc-100 bg-white px-4 py-3 sm:px-6">
-            <button type="button" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-[#f5f6f1]"><Plus className="h-6 w-6" /></button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*,.pdf"
+              className="hidden"
+              onChange={(event) => sendAttachment(event.target.files?.[0])}
+            />
+            <button
+              type="button"
+              disabled={uploadingAttachment}
+              onClick={() => fileInputRef.current?.click()}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-[#f5f6f1] disabled:opacity-60"
+            >
+              {uploadingAttachment ? <Loader2 className="h-5 w-5 animate-spin" /> : <Plus className="h-6 w-6" />}
+            </button>
             <input
               value={text}
               onChange={(event) => onTextChange(event.target.value)}
               placeholder="Сообщение"
-              className="min-h-[46px] flex-1 rounded-2xl border-2 border-sky-200 bg-white px-4 font-semibold outline-none focus:border-sky-400"
+              className="min-h-[46px] flex-1 rounded-2xl border-2 border-sky-200 bg-white px-4 font-normal outline-none focus:border-sky-400"
             />
-            <button type="button" className="hidden h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-[#f5f6f1] sm:flex"><Camera className="h-5 w-5" /></button>
             <button
               type="submit"
               disabled={sending || !text.trim()}
@@ -420,7 +486,7 @@ export default function TreaboChatsPage() {
                 text.trim() && !sending ? 'bg-[#232323] text-white hover:bg-black' : 'text-[#7d849b] hover:bg-[#f5f6f1]'
               }`}
             >
-              {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : text.trim() ? <Send className="h-5 w-5" /> : <Mic className="h-5 w-5" />}
+              {sending ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
             </button>
           </form>
         </section>

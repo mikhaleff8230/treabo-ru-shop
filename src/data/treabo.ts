@@ -73,10 +73,6 @@ export type TreaboChat = {
   last_message_at?: string | null;
   created_at?: string | null;
   updated_at?: string | null;
-  unread_count?: number;
-  is_typing?: boolean;
-  other_is_online?: boolean;
-  other_last_seen_at?: string | null;
 };
 
 export type TreaboMessage = {
@@ -86,8 +82,7 @@ export type TreaboMessage = {
   user_id?: string;
   text: string;
   type?: string;
-  delivered_at?: string | null;
-  read_at?: string | null;
+  metadata?: Record<string, any> | null;
   created_at?: string | null;
 };
 
@@ -377,35 +372,16 @@ export async function fetchTreaboChatMessages(chatId: string, token: string) {
   return treaboApiRequest<TreaboMessage[]>(`/chats/${encodeURIComponent(chatId)}/messages`, { token });
 }
 
-export async function sendTreaboChatMessage(chatId: string, token: string, text: string) {
+export async function sendTreaboChatMessage(
+  chatId: string,
+  token: string,
+  text: string,
+  input: { type?: string; metadata?: Record<string, any> | null } = {},
+) {
   return treaboApiRequest<TreaboMessage>(`/chats/${encodeURIComponent(chatId)}/messages`, {
     method: 'POST',
     token,
-    body: JSON.stringify({ text }),
-  });
-}
-
-export async function markTreaboChatRead(chatId: string, token: string) {
-  return treaboApiRequest<{ ok?: boolean }>(`/chats/${encodeURIComponent(chatId)}/read`, {
-    method: 'POST',
-    token,
-    body: JSON.stringify({}),
-  });
-}
-
-export async function sendTreaboChatTyping(chatId: string, token: string, isTyping: boolean) {
-  return treaboApiRequest<{ is_typing?: boolean }>(`/chats/${encodeURIComponent(chatId)}/typing`, {
-    method: 'POST',
-    token,
-    body: JSON.stringify({ is_typing: isTyping }),
-  });
-}
-
-export async function sendTreaboPresenceHeartbeat(token: string) {
-  return treaboApiRequest<{ ok?: boolean }>('/presence/heartbeat', {
-    method: 'POST',
-    token,
-    body: JSON.stringify({}),
+    body: JSON.stringify({ text, type: input.type, metadata: input.metadata }),
   });
 }
 
