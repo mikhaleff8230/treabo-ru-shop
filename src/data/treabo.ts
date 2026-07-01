@@ -385,6 +385,30 @@ export async function sendTreaboChatMessage(
   });
 }
 
+export async function markTreaboChatRead(chatId: string, token: string) {
+  return treaboApiRequest<{ read_at: string }>(`/chats/${encodeURIComponent(chatId)}/read`, {
+    method: 'POST',
+    token,
+    body: JSON.stringify({}),
+  });
+}
+
+export async function sendTreaboChatTyping(chatId: string, token: string, isTyping: boolean) {
+  return treaboApiRequest<{ is_typing: boolean }>(`/chats/${encodeURIComponent(chatId)}/typing`, {
+    method: 'POST',
+    token,
+    body: JSON.stringify({ is_typing: isTyping }),
+  });
+}
+
+export async function sendTreaboPresenceHeartbeat(token: string) {
+  return treaboApiRequest<{ online: boolean; last_seen_at?: string | null }>('/presence/heartbeat', {
+    method: 'POST',
+    token,
+    body: JSON.stringify({}),
+  });
+}
+
 export async function fetchTreaboBalance(token: string) {
   const payload = await treaboApiRequest<{ success: boolean; data: TreaboBalance }>('/balance', { token });
   return payload.data;
