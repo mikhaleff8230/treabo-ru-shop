@@ -1,23 +1,49 @@
 import type { TreaboUpload } from '@/data/treabo';
 
+export type MissingQuestionObject = {
+  question_id?: number | null;
+  field_key?: string | null;
+  question: string;
+  type: 'text' | 'textarea' | 'number' | 'yesno' | 'select' | 'multiselect' | 'photo';
+  options?: string[] | null;
+  placeholder?: string | null;
+  help_text?: string | null;
+  is_required?: boolean;
+};
+
 export type AiDraft = {
   detected_language: string;
   title: string;
-  category_slug: string;
+  category_slug?: string;
+  category_id?: string | null;
+  work_id?: number | null;
   city: string | null;
   urgency: string;
   description: string;
   master_summary: string;
-  missing_questions: string[];
+  missing_questions: Array<string | MissingQuestionObject>;
   confidence: number;
 };
 
-export type ClarifyFieldType = 'text' | 'area' | 'yesno' | 'datetime' | 'photos';
+export type ClarifyFieldType =
+  | 'text'
+  | 'textarea'
+  | 'area'
+  | 'yesno'
+  | 'datetime'
+  | 'photos'
+  | 'select'
+  | 'multiselect';
 
 export type ClarifyField = {
   key: string;
   question: string;
   type: ClarifyFieldType;
+  options?: string[];
+  placeholder?: string;
+  helpText?: string;
+  isRequired?: boolean;
+  questionId?: number | null;
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -63,17 +89,70 @@ export function inferClarifyFieldType(question: string): ClarifyFieldType {
   return 'text';
 }
 
+export function mapApiTypeToClarifyType(
+  type: MissingQuestionObject['type'] | string,
+): ClarifyFieldType {
+  switch (type) {
+    case 'number':
+      return 'area';
+    case 'photo':
+      return 'photos';
+    case 'textarea':
+      return 'textarea';
+    case 'yesno':
+      return 'yesno';
+    case 'select':
+      return 'select';
+    case 'multiselect':
+      return 'multiselect';
+    default:
+      return 'text';
+  }
+}
+
+export function normalizeMissingQuestion(
+  item: string | MissingQuestionObject,
+  index: number,
+): ClarifyField | null {
+  if (typeof item === 'string') {
+    const question = item.trim();
+    if (!question) return null;
+    const type = inferClarifyFieldType(question);
+    if (type === 'datetime' || type === 'photos') return null;
+    return {
+      key: `q_${index}`,
+      question,
+      type,
+    };
+  }
+
+  if (!item?.question?.trim()) return null;
+
+  const type = mapApiTypeToClarifyType(item.type);
+  if (type === 'datetime') return null;
+
+  return {
+    key: item.field_key?.trim() || (item.question_id != null ? `q_${item.question_id}` : `q_${index}`),
+    question: item.question.trim(),
+    type,
+    options: item.options?.length ? item.options : undefined,
+    placeholder: item.placeholder || undefined,
+    helpText: item.help_text || undefined,
+    isRequired: item.is_required,
+    questionId: item.question_id ?? null,
+  };
+}
+
 export function buildClarifyFields(aiDraft: AiDraft | null): ClarifyField[] {
   if (!aiDraft?.missing_questions?.length) return [];
-  return aiDraft.missing_questions.map((question, index) => ({
-    key: `q_${index}`,
-    question,
-    type: inferClarifyFieldType(question),
-  }));
+  return aiDraft.missing_questions
+    .map((item, index) => normalizeMissingQuestion(item, index))
+    .filter((field): field is ClarifyField => field !== null);
 }
 
 export function needsManualCategory(aiDraft: AiDraft | null) {
   if (!aiDraft) return true;
+  if (aiDraft.category_id) return aiDraft.confidence < 0.5;
   return !aiDraft.category_slug || aiDraft.category_slug === 'other' || aiDraft.confidence < 0.5;
 }
 
@@ -149,9 +228,24 @@ export function buildTaskDescription(draft: Record<string, any>): string {
 
   const answers = draft.aiAnswers as Record<string, string> | undefined;
   if (answers && Object.keys(answers).length) {
+    const questionMap = new Map<string, string>();
+    const missing = draft.aiDraft?.missing_questions;
+    if (Array.isArray(missing)) {
+      missing.forEach((item, index) => {
+        if (typeof item === 'string') {
+          questionMap.set(`q_${index}`, item);
+        } else if (item && typeof item === 'object' && item.question) {
+          const key =
+            item.field_key?.trim() ||
+            (item.question_id != null ? `q_${item.question_id}` : `q_${index}`);
+          questionMap.set(key, item.question);
+        }
+      });
+    }
+
     const clarifyLines = Object.entries(answers)
       .filter(([, value]) => value?.trim())
-      .map(([question, value]) => `${question}: ${value}`);
+      .map(([key, value]) => `${questionMap.get(key) || key}: ${value}`);
     if (clarifyLines.length) {
       parts.push('Уточнения:\n' + clarifyLines.join('\n'));
     }
@@ -164,7 +258,51 @@ export function buildTaskDescription(draft: Record<string, any>): string {
   return parts.filter(Boolean).join('\n\n');
 }
 
+export function buildTaskAiDetails(draft: Record<string, any>) {
+  const aiDraft = draft.aiDraft as AiDraft | undefined;
+  const answers = (draft.aiAnswers || {}) as Record<string, string>;
+  const questionMap = new Map<string, string>();
+
+  if (Array.isArray(aiDraft?.missing_questions)) {
+    aiDraft.missing_questions.forEach((item, index) => {
+      if (typeof item === 'string') {
+        questionMap.set(`q_${index}`, item);
+      } else if (item && typeof item === 'object' && item.question) {
+        const key =
+          item.field_key?.trim() ||
+          (item.question_id != null ? `q_${item.question_id}` : `q_${index}`);
+        questionMap.set(key, item.question);
+      }
+    });
+  }
+
+  const question_answers = Object.entries(answers)
+    .filter(([, value]) => value?.trim())
+    .map(([key, answer]) => ({
+      key,
+      question: questionMap.get(key) || key,
+      answer,
+    }));
+
+  return {
+    prompt: draft.prompt || null,
+    title: aiDraft?.title || null,
+    category_id: aiDraft?.category_id || null,
+    category_slug: aiDraft?.category_slug || null,
+    work_id: aiDraft?.work_id || null,
+    city: draft.city || aiDraft?.city || null,
+    urgency: draft.deadline || aiDraft?.urgency || null,
+    master_summary: aiDraft?.master_summary || null,
+    ai_description: aiDraft?.description || null,
+    question_answers,
+    additional_details: draft.details?.trim() || null,
+  };
+}
+
 export function resolveTaskCategory(draft: Record<string, any>): string {
+  if (draft.aiDraft?.category_id) {
+    return draft.aiDraft.category_id;
+  }
   if (draft.aiDraft?.category_slug && draft.aiDraft.category_slug !== 'other') {
     return draft.aiDraft.category_slug;
   }

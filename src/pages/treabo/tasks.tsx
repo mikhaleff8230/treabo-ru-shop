@@ -59,7 +59,7 @@ export default function TreaboTasksPage() {
               <Link key={task.id} href={routes.taskUrl(task)} className="rounded-[28px] bg-white p-5 shadow-sm transition hover:shadow-md">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
-                    <div className="text-xl font-black text-[#232323]">{task.title}</div>
+                    <div className="text-xl font-normal text-[#232323]">{task.title}</div>
                     <div className="mt-2 text-sm font-semibold text-[#7d849b]">{[task.city, task.address].filter(Boolean).join(', ') || 'Адрес не указан'}</div>
                   </div>
                   <span className="rounded-full bg-[#f3f5fa] px-3 py-1.5 text-xs font-black text-[#232323]">{task.status === 'open' ? 'Открыт' : task.status || 'Новый'}</span>

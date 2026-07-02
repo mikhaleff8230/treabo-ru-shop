@@ -69,7 +69,7 @@ export interface UserLocation {
 }
 
 function apiBase(): string {
-  return getTreaboPublicApiBase();
+  return getTreaboPublicApiBase().replace(/\/proffi$/, '');
 }
 
 async function geoFetch<T>(path: string, init?: RequestInit & { token?: string | null }): Promise<T> {

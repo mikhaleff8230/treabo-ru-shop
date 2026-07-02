@@ -1,12 +1,13 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowLeft, CheckCheck, Loader2, MoreHorizontal, Plus, Search, Send } from 'lucide-react';
+import { ArrowLeft, Check, CheckCheck, Loader2, MoreHorizontal, Plus, Search, Send } from 'lucide-react';
 import Pusher from 'pusher-js';
 import TreaboAccountShell from '@/components/treabo/TreaboAccountShell';
 import {
   fetchTreaboChatMessages,
   fetchTreaboChats,
   markTreaboChatRead,
+  normalizeTreaboAssetUrl,
   sendTreaboChatMessage,
   sendTreaboChatTyping,
   sendTreaboPresenceHeartbeat,
@@ -157,10 +158,41 @@ export default function TreaboChatsPage() {
     fetchTreaboChatMessages(selectedId, token)
       .then((next) => {
         setMessages(next);
-        return markTreaboChatRead(selectedId, token).catch(() => undefined);
+        return markTreaboChatRead(selectedId, token)
+          .then(() => {
+            setChats((current) =>
+              current.map((chat) => (String(chat.id) === String(selectedId) ? { ...chat, unread_count: 0 } : chat)),
+            );
+          })
+          .catch(() => undefined);
       })
       .catch((err) => setError(err instanceof Error ? err.message : 'Не удалось загрузить сообщения'))
       .finally(() => setMessagesLoading(false));
+  }, [selectedId]);
+
+  useEffect(() => {
+    const token = getToken();
+    if (!token || !selectedId) return undefined;
+
+    const timer = setInterval(async () => {
+      try {
+        const next = await fetchTreaboChatMessages(selectedId, token);
+        setMessages((current) => {
+          if (current.length === next.length && current[current.length - 1]?.id === next[next.length - 1]?.id) {
+            return current;
+          }
+          return next;
+        });
+        await markTreaboChatRead(selectedId, token).catch(() => undefined);
+        setChats((current) =>
+          current.map((chat) => (String(chat.id) === String(selectedId) ? { ...chat, unread_count: 0 } : chat)),
+        );
+      } catch {
+        // Polling is a fallback for realtime, so keep the UI quiet on transient failures.
+      }
+    }, 8000);
+
+    return () => clearInterval(timer);
   }, [selectedId]);
 
   useEffect(() => {
@@ -171,7 +203,7 @@ export default function TreaboChatsPage() {
     const pusher = new Pusher(key, getPusherOptions(token));
     const channel = pusher.subscribe(`private-proffi.chat.${selectedId}`);
 
-    channel.bind('message.sent', (event: { message?: TreaboMessage; chat?: Partial<TreaboChat> }) => {
+    const onMessageSent = (event: { message?: TreaboMessage; chat?: Partial<TreaboChat> }) => {
       const message = event?.message;
       if (!message) return;
       setMessages((current) => {
@@ -187,26 +219,29 @@ export default function TreaboChatsPage() {
       );
       if (String(message.sender_id) !== String(auth.user?.id)) {
         markTreaboChatRead(selectedId, token).catch(() => undefined);
+        setChats((current) =>
+          current.map((chat) => (String(chat.id) === String(selectedId) ? { ...chat, unread_count: 0 } : chat)),
+        );
       }
-    });
+    };
 
-    channel.bind('messages.read', (event: { reader_id?: string; read_at?: string }) => {
+    const onMessagesRead = (event: { reader_id?: string; read_at?: string }) => {
       if (String(event?.reader_id) === String(auth.user?.id)) return;
       setMessages((current) =>
         current.map((message) =>
           String(message.sender_id) === String(auth.user?.id) ? { ...message, read_at: event.read_at } : message,
         ),
       );
-    });
+    };
 
-    channel.bind('user.typing', (event: { user_id?: string; is_typing?: boolean }) => {
+    const onUserTyping = (event: { user_id?: string; is_typing?: boolean }) => {
       if (String(event?.user_id) === String(auth.user?.id)) return;
       setTyping(Boolean(event?.is_typing));
       if (typingTimer.current) clearTimeout(typingTimer.current);
       typingTimer.current = setTimeout(() => setTyping(false), 5500);
-    });
+    };
 
-    channel.bind('presence.updated', (event: { user_id?: string; is_online?: boolean; last_seen_at?: string }) => {
+    const onPresenceUpdated = (event: { user_id?: string; is_online?: boolean; last_seen_at?: string }) => {
       if (String(event?.user_id) === String(auth.user?.id)) return;
       setChats((current) =>
         current.map((chat) =>
@@ -215,10 +250,20 @@ export default function TreaboChatsPage() {
             : chat,
         ),
       );
-    });
+    };
+
+    channel.bind('message.sent', onMessageSent);
+    channel.bind('.message.sent', onMessageSent);
+    channel.bind('messages.read', onMessagesRead);
+    channel.bind('.messages.read', onMessagesRead);
+    channel.bind('user.typing', onUserTyping);
+    channel.bind('.user.typing', onUserTyping);
+    channel.bind('presence.updated', onPresenceUpdated);
+    channel.bind('.presence.updated', onPresenceUpdated);
 
     return () => {
       if (typingTimer.current) clearTimeout(typingTimer.current);
+      channel.unbind_all();
       pusher.unsubscribe(`private-proffi.chat.${selectedId}`);
       pusher.disconnect();
     };
@@ -423,7 +468,7 @@ export default function TreaboChatsPage() {
             ) : null}
             {messages.map((message) => {
               const isOwn = String(message.sender_id) === String(auth.user?.id);
-              const attachmentUrl = typeof message.metadata?.url === 'string' ? message.metadata.url : '';
+              const attachmentUrl = normalizeTreaboAssetUrl(typeof message.metadata?.url === 'string' ? message.metadata.url : '');
               const isImage = message.type === 'image' || String(message.metadata?.mime || '').startsWith('image/');
               return (
                 <div key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
@@ -442,7 +487,13 @@ export default function TreaboChatsPage() {
                     ) : null}
                     <div className="whitespace-pre-wrap break-words">{message.text}</div>
                     <div className="mt-1 flex items-center justify-end gap-1 text-[11px] text-[#7d849b]">
-                      {isOwn ? <CheckCheck className="h-3 w-3 text-sky-500" /> : null}
+                      {isOwn ? (
+                        message.read_at ? (
+                          <CheckCheck className="h-3 w-3 text-sky-500" />
+                        ) : (
+                          <Check className="h-3 w-3 text-sky-500" />
+                        )
+                      ) : null}
                       {formatTime(message.created_at)}
                     </div>
                   </div>

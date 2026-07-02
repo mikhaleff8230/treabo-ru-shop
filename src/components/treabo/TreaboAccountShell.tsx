@@ -2,7 +2,9 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { BriefcaseBusiness, CircleHelp, ClipboardList, MessageCircle, Wallet } from 'lucide-react';
 import { ProffiHeader } from '@/components/proffi-mock/ProffiShell';
+import { normalizeTreaboAssetUrl } from '@/data/treabo';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
+import { useTreaboUnreadChats } from '@/hooks/use-treabo-unread-chats';
 
 type Props = {
   title: string;
@@ -12,6 +14,7 @@ type Props = {
 export default function TreaboAccountShell({ title, children }: Props) {
   const router = useRouter();
   const auth = useTreaboAuth();
+  const { unreadCount } = useTreaboUnreadChats(auth.isAuthenticated);
   const items = auth.isSpecialist
     ? [
         { href: '/treabo/profile', label: 'Анкета', icon: ClipboardList },
@@ -35,7 +38,7 @@ export default function TreaboAccountShell({ title, children }: Props) {
           <div className="mb-3 flex items-center gap-3 px-2 py-3">
             <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-[#d9f36b] text-lg font-black">
               {auth.user?.avatar ? (
-                <img src={auth.user.avatar} alt={auth.user.name} className="h-full w-full object-cover" />
+                <img src={normalizeTreaboAssetUrl(auth.user.avatar)} alt={auth.user.name} className="h-full w-full object-cover" />
               ) : (
                 auth.user?.name?.charAt(0)?.toUpperCase() || 'T'
               )}
@@ -60,6 +63,11 @@ export default function TreaboAccountShell({ title, children }: Props) {
                 >
                   <Icon className="h-4 w-4" />
                   {label}
+                  {href === '/treabo/chats' && unreadCount > 0 ? (
+                    <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ff405c] px-1.5 text-[11px] font-black leading-none text-white">
+                      {unreadCount > 9 ? '9+' : unreadCount}
+                    </span>
+                  ) : null}
                 </Link>
               );
             })}

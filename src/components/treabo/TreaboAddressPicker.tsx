@@ -3,6 +3,7 @@ import RussiaCityInput from '@/components/treabo/RussiaCityInput';
 import {
   autoDetectAddress,
   type GeoAddressResult,
+  reverseGeocode,
   saveConfirmedAddress,
   suggestAddresses,
 } from '@/services/geoLocationService';
@@ -80,12 +81,14 @@ export default function TreaboAddressPicker({
   const placemarkRef = useRef<any>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const detectStarted = useRef(false);
+  const chooseMapPointRef = useRef<(lat: number, lng: number) => void>(() => undefined);
 
   const [ready, setReady] = useState(false);
   const [suggestions, setSuggestions] = useState<GeoAddressResult[]>([]);
   const [suggestOpen, setSuggestOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [detecting, setDetecting] = useState(true);
+  const [resolvingMapPoint, setResolvingMapPoint] = useState(false);
   const [detected, setDetected] = useState<GeoAddressResult | null>(null);
   const [gpsUsed, setGpsUsed] = useState(false);
   const [editMode, setEditMode] = useState(false);
@@ -159,6 +162,49 @@ export default function TreaboAddressPicker({
     [applyResult, setConfirmedState],
   );
 
+  const chooseMapPoint = useCallback(
+    async (nextLat: number, nextLng: number) => {
+      onCoordinatesChange(nextLat, nextLng);
+      setConfirmedState(false);
+      setResolvingMapPoint(true);
+
+      try {
+        const result = await reverseGeocode(nextLat, nextLng);
+        const nextResult: GeoAddressResult = {
+          ...result,
+          lat: result.lat ?? nextLat,
+          lng: result.lng ?? nextLng,
+          source: result.source || 'yandex',
+          needs_confirmation: true,
+        };
+
+        setDetected(nextResult);
+        setGpsUsed(false);
+        applyResult(nextResult);
+        setEditMode(false);
+      } catch {
+        setDetected((current) => ({
+          city: city || current?.city || null,
+          region: current?.region || null,
+          country: current?.country || 'Россия',
+          address: address || current?.address || null,
+          full_address: address || current?.full_address || null,
+          lat: nextLat,
+          lng: nextLng,
+          source: 'manual',
+          needs_confirmation: true,
+        }));
+      } finally {
+        setResolvingMapPoint(false);
+      }
+    },
+    [address, applyResult, city, onCoordinatesChange, setConfirmedState],
+  );
+
+  useEffect(() => {
+    chooseMapPointRef.current = chooseMapPoint;
+  }, [chooseMapPoint]);
+
   const runSuggest = useCallback(
     async (text: string) => {
       if (text.trim().length < 2) {
@@ -220,8 +266,7 @@ export default function TreaboAddressPicker({
       placemarkRef.current.events.add('dragend', () => {
         const coords = placemarkRef.current.geometry.getCoordinates();
         if (coords?.length >= 2) {
-          onCoordinatesChange(Number(coords[0]), Number(coords[1]));
-          setConfirmedState(false);
+          chooseMapPointRef.current(Number(coords[0]), Number(coords[1]));
         }
       });
 
@@ -231,8 +276,7 @@ export default function TreaboAddressPicker({
         const coords = event.get('coords');
         if (!coords) return;
         placemarkRef.current.geometry.setCoordinates(coords);
-        onCoordinatesChange(Number(coords[0]), Number(coords[1]));
-        setConfirmedState(false);
+        chooseMapPointRef.current(Number(coords[0]), Number(coords[1]));
       });
     } else {
       const nextCenter =
@@ -240,7 +284,7 @@ export default function TreaboAddressPicker({
       mapInstanceRef.current.setCenter(nextCenter, lat != null && lng != null ? 16 : 11);
       placemarkRef.current.geometry.setCoordinates(nextCenter);
     }
-  }, [ready, city, lat, lng, onCoordinatesChange, setConfirmedState]);
+  }, [ready, city, lat, lng]);
 
   useEffect(() => {
     return () => {
@@ -287,6 +331,7 @@ export default function TreaboAddressPicker({
     'w-full rounded-2xl bg-[#eef1f7] px-4 py-4 text-base text-[#232323] outline-none placeholder:text-[#7d849b] focus:ring-2 focus:ring-[#d9f36b]';
 
   const showConfirmBlock = !editMode && !confirmed && detected && (detected.full_address || detected.city);
+  const hasCoordinates = lat != null && lng != null;
 
   return (
     <div className="mt-8 space-y-4">
@@ -406,7 +451,7 @@ export default function TreaboAddressPicker({
             ) : null}
           </div>
 
-          {address.trim().length >= 3 ? (
+          {address.trim().length >= 3 || hasCoordinates ? (
             <button
               type="button"
               onClick={handleConfirm}
@@ -431,8 +476,13 @@ export default function TreaboAddressPicker({
           <div ref={mapRef} className="h-full w-full" />
         )}
         <div className="pointer-events-none absolute bottom-4 left-4 rounded-full bg-white/90 px-3 py-1.5 text-xs font-semibold text-[#232323]">
-          {mapHint}
+          {resolvingMapPoint ? 'Определяем адрес точки...' : mapHint}
         </div>
+        {hasCoordinates ? (
+          <div className="pointer-events-none absolute right-4 top-4 rounded-full bg-[#232323]/90 px-3 py-1.5 text-xs font-semibold text-white">
+            {Number(lat).toFixed(5)}, {Number(lng).toFixed(5)}
+          </div>
+        ) : null}
       </div>
     </div>
   );

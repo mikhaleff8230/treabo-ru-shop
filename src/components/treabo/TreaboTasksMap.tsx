@@ -31,6 +31,21 @@ function createPlaqueLayout() {
   );
 }
 
+function createCompactPlaqueLayout() {
+  return window.ymaps.templateLayoutFactory.createClass(
+    `<div style="width:176px;height:62px;background:#232323;color:#fff;padding:9px 12px;border-radius:14px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,0.28);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;box-sizing:border-box;{{ properties.active ? 'outline:2px solid #D9F36B;outline-offset:2px;' : '' }}">
+      <div style="font-size:12px;font-weight:800;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ properties.title }}</div>
+      <div style="margin-top:5px;display:inline-flex;max-width:152px;height:22px;align-items:center;border-radius:999px;background:#D9F36B;color:#232323;padding:0 9px;font-size:12px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-sizing:border-box;">{{ properties.priceLabel }}</div>
+    </div>`,
+  );
+}
+
+function createClusterLayout() {
+  return window.ymaps.templateLayoutFactory.createClass(
+    `<div style="width:44px;height:44px;border-radius:999px;background:#D9F36B;color:#232323;border:3px solid #fff;box-shadow:0 8px 24px rgba(0,0,0,0.24);display:flex;align-items:center;justify-content:center;font:900 15px -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">{{ properties.geoObjects.length }}</div>`,
+  );
+}
+
 function loadYmaps(): Promise<void> {
   if (typeof window === 'undefined') return Promise.reject(new Error('no window'));
   if (window.ymaps) {
@@ -148,6 +163,7 @@ export default function TreaboTasksMap({
 }: TreaboTasksMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
+  const clustererRef = useRef<any>(null);
   const placemarksRef = useRef<Map<string, any>>(new Map());
   const onBoundsChangeRef = useRef(onBoundsChange);
   const centerRef = useRef<[number, number]>(MOSCOW_CENTER);
@@ -227,6 +243,7 @@ export default function TreaboTasksMap({
           // ignore
         }
         mapInstanceRef.current = null;
+        clustererRef.current = null;
         placemarksRef.current.clear();
         setMapReady(false);
       }
@@ -256,10 +273,27 @@ export default function TreaboTasksMap({
   useEffect(() => {
     if (!mapReady || !mapInstanceRef.current || !window.ymaps) return;
 
-    placemarksRef.current.forEach((placemark) => mapInstanceRef.current.geoObjects.remove(placemark));
+    if (clustererRef.current) {
+      mapInstanceRef.current.geoObjects.remove(clustererRef.current);
+    }
     placemarksRef.current.clear();
 
-    const layout = createPlaqueLayout();
+    const layout = createCompactPlaqueLayout();
+    const clusterer = new window.ymaps.Clusterer({
+      clusterDisableClickZoom: false,
+      clusterOpenBalloonOnClick: false,
+      groupByCoordinates: false,
+      gridSize: 96,
+      hasBalloon: false,
+      hasHint: false,
+      clusterIconLayout: createClusterLayout(),
+      clusterIconShape: {
+        type: 'Circle',
+        coordinates: [22, 22],
+        radius: 24,
+      },
+    });
+    clustererRef.current = clusterer;
 
     points.forEach((point) => {
       const task = tasksRef.current.find((item) => String(item.id) === point.id);
@@ -270,8 +304,6 @@ export default function TreaboTasksMap({
         {
           priceLabel: point.priceLabel,
           title: point.title,
-          location: [point.city, point.address].filter(Boolean).join(', '),
-          photoUrl: point.photoUrl || '',
           active: active ? '1' : '',
           hintContent: point.title,
         },
@@ -281,8 +313,12 @@ export default function TreaboTasksMap({
           iconImageSize: [1, 1],
           iconImageOffset: [0, 0],
           iconContentLayout: layout,
-          iconContentOffset: [-88, -72],
-          iconContentSize: [176, 120],
+          iconContentOffset: [-88, -62],
+          iconContentSize: [176, 62],
+          iconShape: {
+            type: 'Rectangle',
+            coordinates: [[-88, -62], [88, 0]],
+          },
           zIndex: active ? 1000 : 1,
         },
       );
@@ -298,9 +334,11 @@ export default function TreaboTasksMap({
         }
       });
 
-      mapInstanceRef.current.geoObjects.add(placemark);
+      clusterer.add(placemark);
       placemarksRef.current.set(point.id, placemark);
     });
+
+    mapInstanceRef.current.geoObjects.add(clusterer);
   }, [points, highlightedTaskId, mapReady]);
 
   return (

@@ -1,17 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import type { TreaboTask } from '@/data/treabo';
-
-declare global {
-  interface Window {
-    ymaps: any;
-  }
-}
+import { isYmapsReady, loadYmaps } from '@/lib/treabo/load-ymaps';
 
 const MOSCOW_CENTER: [number, number] = [55.7522, 37.6156];
 
 export default function TreaboTaskMap({ task }: { task: TreaboTask }) {
   const mapRef = useRef<HTMLDivElement>(null);
+  const mapInstanceRef = useRef<{ destroy: () => void } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [failed, setFailed] = useState(false);
 
   const center: [number, number] =
     task.lat != null && task.lng != null
@@ -21,36 +18,41 @@ export default function TreaboTaskMap({ task }: { task: TreaboTask }) {
   useEffect(() => {
     let destroyed = false;
 
-    function initMap() {
-      if (!mapRef.current || !window.ymaps || destroyed) return;
+    loadYmaps()
+      .then(() => {
+        if (destroyed || !mapRef.current || !isYmapsReady()) {
+          throw new Error('ymaps not ready');
+        }
 
-      const map = new window.ymaps.Map(mapRef.current, {
-        center,
-        zoom: task.lat != null && task.lng != null ? 14 : 10,
-        controls: ['zoomControl'],
+        mapInstanceRef.current?.destroy();
+        mapInstanceRef.current = new window.ymaps!.Map(mapRef.current, {
+          center,
+          zoom: task.lat != null && task.lng != null ? 14 : 10,
+          controls: ['zoomControl'],
+        });
+
+        if (task.lat != null && task.lng != null) {
+          mapInstanceRef.current.geoObjects.add(
+            new window.ymaps!.Placemark(center, { hintContent: task.title }, { preset: 'islands#darkGreenDotIcon' }),
+          );
+        }
+
+        if (!destroyed) {
+          setFailed(false);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!destroyed) {
+          setFailed(true);
+          setLoading(false);
+        }
       });
-
-      if (task.lat != null && task.lng != null) {
-        map.geoObjects.add(
-          new window.ymaps.Placemark(center, { hintContent: task.title }, { preset: 'islands#darkGreenDotIcon' }),
-        );
-      }
-
-      setLoading(false);
-    }
-
-    if (window.ymaps) {
-      window.ymaps.ready(initMap);
-    } else {
-      const script = document.createElement('script');
-      script.src = `https://api-maps.yandex.ru/2.1/?apikey=${process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY || ''}&lang=ru_RU`;
-      script.async = true;
-      script.onload = () => window.ymaps.ready(initMap);
-      document.head.appendChild(script);
-    }
 
     return () => {
       destroyed = true;
+      mapInstanceRef.current?.destroy();
+      mapInstanceRef.current = null;
     };
   }, [center, task.lat, task.lng, task.title]);
 
@@ -59,6 +61,11 @@ export default function TreaboTaskMap({ task }: { task: TreaboTask }) {
       {loading ? (
         <div className="absolute inset-0 z-10 flex items-center justify-center text-sm text-[#7d849b]">
           Загрузка карты…
+        </div>
+      ) : null}
+      {failed ? (
+        <div className="absolute inset-0 z-10 flex items-center justify-center px-6 text-center text-sm text-[#7d849b]">
+          Карта временно недоступна
         </div>
       ) : null}
       <div ref={mapRef} className="h-full w-full" />

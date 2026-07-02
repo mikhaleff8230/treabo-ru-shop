@@ -25,7 +25,16 @@ export function useTreaboAuth() {
     const cached = getStoredTreaboUser();
     if (cached) setUser(cached);
 
-    const fresh = await treaboMe();
+    let fresh = await treaboMe();
+    if (!fresh && process.env.NEXT_PUBLIC_TREABO_DEV_AUTO_LOGIN === '1') {
+      const data = await treaboLogin({
+        email: process.env.NEXT_PUBLIC_TREABO_DEV_AUTO_EMAIL || 'local.customer@treabo.local',
+        password: 'local-dev',
+      }).catch(() => null);
+
+      fresh = data && !isTreaboOtpSentResponse(data) ? data.user : null;
+    }
+
     setUser(fresh);
     setLoading(false);
   }, []);

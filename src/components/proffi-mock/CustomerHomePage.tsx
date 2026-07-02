@@ -111,7 +111,7 @@ export default function CustomerHomePage({ categories = [], tasks = [] }: Custom
                       value={prompt}
                       onChange={(event) => setPrompt(event.target.value)}
                       rows={isPromptOpen ? 4 : 1}
-                      className="w-full resize-none bg-transparent text-base font-bold text-[#232323] outline-none placeholder:text-[#232323]"
+                      className="w-full resize-none appearance-none border-0 bg-transparent text-base font-bold text-[#232323] outline-none placeholder:text-[#232323] focus:border-0 focus:outline-none focus:ring-0"
                       placeholder={t('treabo.home.searchPlaceholder')}
                     />
                   </label>

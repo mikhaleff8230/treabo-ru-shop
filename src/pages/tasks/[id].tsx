@@ -23,13 +23,17 @@ import { useMemo, useState } from 'react';
 import {
   ArrowLeft,
   CalendarClock,
+  ChevronLeft,
+  ChevronRight,
   CheckCircle2,
   Clock3,
   Image as ImageIcon,
   MapPin,
   MessageCircle,
   Ruler,
+  Smartphone,
   Wallet,
+  X,
 } from 'lucide-react';
 
 type TaskDetailProps = {
@@ -38,7 +42,8 @@ type TaskDetailProps = {
 
 const money = new Intl.NumberFormat('ru-RU');
 const DEFAULT_RESPONSE_PRICE_RUB = 15;
-const siteUrl = (process.env.NEXT_PUBLIC_WEBSITE_URL || 'https://treabo.md').replace(/\/+$/, '');
+const siteUrl = (process.env.NEXT_PUBLIC_WEBSITE_URL || 'https://treabo.ru').replace(/\/+$/, '');
+const appDownloadPath = process.env.NEXT_PUBLIC_TREABO_APP_APK_URL || '/downloads/treabo-proffi.apk';
 
 function stripHtml(value?: string | null) {
   return (value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -54,6 +59,12 @@ function absoluteUrl(value?: string | null) {
   if (/^https?:\/\//i.test(value)) return value;
   if (value.startsWith('/')) return `${siteUrl}${value}`;
   return `${siteUrl}/${value}`;
+}
+
+function buildAppDownloadUrl() {
+  if (/^https?:\/\//i.test(appDownloadPath)) return appDownloadPath;
+  const origin = typeof window !== 'undefined' ? window.location.origin.replace(/\/+$/, '') : siteUrl;
+  return appDownloadPath.startsWith('/') ? `${origin}${appDownloadPath}` : `${origin}/${appDownloadPath}`;
 }
 
 function photoUrl(value: string | { path?: string | null; url?: string | null } | null | undefined) {
@@ -161,61 +172,136 @@ function formatDate(value?: string | null, locale?: string) {
 
 function PhotoGallery({ photos, title, noPhoto }: { photos: string[]; title: string; noPhoto: string }) {
   const visiblePhotos = photos.filter(Boolean).slice(0, 12);
-  const [activeIndex, setActiveIndex] = useState(0);
-  const activePhoto = visiblePhotos[activeIndex] || visiblePhotos[0];
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+
+  const showPrev = () => setLightboxIndex((current) => (current === null ? current : (current - 1 + visiblePhotos.length) % visiblePhotos.length));
+  const showNext = () => setLightboxIndex((current) => (current === null ? current : (current + 1) % visiblePhotos.length));
 
   if (!visiblePhotos.length) {
     return (
-      <div className="grid gap-3 md:grid-cols-[1fr_140px]">
-        <div className="flex aspect-[4/3] items-center justify-center rounded-[28px] bg-[#edf1f7] text-[#232323]">
-          <div className="text-center">
-            <ImageIcon className="mx-auto h-12 w-12 text-zinc-400" />
-            <div className="mt-3 text-sm font-bold">{noPhoto}</div>
-          </div>
+      <div className="flex min-h-[104px] items-center gap-4 overflow-hidden rounded-[24px] border border-dashed border-[#d9dde6] bg-[#f3f5fa] px-5 text-[#7d849b]">
+        <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white">
+          <ImageIcon className="h-7 w-7 text-zinc-400" />
         </div>
-        <div className="grid gap-3">
-          <div className="rounded-[22px] bg-[#f3f5fa]" />
-          <div className="rounded-[22px] bg-[#f3f5fa]" />
+        <div>
+          <div className="text-sm font-[400] text-[#232323]">{noPhoto}</div>
+          <div className="mt-1 text-xs">Когда заказчик добавит фото, они появятся здесь лентой.</div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="grid gap-3 md:grid-cols-[1fr_140px]">
-      <div className="relative overflow-hidden rounded-[28px] bg-[#edf1f7]">
-        <img src={activePhoto} alt={title} className="aspect-[4/3] h-full w-full object-cover" />
-        <div className="absolute bottom-3 right-3 rounded-full bg-white/95 px-3 py-1.5 text-sm font-black text-[#232323]">
-          {activeIndex + 1}/{visiblePhotos.length}
-        </div>
+    <>
+      <div className="-mx-1 flex gap-3 overflow-x-auto px-1 pb-2">
+        {visiblePhotos.map((photo, index) => (
+          <button
+            key={`${photo}-${index}`}
+            type="button"
+            onClick={() => setLightboxIndex(index)}
+            className="group relative h-28 w-36 flex-none overflow-hidden rounded-[20px] bg-[#edf1f7] transition hover:-translate-y-0.5 sm:h-32 sm:w-44"
+            aria-label={`Открыть фото ${index + 1}`}
+          >
+            <img src={photo} alt={`${title} ${index + 1}`} className="h-full w-full object-cover" />
+            <span className="absolute inset-0 bg-black/0 transition group-hover:bg-black/10" />
+            <span className="absolute bottom-2 right-2 rounded-full bg-white/95 px-2 py-1 text-[11px] font-[400] text-[#232323]">
+              {index + 1}/{visiblePhotos.length}
+            </span>
+          </button>
+        ))}
       </div>
-      <div className="flex max-h-[min(68vh,620px)] gap-3 overflow-x-auto pb-1 md:block md:space-y-3 md:overflow-x-hidden md:overflow-y-auto md:pb-0 md:pr-1">
-        {visiblePhotos.map((photo, index) => {
-          const isActive = index === activeIndex;
 
-          return (
-            <button
-              key={`${photo}-${index}`}
-              type="button"
-              onClick={() => setActiveIndex(index)}
-              className={`relative h-24 w-24 flex-none overflow-hidden rounded-[22px] bg-[#edf1f7] transition md:h-32 md:w-full ${
-                isActive ? 'ring-4 ring-[#d9fb4f] ring-offset-2' : 'opacity-75 hover:opacity-100'
-              }`}
-              aria-label={`Показать фото ${index + 1}`}
-              aria-current={isActive ? 'true' : undefined}
-            >
-              <img src={photo} alt={`${title} ${index + 1}`} className="h-full w-full object-cover" />
-              {isActive ? <span className="absolute inset-0 rounded-[22px] border-2 border-[#232323]/20" /> : null}
-            </button>
-          );
-        })}
-      </div>
-    </div>
+      {lightboxIndex !== null ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4">
+          <button
+            type="button"
+            onClick={() => setLightboxIndex(null)}
+            className="absolute right-4 top-4 flex h-11 w-11 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-white/20"
+            aria-label="Закрыть"
+          >
+            <X className="h-6 w-6" />
+          </button>
+          {visiblePhotos.length > 1 ? (
+            <>
+              <button
+                type="button"
+                onClick={showPrev}
+                className="absolute left-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-white/20"
+                aria-label="Предыдущее фото"
+              >
+                <ChevronLeft className="h-7 w-7" />
+              </button>
+              <button
+                type="button"
+                onClick={showNext}
+                className="absolute right-4 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur transition hover:bg-white/20"
+                aria-label="Следующее фото"
+              >
+                <ChevronRight className="h-7 w-7" />
+              </button>
+            </>
+          ) : null}
+          <div className="max-h-[86vh] max-w-[92vw]">
+            <img src={visiblePhotos[lightboxIndex]} alt={`${title} ${lightboxIndex + 1}`} className="max-h-[86vh] max-w-full rounded-[24px] object-contain" />
+            <div className="mt-3 text-center text-sm font-[400] text-white/80">
+              {lightboxIndex + 1} / {visiblePhotos.length}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </>
   );
 }
 
 function interpolate(template: string, values: Record<string, string | number>) {
   return Object.entries(values).reduce((result, [key, value]) => result.replaceAll(`{{${key}}}`, String(value)), template);
+}
+
+function DownloadAppModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const downloadUrl = buildAppDownloadUrl();
+  const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=12&data=${encodeURIComponent(downloadUrl)}`;
+
+  if (!open) return null;
+
+  return (
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/55 px-4 backdrop-blur-sm">
+      <div className="relative w-full max-w-[448px] rounded-[28px] bg-white p-6 shadow-2xl">
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute right-5 top-5 flex h-9 w-9 items-center justify-center rounded-full text-[#232323] transition hover:bg-[#f3f5fa]"
+          aria-label="Закрыть"
+        >
+          <X className="h-6 w-6" />
+        </button>
+        <h2 className="pr-9 text-3xl font-[700] leading-tight text-[#232323]">Скачать приложение</h2>
+        <p className="mt-3 text-base leading-6 text-[#7d849b]">
+          Отсканируйте QR-код камерой телефона или скачайте APK по ссылке.
+        </p>
+        <div className="mx-auto mt-6 flex h-[288px] w-[288px] items-center justify-center rounded-[28px] bg-white p-3 shadow-inner ring-1 ring-[#eef1f7]">
+          <img src={qrUrl} alt="QR-код для скачивания приложения Treabo" className="h-full w-full object-contain" />
+        </div>
+        <div className="mt-5 grid grid-cols-2 gap-3 text-sm font-[700] text-[#232323]">
+          <span className="rounded-2xl bg-[#f3f5fa] px-4 py-3 text-center">Android APK</span>
+          <span className="rounded-2xl bg-[#f3f5fa] px-4 py-3 text-center">Treabo</span>
+        </div>
+        <a
+          href={downloadUrl}
+          className="mt-5 flex min-h-[52px] w-full items-center justify-center rounded-2xl bg-[#d9f36b] px-5 text-base font-[700] text-[#232323] transition hover:bg-[#c7e85a]"
+          download
+        >
+          Скачать APK
+        </a>
+        <button
+          type="button"
+          onClick={onClose}
+          className="mt-3 flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-[#f3f5fa] px-5 text-sm font-[700] text-[#232323]"
+        >
+          Закрыть
+        </button>
+      </div>
+    </div>
+  );
 }
 
 const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
@@ -227,6 +313,7 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
   const [applyPreview, setApplyPreview] = useState<TreaboApplicationPreview | null>(null);
   const [applyLoading, setApplyLoading] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [downloadOpen, setDownloadOpen] = useState(false);
   const data = task as TreaboTask;
   const budget = Number(data.budget || 0);
   const responsePrice = Number(data.response_price_mdl || DEFAULT_RESPONSE_PRICE_RUB);
@@ -314,49 +401,107 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
           </div>
 
           <section className="rounded-[30px] bg-white p-4 shadow-sm sm:p-6">
-            <div className="mb-4 flex flex-wrap items-center gap-2 text-xs font-black uppercase tracking-wide text-[#7d849b]">
+            <div className="mb-4 flex flex-wrap items-center gap-2 text-xs font-[400] uppercase tracking-wide text-[#7d849b]">
               <span>{text.task.privateCustomer}</span>
               <span className="rounded-full bg-[#d9f36b] px-3 py-1 text-[#232323]">{text.task.treaboTask}</span>
             </div>
-            <h1 className="text-2xl font-black leading-tight sm:text-4xl">{data.title}</h1>
-            <div className="mt-4 grid gap-3 text-sm font-semibold text-[#232323] sm:grid-cols-2">
+            <h1 className="text-2xl font-[400] leading-tight sm:text-4xl">{data.title}</h1>
+            <div className="mt-4 grid gap-3 text-sm font-[400] text-[#232323] sm:grid-cols-2">
               <span className="inline-flex items-center gap-2"><MapPin className="h-4 w-4" /> {[data.city, data.address].filter(Boolean).join(', ') || text.common.addressUnknown}</span>
               <span className="inline-flex items-center gap-2"><Clock3 className="h-4 w-4" /> {text.common.updated} {formatDate(data.updated_at || data.created_at, router.locale)}</span>
             </div>
           </section>
 
-          <section className="mt-4 rounded-[30px] bg-white p-4 shadow-sm sm:p-6">
-            <PhotoGallery photos={photos} title={data.title} noPhoto={text.task.noPhoto} />
-          </section>
+          <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_304px] lg:items-start">
+            <div className="min-w-0">
+              <section className="rounded-[30px] bg-white p-4 shadow-sm sm:p-6">
+                <PhotoGallery photos={photos} title={data.title} noPhoto={text.task.noPhoto} />
+              </section>
 
-          <section className="mt-4 rounded-[30px] bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="text-lg font-black">{text.task.description}</h2>
-            <p className="mt-3 whitespace-pre-line text-base leading-7 text-[#232323]">{data.description || text.task.noDescription}</p>
-          </section>
+              <section className="mt-4 rounded-[30px] bg-white p-5 shadow-sm sm:p-6">
+                <h2 className="text-lg font-[400]">{text.task.description}</h2>
+                <p className="mt-3 whitespace-pre-line text-base leading-7 text-[#232323]">{data.description || text.task.noDescription}</p>
+              </section>
 
-          <section className="mt-4 grid gap-3 sm:grid-cols-2">
-            {facts.map(({ icon: Icon, label, value }) => (
-              <div key={label} className="rounded-[24px] bg-white p-5 shadow-sm">
-                <div className="flex items-center gap-2 text-sm font-bold text-[#7d849b]"><Icon className="h-4 w-4" />{label}</div>
-                <div className="mt-2 text-xl font-black">{value}</div>
-              </div>
-            ))}
-          </section>
+              <section className="mt-4 grid gap-3 sm:grid-cols-2">
+                {facts.map(({ icon: Icon, label, value }) => (
+                  <div key={label} className="rounded-[24px] bg-white p-5 shadow-sm">
+                    <div className="flex items-center gap-2 text-sm font-[400] text-[#7d849b]"><Icon className="h-4 w-4" />{label}</div>
+                    <div className="mt-2 text-xl font-[400]">{value}</div>
+                  </div>
+                ))}
+              </section>
 
-          <section className="mt-4 rounded-[30px] bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="flex items-center gap-2 text-lg font-black"><MapPin className="h-5 w-5" />{text.task.address}</h2>
-            <p className="mt-3 text-base leading-7">{data.address || text.task.addressHint}</p>
-            {data.city ? <div className="mt-2 inline-flex rounded-full bg-[#f3f5fa] px-3 py-1.5 text-sm font-bold">{data.city}</div> : null}
-            <TreaboTaskMap task={data} />
-          </section>
+              <section className="mt-4 rounded-[30px] bg-white p-5 shadow-sm sm:p-6">
+                <h2 className="flex items-center gap-2 text-lg font-[400]"><MapPin className="h-5 w-5" />{text.task.address}</h2>
+                <p className="mt-3 text-base leading-7">{data.address || text.task.addressHint}</p>
+                {data.city ? <div className="mt-2 inline-flex rounded-full bg-[#f3f5fa] px-3 py-1.5 text-sm font-[400]">{data.city}</div> : null}
+                <TreaboTaskMap task={data} />
+              </section>
 
-          <section className="mt-4 rounded-[30px] bg-white p-5 shadow-sm sm:p-6">
-            <h2 className="text-lg font-black">{interpolate(text.task.order, { id: data.id })}</h2>
-            <div className="mt-3 space-y-2 text-sm text-[#7d849b]">
-              <div className="flex items-center gap-2"><Clock3 className="h-4 w-4" /> {interpolate(text.task.created, { date: formatDate(data.created_at, router.locale) })}</div>
-              <div className="flex items-center gap-2 text-emerald-600"><CheckCircle2 className="h-4 w-4" /> {text.task.updatedRecently}</div>
+              <section className="mt-4 rounded-[30px] bg-white p-5 shadow-sm sm:p-6">
+                <h2 className="text-lg font-[400]">{interpolate(text.task.order, { id: data.id })}</h2>
+                <div className="mt-3 space-y-2 text-sm text-[#7d849b]">
+                  <div className="flex items-center gap-2"><Clock3 className="h-4 w-4" /> {interpolate(text.task.created, { date: formatDate(data.created_at, router.locale) })}</div>
+                  <div className="flex items-center gap-2 text-emerald-600"><CheckCircle2 className="h-4 w-4" /> {text.task.updatedRecently}</div>
+                </div>
+              </section>
             </div>
-          </section>
+
+            <aside className="space-y-4 lg:sticky lg:top-24">
+              <section className="overflow-hidden rounded-[28px] bg-white shadow-sm">
+                <div className="flex h-40 items-center justify-center bg-[#fff0a6]">
+                  <div className="relative flex h-28 w-28 items-center justify-center rounded-[32px] bg-[#232323] text-[#d9f36b] shadow-xl">
+                    <Smartphone className="h-14 w-14" />
+                    <span className="absolute -right-3 top-5 rounded-full bg-[#d9f36b] px-2 py-1 text-xs font-[400] text-[#232323]">Treabo</span>
+                  </div>
+                </div>
+                <div className="p-5">
+                  <h2 className="text-lg font-[400]">Скачайте приложение</h2>
+                  <p className="mt-2 text-sm leading-6 text-[#7d849b]">Получайте новые задания, ответы и уведомления быстрее.</p>
+                  <button type="button" onClick={() => setDownloadOpen(true)} className="mt-4 flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-[#d9f36b] px-4 text-sm font-[400] text-[#232323]">
+                    Установить приложение
+                  </button>
+                </div>
+              </section>
+
+              <section className="rounded-[28px] bg-white p-5 shadow-sm">
+                <div className="text-[34px] font-[400] leading-none text-[#232323]">
+                  {budget > 0 ? `${money.format(budget)} ₽` : text.task.facts.negotiable}
+                </div>
+                <div className="mt-2 text-sm font-[400] text-[#7d849b]">{text.task.facts.budget}</div>
+                <div className="mt-5 space-y-3 text-sm">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[#7d849b]">{text.task.facts.term}</span>
+                    <span className="text-right font-[400]">{data.deadline || text.task.facts.byAgreement}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[#7d849b]">{text.task.facts.status}</span>
+                    <span className="text-right font-[400]">{data.status === 'open' ? text.task.facts.open : data.status || text.task.facts.new}</span>
+                  </div>
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-[#7d849b]">Отклик</span>
+                    <span className="text-right font-[400]">{responsePrice > 0 ? `${money.format(responsePrice)} ₽` : 'бесплатно'}</span>
+                  </div>
+                </div>
+                {!isOwnTask ? (
+                  <button
+                    type="button"
+                    onClick={openApplyModal}
+                    disabled={applyLoading}
+                    className="mt-5 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-[#232323] px-5 text-sm font-[400] text-white disabled:opacity-60"
+                  >
+                    <MessageCircle className="h-5 w-5" />
+                    {auth.isSpecialist ? text.task.writeClient : text.task.loginToApply}
+                  </button>
+                ) : (
+                  <div className="mt-5 rounded-2xl bg-[#f3f5fa] px-4 py-3 text-center text-sm font-[400] text-[#232323]">
+                    Это ваша заявка
+                  </div>
+                )}
+              </section>
+            </aside>
+          </div>
         </main>
 
         {auth.isSpecialist ? (
@@ -385,6 +530,7 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
         ) : null}
 
         <TreaboAuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialTab="login" login={auth.login} register={auth.register} sendOtp={auth.sendOtp} verifyOtp={auth.verifyOtp} onSuccess={auth.refresh} />
+        <DownloadAppModal open={downloadOpen} onClose={() => setDownloadOpen(false)} />
         <TreaboApplyConfirmModal
           open={applyOpen}
           price={responsePrice}

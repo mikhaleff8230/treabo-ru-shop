@@ -17,7 +17,7 @@ import team3 from '@/assets/images/team/3.png';
 import team4 from '@/assets/images/team/4.png';
 import team5 from '@/assets/images/team/5.png';
 import team6 from '@/assets/images/team/6.png';
-import type { TreaboCategory, TreaboSpecialist } from '@/data/treabo';
+import { normalizeTreaboAssetUrl, type TreaboCategory, type TreaboSpecialist } from '@/data/treabo';
 import { getTreaboText } from '@/lib/treabo/i18n';
 import RussiaCityInput from '@/components/treabo/RussiaCityInput';
 import TreaboCategorySearchInput from '@/components/treabo/TreaboCategorySearchInput';
@@ -106,7 +106,7 @@ function SmartImage({
   height: number;
 }) {
   if (typeof src === 'string') {
-    return <img src={src} alt={alt} width={width} height={height} className={className} loading="lazy" />;
+    return <img src={normalizeTreaboAssetUrl(src)} alt={alt} width={width} height={height} className={className} loading="lazy" />;
   }
   return <Image src={src} alt={alt} width={width} height={height} className={className} />;
 }
@@ -133,7 +133,7 @@ function SpecialistCard({ specialist }: { specialist: Specialist }) {
               <div className="text-[9px] font-[300] leading-4 text-[#9AA1AD] sm:text-[10px]">
                 {specialist.online}
               </div>
-              <h2 className="mt-0.5 truncate text-[19px] font-[300] leading-tight text-[#232323] sm:text-[20px]">
+              <h2 className="mt-0.5 truncate text-[19px] font-[400] leading-tight text-[#232323] sm:text-[20px]">
                 {specialist.name}
               </h2>
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-[#686F7D] sm:text-[12px]">
@@ -224,7 +224,10 @@ function SpecialistCard({ specialist }: { specialist: Specialist }) {
 function SpecialistsFiltersPanel({
   text,
   categoryOptions,
+  categories,
+  categoryQuery,
   selectedCategoryId,
+  onCategoryQueryChange,
   onCategorySelect,
   openSections,
   toggleSection,
@@ -233,7 +236,10 @@ function SpecialistsFiltersPanel({
 }: {
   text: ReturnType<typeof getTreaboText>;
   categoryOptions: { id: string; label: string; parentLabel?: string }[];
+  categories: TreaboCategory[];
+  categoryQuery: string;
   selectedCategoryId?: string | null;
+  onCategoryQueryChange: (value: string) => void;
   onCategorySelect: (categoryId: string | null) => void;
   openSections: Set<string>;
   toggleSection: (key: string) => void;
@@ -248,17 +254,15 @@ function SpecialistsFiltersPanel({
           open={openSections.has('category')}
           onToggle={() => toggleSection('category')}
         >
-          <div className="flex flex-wrap gap-2">
-            {categoryOptions.map((option) => (
-              <MarketplaceFilterOption
-                key={option.id}
-                label={option.parentLabel ? `${option.parentLabel} / ${option.label}` : option.label}
-                type="chip"
-                selected={selectedCategoryId === option.id}
-                onClick={() => onCategorySelect(selectedCategoryId === option.id ? null : option.id)}
-              />
-            ))}
-          </div>
+          <TreaboCategorySearchInput
+            categories={categories}
+            value={categoryQuery}
+            categoryId={selectedCategoryId}
+            onValueChange={onCategoryQueryChange}
+            onCategoryIdChange={onCategorySelect}
+            placeholder={text.common.servicePlaceholder}
+            showSelectedHint
+          />
         </MarketplaceFilterGroup>
       ) : null}
 
@@ -299,6 +303,7 @@ export default function SpecialistsMarketplacePage({
   const specialists = buildSpecialists(router.locale, apiSpecialists, categories);
   const [serviceQuery, setServiceQuery] = useState(selectedQuery || legacyService);
   const [categoryId, setCategoryId] = useState(selectedCategoryId);
+  const [sidebarCategoryQuery, setSidebarCategoryQuery] = useState(selectedQuery || legacyService);
   const [city, setCity] = useState(selectedCity || text.city);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [openSections, setOpenSections] = useState<Set<string>>(() => new Set(['category', text.specialists.filters[0]?.title]));
@@ -335,6 +340,7 @@ export default function SpecialistsMarketplacePage({
   function resetFilters() {
     setVisualSelections(new Set());
     setCategoryId(null);
+    setSidebarCategoryQuery('');
     setServiceQuery('');
     router.push(city.trim() ? `/specialists?city=${encodeURIComponent(city.trim())}` : '/specialists');
   }
@@ -343,9 +349,13 @@ export default function SpecialistsMarketplacePage({
     <SpecialistsFiltersPanel
       text={text}
       categoryOptions={categoryOptions}
+      categories={categories}
+      categoryQuery={sidebarCategoryQuery}
       selectedCategoryId={categoryId}
+      onCategoryQueryChange={setSidebarCategoryQuery}
       onCategorySelect={(id) => {
         setCategoryId(id);
+        if (!id) setSidebarCategoryQuery('');
         runSearch({ category_id: id });
       }}
       openSections={openSections}

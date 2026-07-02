@@ -7,10 +7,9 @@ import {
   Check,
   CheckCircle2,
   ListChecks,
-  MessageCircle,
+  MapPin,
   Plus,
   Send,
-  UserRound,
 } from 'lucide-react';
 import routes from '@/config/routes';
 import TreaboPhoneInput from '@/components/treabo/TreaboPhoneInput';
@@ -26,6 +25,7 @@ import {
   type AiDraft,
   type ClarifyField,
   buildClarifyFields,
+  buildTaskAiDetails,
   buildTaskDescription,
   categorySlugToLabel,
   generateLocalAiDraft,
@@ -51,7 +51,16 @@ type Step = {
 const MAX_PHOTO_BYTES = 20 * 1024 * 1024;
 const MAX_PHOTOS = 10;
 const inputClass =
-  'w-full rounded-2xl bg-[#eef1f7] px-4 py-4 text-base text-[#232323] outline-none placeholder:text-[#7d849b] focus:ring-2 focus:ring-[#d9f36b]';
+  'w-full rounded-2xl border-0 bg-[#eef1f7] px-4 py-4 text-base text-[#232323] outline-none placeholder:text-[#7d849b] focus:ring-2 focus:ring-[#d9f36b]';
+
+const ipCityAliases: Record<string, string> = {
+  Moscow: 'Москва',
+  'Saint Petersburg': 'Санкт-Петербург',
+  Novosibirsk: 'Новосибирск',
+  Yekaterinburg: 'Екатеринбург',
+  Kazan: 'Казань',
+  Nizhny: 'Нижний Новгород',
+};
 
 function createDraftId() {
   return `trb-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -124,6 +133,28 @@ export default function RequestWizard() {
   }, [router.query.q]);
 
   useEffect(() => {
+    let cancelled = false;
+
+    fetch('https://ipapi.co/json/', { cache: 'no-store' })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((payload) => {
+        if (payload?.country_code && payload.country_code !== 'RU') return;
+        const rawCity = typeof payload?.city === 'string' ? payload.city.trim() : '';
+        const detectedCity = ipCityAliases[rawCity] || rawCity;
+        if (!cancelled && detectedCity) {
+          setDraft((current) =>
+            current.city && current.city !== text.city ? current : { ...current, city: detectedCity },
+          );
+        }
+      })
+      .catch(() => undefined);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [text.city]);
+
+  useEffect(() => {
     if (!draft.id) return;
     const { pendingPhotoFiles, ...serializable } = draft;
     localStorage.setItem(`treabo-request-${draft.id}`, JSON.stringify(serializable));
@@ -139,10 +170,10 @@ export default function RequestWizard() {
     setDraft((current) => ({ ...current, [key]: value }));
   }, []);
 
-  const updateAiAnswer = useCallback((question: string, value: string) => {
+  const updateAiAnswer = useCallback((key: string, value: string) => {
     setDraft((current) => ({
       ...current,
-      aiAnswers: { ...(current.aiAnswers || {}), [question]: value },
+      aiAnswers: { ...(current.aiAnswers || {}), [key]: value },
     }));
   }, []);
 
@@ -173,6 +204,8 @@ export default function RequestWizard() {
       title: resolveTaskTitle(currentDraft, text.request.newRequest),
       description: buildTaskDescription(currentDraft),
       category: resolveTaskCategory(currentDraft),
+      work_id: aiDraft?.work_id || null,
+      ai_details: buildTaskAiDetails(currentDraft),
       city: currentDraft.city || aiDraft?.city || text.city,
       address: currentDraft.address || '',
       lat: currentDraft.lat ?? undefined,
@@ -397,7 +430,7 @@ export default function RequestWizard() {
 
     try {
       const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 15000);
+      const timeout = setTimeout(() => controller.abort(), 45000);
       const response = await fetch(treaboApiUrl('/ai/job-draft'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json; charset=utf-8', Accept: 'application/json' },
@@ -428,7 +461,7 @@ export default function RequestWizard() {
     setDraft((current) => ({
       ...current,
       aiDraft: generatedDraft,
-      category: categorySlugToLabel(generatedDraft.category_slug) || current.category,
+      category: categorySlugToLabel(generatedDraft.category_slug || '') || current.category,
       city: generatedDraft.city || current.city || text.city,
       deadline:
         generatedDraft.urgency && generatedDraft.urgency !== 'unknown'
@@ -439,7 +472,7 @@ export default function RequestWizard() {
   }
 
   function renderClarifyField(field: ClarifyField) {
-    const value = draft.aiAnswers?.[field.question] || '';
+    const value = draft.aiAnswers?.[field.key] || '';
 
     if (field.type === 'yesno') {
       return (
@@ -448,7 +481,7 @@ export default function RequestWizard() {
             <button
               key={label}
               type="button"
-              onClick={() => updateAiAnswer(field.question, label)}
+              onClick={() => updateAiAnswer(field.key, label)}
               className={`rounded-xl px-4 py-2 text-sm font-bold ${value === label ? 'bg-[#232323] text-white' : 'bg-[#eef1f7] text-[#232323]'}`}
             >
               {label}
@@ -462,10 +495,64 @@ export default function RequestWizard() {
       return (
         <input
           value={value}
-          onChange={(event) => updateAiAnswer(field.question, event.target.value)}
-          placeholder="Например: 12 м²"
+          onChange={(event) => updateAiAnswer(field.key, event.target.value)}
+          placeholder={field.placeholder || 'Например: 12 м²'}
           className={inputClass}
         />
+      );
+    }
+
+    if (field.type === 'textarea') {
+      return (
+        <textarea
+          value={value}
+          onChange={(event) => updateAiAnswer(field.key, event.target.value)}
+          placeholder={field.placeholder}
+          className={`${inputClass} min-h-[96px]`}
+        />
+      );
+    }
+
+    if (field.type === 'select' && field.options?.length) {
+      return (
+        <select
+          value={value}
+          onChange={(event) => updateAiAnswer(field.key, event.target.value)}
+          className={inputClass}
+        >
+          <option value="">Выберите вариант</option>
+          {field.options.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+      );
+    }
+
+    if (field.type === 'multiselect' && field.options?.length) {
+      const selected = value ? value.split(',').map((item) => item.trim()).filter(Boolean) : [];
+      return (
+        <div className="space-y-2">
+          {field.options.map((option) => {
+            const checked = selected.includes(option);
+            return (
+              <label key={option} className="flex items-center gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  checked={checked}
+                  onChange={() => {
+                    const next = checked
+                      ? selected.filter((item) => item !== option)
+                      : [...selected, option];
+                    updateAiAnswer(field.key, next.join(', '));
+                  }}
+                />
+                {option}
+              </label>
+            );
+          })}
+        </div>
       );
     }
 
@@ -474,7 +561,7 @@ export default function RequestWizard() {
         <input
           type="datetime-local"
           value={value}
-          onChange={(event) => updateAiAnswer(field.question, event.target.value)}
+          onChange={(event) => updateAiAnswer(field.key, event.target.value)}
           className={inputClass}
         />
       );
@@ -489,7 +576,7 @@ export default function RequestWizard() {
               <button
                 key={label}
                 type="button"
-                onClick={() => updateAiAnswer(field.question, label)}
+                onClick={() => updateAiAnswer(field.key, label)}
                 className={`rounded-xl px-4 py-2 text-sm font-bold ${photoAnswer === label ? 'bg-[#232323] text-white' : 'bg-[#eef1f7] text-[#232323]'}`}
               >
                 {label}
@@ -519,7 +606,8 @@ export default function RequestWizard() {
     return (
       <input
         value={value}
-        onChange={(event) => updateAiAnswer(field.question, event.target.value)}
+        onChange={(event) => updateAiAnswer(field.key, event.target.value)}
+        placeholder={field.placeholder}
         className={inputClass}
       />
     );
@@ -540,7 +628,7 @@ export default function RequestWizard() {
           <label className="block space-y-2">
             <span className="text-sm font-bold text-[#232323]">{text.request.category}</span>
             <select
-              value={draft.category || categorySlugToLabel(aiDraft.category_slug)}
+              value={draft.category || categorySlugToLabel(aiDraft.category_slug || '')}
               onChange={(event) => update('category', event.target.value)}
               className={inputClass}
             >
@@ -586,7 +674,13 @@ export default function RequestWizard() {
 
         {clarifyFields.map((field) => (
           <label key={field.key} className="block space-y-2">
-            <span className="text-sm font-bold text-[#232323]">{field.question}</span>
+            <span className="text-sm font-bold text-[#232323]">
+              {field.question}
+              {field.isRequired ? ' *' : ''}
+            </span>
+            {field.helpText ? (
+              <span className="block text-xs text-[#7d849b]">{field.helpText}</span>
+            ) : null}
             {renderClarifyField(field)}
           </label>
         ))}
@@ -620,13 +714,12 @@ export default function RequestWizard() {
         return (
           <>
             <h1 className="text-4xl font-black leading-tight text-[#232323] md:text-5xl">{step.title}</h1>
-            <p className="mt-4 max-w-xl text-base leading-7 text-[#232323]">{step.subtitle}</p>
             <div className="mt-9 max-w-3xl rounded-[28px] border border-[#dfe4ee] bg-[#f8f9fb] p-3 shadow-sm">
               <textarea
                 value={draft.prompt || ''}
                 onChange={(event) => update('prompt', event.target.value)}
                 placeholder={text.request.firstPromptPlaceholder}
-                className="min-h-[150px] w-full resize-none bg-transparent px-3 py-3 text-lg font-semibold text-[#232323] outline-none placeholder:text-[#8b92a8]"
+                className="block min-h-[150px] w-full resize-none appearance-none border-0 bg-transparent px-3 py-3 text-lg font-semibold text-[#232323] outline-none placeholder:text-[#8b92a8] focus:border-0 focus:outline-none focus:ring-0"
               />
               <div className="flex justify-end">
                 <button
@@ -650,9 +743,8 @@ export default function RequestWizard() {
             ) : null}
             {aiDraft ? (
               <div className="mt-5 max-w-3xl rounded-3xl border border-[#dfe4ee] bg-white p-5 shadow-sm">
-                <div className="text-sm font-black uppercase tracking-wide text-[#7d849b]">{text.request.aiDraft}</div>
+                <div className="text-sm font-black uppercase tracking-wide text-[#7d849b]">Детали заявки</div>
                 <h2 className="mt-2 text-2xl font-black text-[#232323]">{aiDraft.title}</h2>
-                <p className="mt-3 text-base leading-7 text-[#232323]">{aiDraft.description}</p>
                 <div className="mt-4 grid gap-3 text-sm font-semibold text-[#232323] sm:grid-cols-3">
                   <span className="rounded-2xl bg-[#f3f5fa] px-4 py-3">
                     {text.request.category}: {categorySlugToLabel(aiDraft.category_slug)}
@@ -920,10 +1012,15 @@ export default function RequestWizard() {
           Treabo
         </Link>
         <div className="flex items-center gap-3 text-sm font-medium md:gap-8">
-          <span className="hidden md:inline">{draft.city || text.city}</span>
-          <Link href={routes.works} className="hidden md:inline">
-            {text.request.specialistSite}
-          </Link>
+          <label className="hidden min-w-[150px] items-center gap-2 md:flex">
+            <MapPin className="h-4 w-4 text-[#232323]" />
+            <RussiaCityInput
+              value={draft.city || text.city}
+              onChange={(city) => update('city', city)}
+              inputClassName="w-full bg-transparent text-sm font-medium text-[#232323] outline-none placeholder:text-[#232323]"
+              placeholder={text.city}
+            />
+          </label>
           <span className="hidden md:inline">{isAuthenticated ? user?.name || text.request.login : text.request.login}</span>
         </div>
       </header>
@@ -937,17 +1034,6 @@ export default function RequestWizard() {
                 <ListChecks className="h-4 w-4" /> {text.request.navDetails}
               </span>
               <span>{taskCreated ? 100 : step.progress}%</span>
-            </div>
-            <div className="flex items-center justify-between px-4 py-3 text-sm">
-              <span className="flex items-center gap-3">
-                <MessageCircle className="h-4 w-4" /> {text.request.navOffers}
-              </span>
-            </div>
-            <div className="flex items-center justify-between px-4 py-3 text-sm">
-              <span className="flex items-center gap-3">
-                <UserRound className="h-4 w-4" /> {text.request.navSpecialists}
-              </span>
-              <span className="text-[#7d849b]">12735</span>
             </div>
           </div>
         </aside>

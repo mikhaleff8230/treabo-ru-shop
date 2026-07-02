@@ -1,18 +1,22 @@
 import Link from 'next/link';
-import Image from 'next/image';
 import { useRouter } from 'next/router';
 import { useState } from 'react';
 import { CircleHelp, ClipboardList, LogOut, Map, Menu, MessageCircle, UserRound, Wallet } from 'lucide-react';
 import TreaboAuthModal from '@/components/auth/treabo-auth-modal';
 import TreaboLocationSelector from '@/components/treabo/TreaboLocationSelector';
 import routes from '@/config/routes';
+import { normalizeTreaboAssetUrl } from '@/data/treabo';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
+import { useTreaboBrandLogo } from '@/hooks/use-treabo-brand-logo';
+import { useTreaboUnreadChats } from '@/hooks/use-treabo-unread-chats';
 import { getTreaboText } from '@/lib/treabo/i18n';
 
 export function ProffiHeader() {
   const router = useRouter();
   const text = getTreaboText(router.locale);
   const auth = useTreaboAuth();
+  const { src: logoSrc, alt: logoAlt } = useTreaboBrandLogo();
+  const { unreadCount } = useTreaboUnreadChats(auth.isAuthenticated);
   const [authOpen, setAuthOpen] = useState(false);
   const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
 
@@ -44,12 +48,12 @@ export function ProffiHeader() {
       <header className="sticky top-0 z-40 border-b border-zinc-200 bg-white/95 backdrop-blur">
         <div className="mx-auto flex h-14 max-w-[1160px] items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/" className="flex shrink-0 items-center">
-            <Image
-              src="/treabo-logo.png"
-              alt="Treabo"
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={logoSrc}
+              alt={logoAlt}
               width={150}
               height={30}
-              priority
               className="h-8 w-auto object-contain"
             />
           </Link>
@@ -59,16 +63,24 @@ export function ProffiHeader() {
           </div>
 
           <nav className="hidden items-center gap-2 text-sm font-semibold text-[#232323] md:flex">
-            {headerLinks.map(({ href, label, icon: Icon }) => (
+            {headerLinks.map(({ href, label, icon: Icon }) => {
+              const isChats = href === '/treabo/chats';
+              return (
               <Link
                 key={href}
                 href={href}
-                className="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 transition hover:bg-[#d9f36b] hover:text-[#232323]"
+                className="relative inline-flex items-center gap-1.5 rounded-xl px-3 py-2 transition hover:bg-[#d9f36b] hover:text-[#232323]"
               >
                 {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
                 {label}
+                {isChats && unreadCount > 0 ? (
+                  <span className="ml-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ff405c] px-1.5 text-[11px] font-black leading-none text-white">
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                ) : null}
               </Link>
-            ))}
+              );
+            })}
             {!auth.isAuthenticated ? (
               <button
                 type="button"
@@ -100,7 +112,7 @@ export function ProffiHeader() {
                 >
                   <span className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full bg-[#d9f36b] text-xs font-semibold">
                     {auth.user?.avatar ? (
-                      <img src={auth.user.avatar} alt={auth.user.name} className="h-full w-full object-cover" />
+                      <img src={normalizeTreaboAssetUrl(auth.user.avatar)} alt={auth.user.name} className="h-full w-full object-cover" />
                     ) : (
                       auth.user?.name?.charAt(0)?.toUpperCase() || 'T'
                     )}
@@ -112,31 +124,38 @@ export function ProffiHeader() {
                     </span>
                   </span>
                 </button>
-                <div className="invisible absolute right-0 top-12 z-[90] w-60 translate-y-2 rounded-[24px] border border-zinc-200 bg-white p-2 opacity-0 shadow-2xl transition group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
-                  <Link href="/treabo/profile" className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-[#232323] hover:bg-[#f5f6f1]">
-                    <ClipboardList className="h-4 w-4" />
-                    {text.header.questionnaire}
-                  </Link>
-                  <Link href="/treabo/chats" className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-[#232323] hover:bg-[#f5f6f1]">
-                    <MessageCircle className="h-4 w-4" />
-                    {text.header.chats}
-                  </Link>
-                  <Link href="/treabo/balance" className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-[#232323] hover:bg-[#f5f6f1]">
-                    <Wallet className="h-4 w-4" />
-                    {text.header.balance}
-                  </Link>
-                  <Link href="/treabo/support" className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-[#232323] hover:bg-[#f5f6f1]">
-                    <CircleHelp className="h-4 w-4" />
-                    {text.header.support}
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={auth.logout}
-                    className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-bold text-red-600 hover:bg-red-50"
-                  >
-                    <LogOut className="h-4 w-4" />
-                    {text.header.logout}
-                  </button>
+                <div className="invisible absolute right-0 top-full z-[90] w-60 pt-2 opacity-0 transition group-hover:visible group-hover:opacity-100">
+                  <div className="translate-y-2 rounded-[24px] border border-zinc-200 bg-white p-2 shadow-2xl transition group-hover:translate-y-0">
+                    <Link href="/treabo/profile" className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-[#232323] hover:bg-[#f5f6f1]">
+                      <ClipboardList className="h-4 w-4" />
+                      {text.header.questionnaire}
+                    </Link>
+                    <Link href="/treabo/chats" className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-[#232323] hover:bg-[#f5f6f1]">
+                      <MessageCircle className="h-4 w-4" />
+                      {text.header.chats}
+                      {unreadCount > 0 ? (
+                        <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ff405c] px-1.5 text-[11px] font-black leading-none text-white">
+                          {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
+                      ) : null}
+                    </Link>
+                    <Link href="/treabo/balance" className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-[#232323] hover:bg-[#f5f6f1]">
+                      <Wallet className="h-4 w-4" />
+                      {text.header.balance}
+                    </Link>
+                    <Link href="/treabo/support" className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-[#232323] hover:bg-[#f5f6f1]">
+                      <CircleHelp className="h-4 w-4" />
+                      {text.header.support}
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={auth.logout}
+                      className="flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left text-sm font-bold text-red-600 hover:bg-red-50"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      {text.header.logout}
+                    </button>
+                  </div>
                 </div>
               </div>
             ) : null}
@@ -175,6 +194,7 @@ export function ProffiHeader() {
 export function ProffiFooter() {
   const router = useRouter();
   const text = getTreaboText(router.locale);
+  const { src: logoSrc, alt: logoAlt } = useTreaboBrandLogo();
   const footerColumns = [
     text.header.findSpecialist,
     text.header.tasks,
@@ -187,9 +207,10 @@ export function ProffiFooter() {
       <div className="mx-auto grid max-w-[1160px] gap-6 px-4 py-6 sm:px-6 md:grid-cols-[1fr_2fr] lg:px-8">
         <div>
           <div className="mb-2 flex items-center">
-            <Image
-              src="/treabo-logo.png"
-              alt="Treabo"
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={logoSrc}
+              alt={logoAlt}
               width={142}
               height={28}
               className="h-7 w-auto object-contain"

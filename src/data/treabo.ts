@@ -16,6 +16,11 @@ export type TreaboTask = {
   description?: string | null;
   category?: string | null;
   category_id?: string | null;
+  work_id?: number | string | null;
+  work_title?: string | null;
+  work?: { id?: number | string | null; title?: string | null; description?: string | null } | null;
+  details?: Record<string, any> | null;
+  ai_details?: Record<string, any> | null;
   city?: string | null;
   address?: string | null;
   budget?: number | null;
@@ -71,6 +76,10 @@ export type TreaboChat = {
   specialist_name?: string | null;
   last_message?: string | null;
   last_message_at?: string | null;
+  unread_count?: number;
+  other_is_online?: boolean;
+  other_last_seen_at?: string | null;
+  is_typing?: boolean;
   created_at?: string | null;
   updated_at?: string | null;
 };
@@ -84,6 +93,8 @@ export type TreaboMessage = {
   type?: string;
   metadata?: Record<string, any> | null;
   created_at?: string | null;
+  delivered_at?: string | null;
+  read_at?: string | null;
 };
 
 export type TreaboBalance = {
@@ -191,12 +202,19 @@ const withProffiPrefix = (value: string) => {
 
 const apiCandidates = () => {
   const explicit = process.env.TREABO_API_ENDPOINT || process.env.NEXT_PUBLIC_TREABO_API_ENDPOINT;
+  const candidates: string[] = [];
 
-  return [
-    explicit ? withProffiPrefix(explicit) : undefined,
-    'http://host.docker.internal:8001/api/proffi',
-    'http://127.0.0.1:8001/api/proffi',
-  ].filter(Boolean) as string[];
+  if (explicit) {
+    candidates.push(withProffiPrefix(explicit));
+  } else {
+    candidates.push('http://127.0.0.1:8001/api/proffi');
+  }
+
+  if (process.env.TREABO_IN_DOCKER === '1') {
+    candidates.push('http://host.docker.internal:8001/api/proffi');
+  }
+
+  return [...new Set(candidates)];
 };
 
 function buildQuery(filters?: TreaboTaskFilters) {
@@ -212,24 +230,41 @@ function buildQuery(filters?: TreaboTaskFilters) {
   return query ? `?${query}` : '';
 }
 
-async function fetchJson<T>(path: string): Promise<T | null> {
+type FetchJsonOptions = {
+  retries?: number;
+  timeoutMs?: number;
+};
+
+async function fetchJson<T>(path: string, options: FetchJsonOptions = {}): Promise<T | null> {
+  const retries = options.retries ?? 1;
+  const timeoutMs = options.timeoutMs ?? 12000;
+
   for (const baseUrl of apiCandidates()) {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
+    for (let attempt = 0; attempt <= retries; attempt += 1) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-    try {
-      const response = await fetch(`${trimSlash(baseUrl)}${path}`, {
-        headers: { Accept: 'application/json' },
-        signal: controller.signal,
-      });
+      try {
+        const response = await fetch(`${trimSlash(baseUrl)}${path}`, {
+          headers: { Accept: 'application/json' },
+          signal: controller.signal,
+        });
 
-      if (response.ok) {
-        return (await response.json()) as T;
+        if (response.ok) {
+          return (await response.json()) as T;
+        }
+
+        if (response.status === 404) {
+          return null;
+        }
+      } catch {
+        if (attempt < retries) {
+          await new Promise((resolve) => setTimeout(resolve, 300 * (attempt + 1)));
+          continue;
+        }
+      } finally {
+        clearTimeout(timeout);
       }
-    } catch {
-      // Try the next local candidate; the mock UI remains available if API is down.
-    } finally {
-      clearTimeout(timeout);
     }
   }
 
@@ -250,6 +285,35 @@ export function getTreaboPublicApiBase(): string {
   }
 
   return trimSlash(apiCandidates()[0] || 'http://127.0.0.1:8001/api/proffi');
+}
+
+export function normalizeTreaboAssetUrl(value?: string | null): string {
+  if (!value) return '';
+  if (/^https?:\/\//i.test(value)) {
+    return value.replace('https://treabo.ru/api/files/', 'https://api.treabo.ru/api/proffi/files/');
+  }
+  if (value.startsWith('/api/proffi/files/')) {
+    if (typeof window !== 'undefined' && window.location.hostname.includes('treabo.ru')) {
+      return `https://api.treabo.ru${value}`;
+    }
+    return value;
+  }
+  if (value.startsWith('/api/files/')) {
+    const path = value.replace(/^\/api\/files\/?/, '');
+    if (typeof window !== 'undefined' && window.location.hostname.includes('treabo.ru')) {
+      return `https://api.treabo.ru/api/proffi/files/${path}`;
+    }
+    return `/api/treabo/files/${path}`;
+  }
+  if (value.startsWith('/storage/') || value.startsWith('storage/')) {
+    const path = value.replace(/^\/?storage\/?/, '');
+    if (typeof window !== 'undefined' && window.location.hostname.includes('treabo.ru')) {
+      return `https://api.treabo.ru/storage/${path}`;
+    }
+    const apiBase = (process.env.NEXT_PUBLIC_REST_API_ENDPOINT || 'http://127.0.0.1:8001').replace(/\/$/, '');
+    return `${apiBase}/storage/${path}`;
+  }
+  return value;
 }
 
 export async function uploadTreaboFile(
@@ -338,7 +402,11 @@ export async function fetchMyTreaboTasks(token: string) {
 }
 
 export async function fetchTreaboTask(id: string) {
-  return await fetchJson<TreaboTask>(`/tasks/${encodeURIComponent(id)}`);
+  const direct = await fetchJson<TreaboTask>(`/tasks/${encodeURIComponent(id)}`, { retries: 2 });
+  if (direct) return direct;
+
+  const tasks = await fetchJson<TreaboTask[]>('/tasks', { retries: 1 });
+  return tasks?.find((task) => String(task.id) === String(id)) ?? null;
 }
 
 export async function createTreaboTaskApplication(
