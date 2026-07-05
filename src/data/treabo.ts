@@ -10,6 +10,32 @@ export type TreaboCategory = {
   sort_order?: number;
 };
 
+export type TreaboWork = {
+  id: number | string;
+  category_id?: string | null;
+  title: string;
+  slug?: string | null;
+  aliases?: string[] | null;
+  description?: string | null;
+  sort_order?: number;
+  is_active?: boolean;
+};
+
+export type TreaboWorkQuestion = {
+  id: number | string;
+  work_id: number | string;
+  category_id?: string | null;
+  question: string;
+  field_key?: string | null;
+  type: 'text' | 'textarea' | 'number' | 'yesno' | 'select' | 'multiselect' | 'photo' | string;
+  options?: string[] | null;
+  placeholder?: string | null;
+  help_text?: string | null;
+  is_required?: boolean;
+  sort_order?: number;
+  is_active?: boolean;
+};
+
 export type TreaboTask = {
   id: string;
   title: string;
@@ -428,6 +454,21 @@ export function taskPublicSlug(task: Pick<TreaboTask, 'id' | 'title'>) {
 
 export async function fetchTreaboCategories() {
   return (await fetchJson<TreaboCategory[]>('/categories')) ?? [];
+}
+
+export async function fetchTreaboWorks(filters?: { category_id?: string | null }) {
+  const params = new URLSearchParams();
+  if (filters?.category_id) params.set('category_id', filters.category_id);
+  const query = params.toString();
+  return (await fetchJson<TreaboWork[]>(`/works${query ? `?${query}` : ''}`)) ?? [];
+}
+
+export async function fetchTreaboWorkQuestions(filters?: { work_id?: number | string | null; category_id?: string | null }) {
+  const params = new URLSearchParams();
+  if (filters?.work_id != null) params.set('work_id', String(filters.work_id));
+  if (filters?.category_id) params.set('category_id', filters.category_id);
+  const query = params.toString();
+  return (await fetchJson<TreaboWorkQuestion[]>(`/questions${query ? `?${query}` : ''}`)) ?? [];
 }
 
 export async function fetchTreaboTasks(filters?: TreaboTaskFilters) {

@@ -12,7 +12,7 @@ type JobsMarketplaceMapLayoutProps = {
   onToggleFullscreen: () => void;
   onExitMap: () => void;
   highlightedTaskId?: string | null;
-  onTaskMapClick: (task: TreaboTask) => void;
+  onTaskMapClick?: (task: TreaboTask) => void;
   onBoundsChange: (bounds: TreaboMapBounds) => void;
   viewOnMapLabel: string;
   mapFullWidthLabel: string;
@@ -108,7 +108,7 @@ export default function JobsMarketplaceMapLayout({
         className="h-full rounded-none border-0 md:rounded-[24px] md:border md:border-[#E7E9EC]"
         highlightedTaskId={highlightedTaskId}
         onTaskClick={onTaskMapClick}
-        navigateOnClick={false}
+        navigateOnClick
         onBoundsChange={onBoundsChange}
         preserveViewport
       />

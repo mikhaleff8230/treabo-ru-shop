@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { BriefcaseBusiness, CircleHelp, ClipboardList, MessageCircle, Wallet } from 'lucide-react';
+import { BriefcaseBusiness, CircleHelp, ClipboardList, MessageCircle, Star, Wallet } from 'lucide-react';
 import { ProffiHeader } from '@/components/proffi-mock/ProffiShell';
 import { normalizeTreaboAssetUrl } from '@/data/treabo';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
@@ -18,6 +18,7 @@ export default function TreaboAccountShell({ title, children }: Props) {
   const items = auth.isSpecialist
     ? [
         { href: '/treabo/profile', label: 'Анкета', icon: ClipboardList },
+        { href: '/treabo/reviews', label: 'Мои отзывы', icon: Star },
         { href: '/treabo/chats', label: 'Чаты', icon: MessageCircle },
         { href: '/works', label: 'Задания', icon: BriefcaseBusiness },
         { href: '/treabo/balance', label: 'Баланс', icon: Wallet },

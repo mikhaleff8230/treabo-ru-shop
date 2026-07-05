@@ -93,6 +93,7 @@ export default function TreaboAddressPicker({
   const [gpsUsed, setGpsUsed] = useState(false);
   const [editMode, setEditMode] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
+  const [confirmError, setConfirmError] = useState('');
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const applyResult = useCallback(
@@ -155,6 +156,7 @@ export default function TreaboAddressPicker({
       if (!label) return;
       setSuggestOpen(false);
       setEditMode(true);
+      setConfirmError('');
       applyResult(item);
       setDetected(item);
       setConfirmedState(false);
@@ -166,6 +168,7 @@ export default function TreaboAddressPicker({
     async (nextLat: number, nextLng: number) => {
       onCoordinatesChange(nextLat, nextLng);
       setConfirmedState(false);
+      setConfirmError('');
       setResolvingMapPoint(true);
 
       try {
@@ -301,16 +304,41 @@ export default function TreaboAddressPicker({
   }, []);
 
   const handleConfirm = async () => {
+    setConfirmError('');
+    let confirmedResult: GeoAddressResult | null = null;
+
+    if (lat == null || lng == null) {
+      try {
+        const [first] = await suggestAddresses(address || city, { city, count: 1 });
+        if (first?.lat != null && first?.lng != null) {
+          confirmedResult = first;
+          setDetected(first);
+          applyResult(first);
+        }
+      } catch {
+        confirmedResult = null;
+      }
+    }
+
+    const payloadLat = lat ?? confirmedResult?.lat ?? detected?.lat ?? null;
+    const payloadLng = lng ?? confirmedResult?.lng ?? detected?.lng ?? null;
+
+    if (payloadLat == null || payloadLng == null) {
+      setConfirmError('Выберите адрес из подсказки или поставьте точку на карте');
+      setConfirmedState(false);
+      return;
+    }
+
     const payload: GeoAddressResult = {
-      city: city || detected?.city || null,
-      region: detected?.region || null,
+      city: city || confirmedResult?.city || detected?.city || null,
+      region: confirmedResult?.region || detected?.region || null,
       country: detected?.country || 'Россия',
-      address: address || detected?.address || null,
-      full_address: detected?.full_address || address || null,
-      lat: lat ?? detected?.lat ?? null,
-      lng: lng ?? detected?.lng ?? null,
-      fias_id: detected?.fias_id,
-      kladr_id: detected?.kladr_id,
+      address: address || confirmedResult?.address || detected?.address || null,
+      full_address: confirmedResult?.full_address || detected?.full_address || address || null,
+      lat: payloadLat,
+      lng: payloadLng,
+      fias_id: confirmedResult?.fias_id || detected?.fias_id,
+      kladr_id: confirmedResult?.kladr_id || detected?.kladr_id,
       source: gpsUsed ? 'browser' : 'manual',
       needs_confirmation: false,
     };
@@ -366,6 +394,7 @@ export default function TreaboAddressPicker({
               type="button"
               onClick={() => {
                 setEditMode(true);
+                setConfirmError('');
                 setConfirmedState(false);
                 if (!address && detected?.city) {
                   onCityChange(detected.city);
@@ -421,6 +450,7 @@ export default function TreaboAddressPicker({
               onChange={(event) => {
                 onAddressChange(event.target.value);
                 setSuggestOpen(true);
+                setConfirmError('');
                 setConfirmedState(false);
               }}
               onFocus={() => address.trim().length >= 2 && setSuggestOpen(true)}
@@ -459,6 +489,11 @@ export default function TreaboAddressPicker({
             >
               Подтвердить адрес
             </button>
+          ) : null}
+          {confirmError ? (
+            <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+              {confirmError}
+            </div>
           ) : null}
         </>
       ) : null}

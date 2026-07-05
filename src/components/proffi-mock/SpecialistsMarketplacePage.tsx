@@ -50,8 +50,8 @@ type Specialist = {
   rating: string;
   reviews: string;
   praise: string;
-  team: string;
   verified: string;
+  passportVerified: boolean;
   qualification: string;
   location: string;
   services: string[];
@@ -88,6 +88,9 @@ function buildSpecialists(
         serviceIds: serviceIds.length ? serviceIds : [],
         photos: item.portfolio?.length ? item.portfolio.slice(0, 3) : fallbackPhotos[index % fallbackPhotos.length],
         avatar: item.avatar || fallbackAvatars[index % fallbackAvatars.length],
+        reviews: `${item.reviews_count || 0} отзывов`,
+        verified: item.passport_verified ? 'Паспорт проверен' : 'Паспорт не проверен',
+        passportVerified: Boolean(item.passport_verified),
       };
     });
   }
@@ -185,12 +188,17 @@ function SpecialistCard({ specialist }: { specialist: Specialist }) {
                   <MessageCircle className="h-3.5 w-3.5" />
                   {specialist.reviews}
                 </span>
-                <span className="inline-flex items-center gap-1 rounded-[8px] bg-[#F4F5FA] px-1.5 py-0.5 text-[#566074]">
-                  <ShieldCheck className="h-3.5 w-3.5 fill-emerald-500 text-emerald-500" />
+                <span
+                  className={`inline-flex items-center gap-1 rounded-[8px] px-1.5 py-0.5 ${
+                    specialist.passportVerified ? 'bg-emerald-50 text-emerald-700' : 'bg-[#F4F5FA] text-[#7A818D]'
+                  }`}
+                >
+                  <ShieldCheck
+                    className={`h-3.5 w-3.5 ${
+                      specialist.passportVerified ? 'fill-emerald-500 text-emerald-500' : 'text-[#9AA1AD]'
+                    }`}
+                  />
                   {specialist.verified}
-                </span>
-                <span className="inline-flex items-center gap-1 rounded-[8px] bg-[#F4F5FA] px-1.5 py-0.5 text-[#566074]">
-                  {specialist.team}
                 </span>
               </div>
               <p className="mt-1.5 max-h-5 max-w-3xl overflow-hidden text-[12px] leading-5 text-[#777D88]">

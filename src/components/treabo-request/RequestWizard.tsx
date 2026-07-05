@@ -15,7 +15,17 @@ import TreaboPhoneInput from '@/components/treabo/TreaboPhoneInput';
 import TreaboAddressPicker from '@/components/treabo/TreaboAddressPicker';
 import RussiaCityInput from '@/components/treabo/RussiaCityInput';
 import OtpCodeInput from '@/components/auth/otp-code-input';
-import { createTreaboTask, uploadTreaboFile, type TreaboUpload } from '@/data/treabo';
+import {
+  createTreaboTask,
+  fetchTreaboCategories,
+  fetchTreaboWorkQuestions,
+  fetchTreaboWorks,
+  uploadTreaboFile,
+  type TreaboCategory,
+  type TreaboWork,
+  type TreaboWorkQuestion,
+  type TreaboUpload,
+} from '@/data/treabo';
 import { getStoredTreaboToken, isTreaboOtpSentResponse } from '@/data/treabo-auth';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
 import { getTreaboText } from '@/lib/treabo/i18n';
@@ -28,6 +38,7 @@ import {
   buildTaskDescription,
   categorySlugToLabel,
   generateLocalAiDraft,
+  mapApiTypeToClarifyType,
   needsManualCategory,
   needsManualCity,
   needsManualUrgency,
@@ -60,6 +71,24 @@ const ipCityAliases: Record<string, string> = {
   Kazan: 'Казань',
   Nizhny: 'Нижний Новгород',
 };
+
+type CategoryOption = {
+  id: string | null;
+  slug?: string | null;
+  label: string;
+};
+
+function promptTitleFallback(prompt?: string, fallback = '') {
+  const cleaned = String(prompt || '').replace(/\s+/g, ' ').trim();
+  if (!cleaned) return fallback;
+  const firstSentence = cleaned.split(/[.!?\n]/).find(Boolean)?.trim() || cleaned;
+  return firstSentence.slice(0, 96);
+}
+
+function isGenericAiTitle(value?: string | null) {
+  const normalized = String(value || '').toLowerCase();
+  return !normalized || normalized.includes('заявка для специалиста') || normalized.includes('request for specialist');
+}
 
 function createDraftId() {
   return `trb-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -99,6 +128,11 @@ export default function RequestWizard() {
   const [stepIndex, setStepIndex] = useState(0);
   const [draft, setDraft] = useState<WizardDraft>({ city: text.city });
   const [aiDraft, setAiDraft] = useState<AiDraft | null>(null);
+  const [categories, setCategories] = useState<TreaboCategory[]>([]);
+  const [works, setWorks] = useState<TreaboWork[]>([]);
+  const [workQuestions, setWorkQuestions] = useState<TreaboWorkQuestion[]>([]);
+  const [worksLoading, setWorksLoading] = useState(false);
+  const [questionsLoading, setQuestionsLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -121,9 +155,205 @@ export default function RequestWizard() {
   const [resendTimer, setResendTimer] = useState(0);
   const autoCreateAttempted = useRef(false);
 
-  const step = steps[stepIndex];
   const clarifyFields = useMemo(() => buildClarifyFields(aiDraft), [aiDraft]);
-  const taskName = aiDraft?.title || draft.category || draft.prompt || text.request.newRequest;
+  const categoryOptions = useMemo<CategoryOption[]>(() => {
+    const apiOptions = categories
+      .map((category) => ({
+        id: String(category.id),
+        slug: category.slug,
+        label: category.name_ru || category.slug || String(category.id),
+      }))
+      .filter((category) => category.label);
+
+    if (apiOptions.length) return apiOptions;
+
+    return text.request.categories.map((label) => ({
+      id: null,
+      label,
+    }));
+  }, [categories, text.request.categories]);
+
+  const workQuestionFields = useMemo<ClarifyField[]>(
+    () =>
+      workQuestions.map((question) => ({
+        key: question.field_key?.trim() || `work_q_${question.id}`,
+        question: question.question,
+        type: mapApiTypeToClarifyType(question.type),
+        options: question.options?.length ? question.options : undefined,
+        placeholder: question.placeholder || undefined,
+        helpText: question.help_text || undefined,
+        isRequired: question.is_required,
+        questionId: Number(question.id) || null,
+      })),
+    [workQuestions],
+  );
+
+  const normalizedSteps = useMemo(
+    () =>
+      steps.map((item) =>
+        item.key === 'contacts'
+          ? {
+              ...item,
+              title: 'До создания заявки осталось чуть-чуть',
+            }
+          : item,
+      ),
+    [steps],
+  );
+
+  const visibleSteps = useMemo(() => {
+    const result: Step[] = [];
+
+    normalizedSteps.forEach((item) => {
+      if (item.key === 'work' || item.key === 'work_questions') return;
+      result.push(item);
+
+      if (item.key === 'category' && works.length) {
+        result.push({
+          key: 'work',
+          title: 'Какая именно работа нужна?',
+          progress: 35,
+        });
+
+        if (workQuestions.length) {
+          result.push({
+            key: 'work_questions',
+            title: 'Уточните детали работы',
+            progress: 40,
+          });
+        }
+      } else if (item.key === 'category' && workQuestions.length) {
+        result.push({
+          key: 'work_questions',
+          title: 'Уточните детали работы',
+          progress: 40,
+        });
+      }
+    });
+
+    return result;
+  }, [normalizedSteps, workQuestions.length, works.length]);
+
+  const step = visibleSteps[Math.min(stepIndex, Math.max(visibleSteps.length - 1, 0))] || normalizedSteps[0];
+  const taskName =
+    !isGenericAiTitle(aiDraft?.title)
+      ? aiDraft?.title
+      : draft.title || promptTitleFallback(draft.prompt, draft.category || text.request.newRequest);
+
+  const selectCategory = useCallback((option: CategoryOption) => {
+    setDraft((current) => ({
+      ...current,
+      category: option.label,
+      category_id: option.id,
+      category_slug: option.slug || current.category_slug,
+      work_id: null,
+      work_title: null,
+      workQuestions: [],
+    }));
+  }, []);
+
+  const selectWork = useCallback((work: TreaboWork) => {
+    setDraft((current) => ({
+      ...current,
+      work_id: work.id,
+      work_title: work.title,
+      workQuestions: [],
+    }));
+  }, []);
+
+  const selectedCategoryLabel = useMemo(() => {
+    if (draft.category) return draft.category;
+    const byId = draft.category_id
+      ? categoryOptions.find((category) => String(category.id) === String(draft.category_id))
+      : null;
+    if (byId) return byId.label;
+    const bySlug = aiDraft?.category_slug
+      ? categoryOptions.find((category) => category.slug === aiDraft.category_slug)
+      : null;
+    return bySlug?.label || (aiDraft ? categorySlugToLabel(aiDraft.category_slug || '') : '');
+  }, [aiDraft, categoryOptions, draft.category, draft.category_id]);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchTreaboCategories()
+      .then((items) => {
+        if (!cancelled) setCategories(items);
+      })
+      .catch(() => {
+        if (!cancelled) setCategories([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!draft.category_id) {
+      setWorks([]);
+      return;
+    }
+
+    let cancelled = false;
+    setWorksLoading(true);
+    fetchTreaboWorks({ category_id: draft.category_id })
+      .then((items) => {
+        if (!cancelled) setWorks(items.filter((item) => item.is_active !== false));
+      })
+      .catch(() => {
+        if (!cancelled) setWorks([]);
+      })
+      .finally(() => {
+        if (!cancelled) setWorksLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [draft.category_id]);
+
+  useEffect(() => {
+    const filters = draft.work_id
+      ? { work_id: draft.work_id }
+      : draft.category_id && !works.length
+        ? { category_id: draft.category_id }
+        : null;
+
+    if (!filters) {
+      setWorkQuestions([]);
+      setDraft((current) => ({ ...current, workQuestions: [] }));
+      return;
+    }
+
+    let cancelled = false;
+    setQuestionsLoading(true);
+    fetchTreaboWorkQuestions(filters)
+      .then((items) => {
+        const activeItems = items.filter((item) => item.is_active !== false && item.question);
+        if (!cancelled) {
+          setWorkQuestions(activeItems);
+          setDraft((current) => ({ ...current, workQuestions: activeItems }));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setWorkQuestions([]);
+          setDraft((current) => ({ ...current, workQuestions: [] }));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setQuestionsLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [draft.category_id, draft.work_id, works.length]);
+
+  useEffect(() => {
+    if (stepIndex <= visibleSteps.length - 1) return;
+    setStepIndex(Math.max(visibleSteps.length - 1, 0));
+  }, [stepIndex, visibleSteps.length]);
 
   useEffect(() => {
     const queryPrompt = typeof router.query.q === 'string' ? router.query.q : '';
@@ -207,7 +437,8 @@ export default function RequestWizard() {
       title: resolveTaskTitle(currentDraft, text.request.newRequest),
       description: buildTaskDescription(currentDraft),
       category: resolveTaskCategory(currentDraft),
-      work_id: aiDraft?.work_id || null,
+      category_id: currentDraft.category_id || aiDraft?.category_id || null,
+      work_id: currentDraft.work_id || aiDraft?.work_id || null,
       ai_details: buildTaskAiDetails(currentDraft),
       city: currentDraft.city || aiDraft?.city || text.city,
       address: currentDraft.address || '',
@@ -349,7 +580,17 @@ export default function RequestWizard() {
       setSubmitError('Подтвердите адрес перед продолжением');
       return;
     }
-    if (stepIndex >= steps.length - 1) return;
+    if (step?.key === 'work_questions') {
+      const missingRequired = workQuestionFields.some((field) => {
+        if (!field.isRequired) return false;
+        return !String(draft.aiAnswers?.[field.key] || '').trim();
+      });
+      if (missingRequired) {
+        setSubmitError('Ответьте на обязательные вопросы');
+        return;
+      }
+    }
+    if (stepIndex >= visibleSteps.length - 1) return;
     setSubmitError('');
     setStepIndex((value) => value + 1);
   }
@@ -464,10 +705,21 @@ export default function RequestWizard() {
 
   function applyAiDraft(generatedDraft: AiDraft) {
     setAiDraft(generatedDraft);
+    const apiCategory =
+      generatedDraft.category_id != null
+        ? categoryOptions.find((category) => String(category.id) === String(generatedDraft.category_id))
+        : categoryOptions.find((category) => category.slug === generatedDraft.category_slug);
+
     setDraft((current) => ({
       ...current,
       aiDraft: generatedDraft,
-      category: categorySlugToLabel(generatedDraft.category_slug || '') || current.category,
+      title: isGenericAiTitle(generatedDraft.title)
+        ? promptTitleFallback(current.prompt, current.title || text.request.newRequest)
+        : generatedDraft.title,
+      category: apiCategory?.label || categorySlugToLabel(generatedDraft.category_slug || '') || current.category,
+      category_id: apiCategory?.id || generatedDraft.category_id || current.category_id || null,
+      category_slug: apiCategory?.slug || generatedDraft.category_slug || current.category_slug || null,
+      work_id: generatedDraft.work_id || current.work_id || null,
       city: generatedDraft.city || current.city || text.city,
       deadline:
         generatedDraft.urgency && generatedDraft.urgency !== 'unknown'
@@ -634,13 +886,17 @@ export default function RequestWizard() {
           <label className="block space-y-2">
             <span className="text-sm font-bold text-[#232323]">{text.request.category}</span>
             <select
-              value={draft.category || categorySlugToLabel(aiDraft.category_slug || '')}
-              onChange={(event) => update('category', event.target.value)}
+              value={selectedCategoryLabel}
+              onChange={(event) => {
+                const option = categoryOptions.find((category) => category.label === event.target.value);
+                if (option) selectCategory(option);
+                else update('category', event.target.value);
+              }}
               className={inputClass}
             >
-              {text.request.categories.map((item) => (
-                <option key={item} value={item}>
-                  {item}
+              {categoryOptions.map((item) => (
+                <option key={item.id || item.label} value={item.label}>
+                  {item.label}
                 </option>
               ))}
             </select>
@@ -760,7 +1016,7 @@ export default function RequestWizard() {
             {aiDraft ? (
               <div className="mt-5 max-w-3xl rounded-3xl border border-[#dfe4ee] bg-white p-5 shadow-sm">
                 <div className="text-sm font-black uppercase tracking-wide text-[#7d849b]">Детали заявки</div>
-                <h2 className="mt-2 text-2xl font-black text-[#232323]">{aiDraft.title}</h2>
+                <h2 className="mt-2 text-2xl font-black text-[#232323]">{taskName}</h2>
                 <div className="mt-4 grid gap-3 text-sm font-semibold text-[#232323] sm:grid-cols-2">
                   <span className="rounded-2xl bg-[#f3f5fa] px-4 py-3">
                     {text.request.city}: {aiDraft.city || draft.city || text.request.unknownCity}
@@ -781,10 +1037,55 @@ export default function RequestWizard() {
         return (
           <ChoiceStep
             title={step.title}
-            items={text.request.categories}
-            value={draft.category || (aiDraft ? categorySlugToLabel(aiDraft.category_slug) : undefined)}
-            onSelect={(item) => update('category', item)}
+            items={categoryOptions.map((category) => category.label)}
+            value={selectedCategoryLabel}
+            onSelect={(item) => {
+              const option = categoryOptions.find((category) => category.label === item);
+              if (option) selectCategory(option);
+              else update('category', item);
+            }}
           />
+        );
+      case 'work':
+        return (
+          <ChoiceStep
+            title={step.title}
+            items={works.map((work) => work.title)}
+            value={draft.work_title || ''}
+            loading={worksLoading}
+            emptyText="Для этой категории пока нет отдельных работ. Можно продолжить дальше."
+            onSelect={(item) => {
+              const work = works.find((current) => current.title === item);
+              if (work) selectWork(work);
+            }}
+          />
+        );
+      case 'work_questions':
+        return (
+          <>
+            <h1 className="text-4xl font-black leading-tight text-[#232323] md:text-5xl">{step.title}</h1>
+            {questionsLoading ? (
+              <div className="mt-6 rounded-3xl border border-[#dfe4ee] bg-[#f8f9fb] p-5 text-base font-semibold text-[#232323]">
+                Загружаем вопросы...
+              </div>
+            ) : (
+              <div className="mt-7 max-w-3xl space-y-5">
+                {workQuestionFields.map((field) => (
+                  <label key={field.key} className="block space-y-2">
+                    <span className="text-sm font-bold text-[#232323]">
+                      {field.question}
+                      {field.isRequired ? ' *' : ''}
+                    </span>
+                    {field.helpText ? <span className="block text-xs text-[#7d849b]">{field.helpText}</span> : null}
+                    {renderClarifyField(field)}
+                  </label>
+                ))}
+              </div>
+            )}
+            {submitError && step.key === 'work_questions' ? (
+              <div className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{submitError}</div>
+            ) : null}
+          </>
         );
       case 'deadline':
         return (
@@ -1100,20 +1401,32 @@ function ChoiceStep({
   title,
   items,
   value,
+  loading,
+  emptyText,
   onSelect,
 }: {
   title: string;
   items: string[];
   value?: string;
+  loading?: boolean;
+  emptyText?: string;
   onSelect: (item: string) => void;
 }) {
   return (
     <>
       <h1 className="text-4xl font-black leading-tight text-[#232323] md:text-5xl">{title}</h1>
       <div className="mt-9 max-w-xl space-y-1">
-        {items.map((item) => (
-          <Option key={item} label={item} active={value === item} onClick={() => onSelect(item)} />
-        ))}
+        {loading ? (
+          <div className="rounded-3xl border border-[#dfe4ee] bg-[#f8f9fb] p-5 text-base font-semibold text-[#232323]">
+            Загружаем...
+          </div>
+        ) : items.length ? (
+          items.map((item) => <Option key={item} label={item} active={value === item} onClick={() => onSelect(item)} />)
+        ) : emptyText ? (
+          <div className="rounded-3xl border border-[#dfe4ee] bg-[#f8f9fb] p-5 text-base font-semibold text-[#232323]">
+            {emptyText}
+          </div>
+        ) : null}
       </div>
     </>
   );

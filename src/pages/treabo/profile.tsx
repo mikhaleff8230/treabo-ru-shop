@@ -1,28 +1,124 @@
-import { useEffect, useState } from 'react';
-import { Camera, ImagePlus, Pencil, Star, Trash2 } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
+import { Camera, CheckCircle2, ImagePlus, Pencil, ShieldCheck, Star, Trash2 } from 'lucide-react';
 import TreaboAccountShell from '@/components/treabo/TreaboAccountShell';
-import { fetchTreaboStats, uploadTreaboFile, type TreaboStats } from '@/data/treabo';
+import {
+  fetchTreaboSpecialistReviews,
+  fetchTreaboStats,
+  treaboApiRequest,
+  uploadTreaboFile,
+  type TreaboSpecialistReview,
+  type TreaboStats,
+} from '@/data/treabo';
 import { getStoredTreaboToken } from '@/data/treabo-auth';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
+
+type IdentityVerification = {
+  status?: 'not_submitted' | 'pending' | 'approved' | 'rejected' | string;
+  moderator_comment?: string | null;
+  updated_at?: string | null;
+};
+
+const verificationCopy: Record<string, { label: string; tone: string; text: string }> = {
+  approved: {
+    label: 'Паспорт проверен',
+    tone: 'bg-[#eefbe4] text-[#2f6f1f]',
+    text: 'Модератор подтвердил документы. В списках мастеров будет показан бейдж паспорта.',
+  },
+  pending: {
+    label: 'Паспорт на проверке',
+    tone: 'bg-[#fff7dc] text-[#8a5a00]',
+    text: 'Заявка отправлена модератору. Обычно проверка занимает до суток.',
+  },
+  rejected: {
+    label: 'Паспорт отклонен',
+    tone: 'bg-red-50 text-red-700',
+    text: 'Модератор отклонил заявку. Повторно отправить документы можно из приложения.',
+  },
+  not_submitted: {
+    label: 'Паспорт не подтвержден',
+    tone: 'bg-[#f1f3f7] text-[#6d7484]',
+    text: 'Пройдите проверку личности в мобильном приложении Treabo.',
+  },
+};
+
+function photoUrl(value?: string | null) {
+  if (!value) return '';
+  if (/^(https?:)?\/\//i.test(value) || value.startsWith('/')) return value;
+  return value;
+}
+
+function stars(rating: number) {
+  return Array.from({ length: 5 }, (_, index) => (
+    <Star
+      key={index}
+      className={`h-4 w-4 ${index < Math.round(rating) ? 'fill-[#232323] text-[#232323]' : 'text-[#c7ccd8]'}`}
+    />
+  ));
+}
 
 export default function TreaboProfilePage() {
   const auth = useTreaboAuth();
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingPortfolio, setUploadingPortfolio] = useState(false);
+  const [savingProfile, setSavingProfile] = useState(false);
   const [error, setError] = useState('');
   const [stats, setStats] = useState<TreaboStats | null>(null);
+  const [verification, setVerification] = useState<IdentityVerification | null>(null);
+  const [reviews, setReviews] = useState<TreaboSpecialistReview[]>([]);
+  const [bio, setBio] = useState('');
+  const [services, setServices] = useState('');
+  const [city, setCity] = useState('');
+
   const portfolio = auth.user?.portfolio || [];
   const rating = Number(stats?.rating ?? auth.user?.rating ?? 0);
-  const reviewsCount = Number(stats?.reviews_count ?? auth.user?.reviews_count ?? 0);
+  const reviewsCount = Number(stats?.reviews_count ?? auth.user?.reviews_count ?? reviews.length ?? 0);
+  const verificationStatus = verification?.status || auth.user?.identity_status || (auth.user?.passport_verified ? 'approved' : 'not_submitted');
+  const verificationInfo = verificationCopy[verificationStatus] || verificationCopy.not_submitted;
+
+  useEffect(() => {
+    setBio(auth.user?.bio || '');
+    setServices((auth.user?.services || []).join(', '));
+    setCity(auth.user?.city || '');
+  }, [auth.user?.bio, auth.user?.city, auth.user?.services]);
 
   useEffect(() => {
     const token = getStoredTreaboToken();
     if (!token) return;
 
-    fetchTreaboStats(token)
-      .then(setStats)
-      .catch(() => undefined);
+    fetchTreaboStats(token).then(setStats).catch(() => undefined);
+    treaboApiRequest<IdentityVerification>('/identity-verification', { token })
+      .then(setVerification)
+      .catch(() => setVerification({ status: 'not_submitted' }));
   }, []);
+
+  useEffect(() => {
+    if (!auth.user?.id) return;
+    fetchTreaboSpecialistReviews(String(auth.user.id))
+      .then((payload) => setReviews(payload?.data || []))
+      .catch(() => setReviews([]));
+  }, [auth.user?.id]);
+
+  const serviceList = useMemo(
+    () => services.split(',').map((item) => item.trim()).filter(Boolean),
+    [services],
+  );
+
+  async function saveProfile() {
+    setSavingProfile(true);
+    setError('');
+    try {
+      await auth.updateProfile({
+        bio,
+        services: serviceList,
+        city: city.trim() || undefined,
+      });
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : 'Не удалось сохранить анкету');
+    } finally {
+      setSavingProfile(false);
+    }
+  }
 
   async function uploadAvatar(file?: File | null) {
     if (!file) return;
@@ -36,9 +132,7 @@ export default function TreaboProfilePage() {
     setError('');
     try {
       const uploaded = await uploadTreaboFile(file, { token, folder: 'avatars' });
-      if (uploaded.url) {
-        await auth.updateProfile({ avatar: uploaded.url });
-      }
+      if (uploaded.url) await auth.updateProfile({ avatar: uploaded.url });
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : 'Не удалось загрузить аватар');
     } finally {
@@ -59,9 +153,7 @@ export default function TreaboProfilePage() {
     try {
       const slots = Math.max(0, 10 - portfolio.length);
       const selected = Array.from(files).slice(0, slots);
-      const uploaded = await Promise.all(
-        selected.map((file) => uploadTreaboFile(file, { token, folder: 'portfolio' })),
-      );
+      const uploaded = await Promise.all(selected.map((file) => uploadTreaboFile(file, { token, folder: 'portfolio' })));
       const urls = uploaded.map((item) => item.url).filter(Boolean) as string[];
       await auth.updateProfile({ portfolio: [...portfolio, ...urls].slice(0, 10) });
     } catch (uploadError) {
@@ -80,11 +172,11 @@ export default function TreaboProfilePage() {
       <div className="space-y-4">
         {error ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</div> : null}
 
-        <section className="rounded-[30px] bg-white p-5 shadow-sm">
+        <section className="rounded-[24px] bg-white p-5 shadow-sm">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
             <div className="relative h-28 w-28 overflow-hidden rounded-2xl bg-[#edf1f7]">
               {auth.user?.avatar ? (
-                <img src={auth.user.avatar} alt={auth.user.name} className="h-full w-full object-cover" />
+                <img src={photoUrl(auth.user.avatar)} alt={auth.user.name} className="h-full w-full object-cover" />
               ) : (
                 <div className="flex h-full w-full items-center justify-center text-4xl font-black">
                   {auth.user?.name?.charAt(0)?.toUpperCase() || 'T'}
@@ -105,28 +197,100 @@ export default function TreaboProfilePage() {
               </label>
             </div>
             <div className="min-w-0 flex-1">
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <h2 className="text-3xl font-black leading-tight">{auth.user?.name || 'Специалист Treabo'}</h2>
-                  <div className="mt-3 flex flex-wrap gap-3 text-sm font-bold">
-                    <span className="inline-flex items-center gap-1"><Star className="h-4 w-4 fill-[#232323]" /> {rating.toFixed(1).replace('.', ',')}</span>
+                  <div className="mt-3 flex flex-wrap items-center gap-3 text-sm font-bold">
+                    <span className="inline-flex items-center gap-1">{stars(rating)} {rating.toFixed(1).replace('.', ',')}</span>
                     <span>{reviewsCount} отзывов</span>
-                    <span className="text-[#7d849b]">Паспорт проверен</span>
+                    <span className={`rounded-full px-3 py-1 text-xs font-bold ${verificationInfo.tone}`}>
+                      {verificationInfo.label}
+                    </span>
                   </div>
                 </div>
-                <button className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-100">
-                  <Pencil className="h-4 w-4" />
-                </button>
+                <ShieldCheck className="h-8 w-8 text-[#232323]" />
               </div>
               <div className="mt-5 flex flex-wrap gap-2">
-                <span className="rounded-full bg-[#f5f6f1] px-3 py-1.5 text-sm font-bold">Квалификация подтверждена</span>
-                <span className="rounded-full bg-[#f5f6f1] px-3 py-1.5 text-sm font-bold">{auth.user?.city || 'Chișinău'}</span>
+                {(auth.user?.services || []).slice(0, 5).map((service) => (
+                  <span key={service} className="rounded-full bg-[#f5f6f1] px-3 py-1.5 text-sm font-bold">
+                    {service}
+                  </span>
+                ))}
+                <span className="rounded-full bg-[#f5f6f1] px-3 py-1.5 text-sm font-bold">
+                  {auth.user?.city || 'Город не указан'}
+                </span>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="rounded-[30px] bg-white p-5 shadow-sm">
+        <section className="rounded-[24px] bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center gap-2">
+            <Pencil className="h-5 w-5" />
+            <h2 className="text-xl font-black">Данные анкеты</h2>
+          </div>
+          <div className="grid gap-4">
+            <label className="block">
+              <span className="text-sm font-bold text-[#7d849b]">О себе</span>
+              <textarea
+                value={bio}
+                onChange={(event) => setBio(event.target.value)}
+                rows={5}
+                className="mt-2 w-full rounded-2xl bg-[#f3f5fa] px-4 py-3 text-base outline-none focus:ring-2 focus:ring-[#d9f36b]"
+                placeholder="Опишите опыт, сильные стороны, с какими задачами работаете"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-bold text-[#7d849b]">Услуги через запятую</span>
+              <input
+                value={services}
+                onChange={(event) => setServices(event.target.value)}
+                className="mt-2 w-full rounded-2xl bg-[#f3f5fa] px-4 py-3 text-base outline-none focus:ring-2 focus:ring-[#d9f36b]"
+                placeholder="Сантехника, электрика, ремонт ванной"
+              />
+            </label>
+            <label className="block">
+              <span className="text-sm font-bold text-[#7d849b]">Город</span>
+              <input
+                value={city}
+                onChange={(event) => setCity(event.target.value)}
+                className="mt-2 w-full rounded-2xl bg-[#f3f5fa] px-4 py-3 text-base outline-none focus:ring-2 focus:ring-[#d9f36b]"
+                placeholder="Москва"
+              />
+            </label>
+            <button
+              type="button"
+              onClick={saveProfile}
+              disabled={savingProfile}
+              className="inline-flex h-12 w-fit items-center rounded-2xl bg-[#d9f36b] px-5 text-sm font-black text-[#232323] disabled:opacity-60"
+            >
+              {savingProfile ? 'Сохраняем...' : 'Сохранить анкету'}
+            </button>
+          </div>
+        </section>
+
+        <section className="rounded-[24px] bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-xl font-black">Верификация личности</h2>
+              <p className="mt-1 text-sm font-semibold text-[#7d849b]">{verificationInfo.text}</p>
+            </div>
+            <span className={`w-fit rounded-full px-3 py-1.5 text-sm font-bold ${verificationInfo.tone}`}>
+              {verificationInfo.label}
+            </span>
+          </div>
+          {verification?.moderator_comment ? (
+            <div className="mt-4 rounded-2xl bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+              Комментарий модератора: {verification.moderator_comment}
+            </div>
+          ) : null}
+          <div className="mt-4 rounded-2xl border border-dashed border-[#d3d9e8] bg-[#f8f9fb] px-5 py-4 text-sm font-semibold text-[#5a6070]">
+            Фото паспорта, страницы прописки и селфи с паспортом отправляются только из мобильного приложения Treabo.
+            Так модератор получает реальные снимки с устройства, а не файлы, загруженные с компьютера.
+          </div>
+        </section>
+
+        <section className="rounded-[24px] bg-white p-5 shadow-sm">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h2 className="text-xl font-black">Портфолио</h2>
@@ -153,7 +317,7 @@ export default function TreaboProfilePage() {
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
               {portfolio.map((photo) => (
                 <div key={photo} className="group relative overflow-hidden rounded-2xl bg-[#edf1f7]">
-                  <img src={photo} alt="Портфолио мастера" className="h-32 w-full object-cover" loading="lazy" />
+                  <img src={photoUrl(photo)} alt="Портфолио мастера" className="h-32 w-full object-cover" loading="lazy" />
                   <button
                     type="button"
                     onClick={() => removePortfolioPhoto(photo)}
@@ -167,23 +331,47 @@ export default function TreaboProfilePage() {
             </div>
           ) : (
             <div className="rounded-3xl border border-dashed border-[#d3d9e8] bg-[#f8f9fb] px-5 py-8 text-sm font-semibold text-[#7d849b]">
-              Добавьте фотографии выполненных работ. Они будут отображаться в списке мастеров и анкете.
+              Добавьте фотографии выполненных работ. Они будут отображаться в списке мастеров и публичной анкете.
             </div>
           )}
         </section>
 
-        <section className="rounded-[30px] bg-white p-5 shadow-sm">
-          <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-xl font-black">О себе</h2>
-            <Pencil className="h-4 w-4" />
+        <section className="rounded-[24px] bg-white p-5 shadow-sm">
+          <div className="mb-4 flex items-center justify-between">
+            <h2 className="text-xl font-black">Мои отзывы</h2>
+            <span className="text-sm font-bold text-[#7d849b]">{reviewsCount} отзывов</span>
           </div>
-          <p className="max-w-3xl text-base leading-7">
-            Здесь будет описание мастера, услуги, выезд к клиенту, портфолио и подтвержденные документы.
-            Сейчас страница подготовлена под данные из приложения Treabo.
-          </p>
+          <Link href="/treabo/reviews" className="mb-4 inline-flex rounded-2xl bg-[#f3f5fa] px-4 py-2 text-sm font-black text-[#232323]">
+            Открыть все отзывы
+          </Link>
+          {reviews.length ? (
+            <div className="space-y-3">
+              {reviews.slice(0, 6).map((review) => (
+                <article key={review.id} className="rounded-2xl bg-[#f8f9fb] p-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="font-bold">{review.customer_name || 'Клиент Treabo'}</div>
+                    <div className="flex items-center gap-1">{stars(Number(review.rating || 0))}</div>
+                  </div>
+                  {review.task_title ? <div className="mt-1 text-xs font-semibold text-[#7d849b]">{review.task_title}</div> : null}
+                  {review.comment ? <p className="mt-2 text-sm leading-6 text-[#232323]">{review.comment}</p> : null}
+                  {review.photos?.length ? (
+                    <div className="mt-3 flex gap-2">
+                      {review.photos.slice(0, 4).map((photo) => (
+                        <img key={photo} src={photoUrl(photo)} alt="Фото отзыва" className="h-16 w-16 rounded-xl object-cover" />
+                      ))}
+                    </div>
+                  ) : null}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="rounded-3xl border border-dashed border-[#d3d9e8] bg-[#f8f9fb] px-5 py-8 text-sm font-semibold text-[#7d849b]">
+              Отзывов пока нет. После выполненных заданий они появятся здесь и в публичной анкете мастера.
+            </div>
+          )}
         </section>
 
-        <section className="rounded-[30px] bg-white p-5 shadow-sm">
+        <section className="rounded-[24px] bg-white p-5 shadow-sm">
           <h2 className="text-xl font-black">Моя статистика</h2>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             {[

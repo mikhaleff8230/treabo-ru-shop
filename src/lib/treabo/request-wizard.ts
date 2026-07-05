@@ -242,6 +242,13 @@ export function buildTaskDescription(draft: Record<string, any>): string {
         }
       });
     }
+    if (Array.isArray(draft.workQuestions)) {
+      draft.workQuestions.forEach((item: any) => {
+        if (!item?.question) return;
+        const key = item.field_key?.trim() || `work_q_${item.id}`;
+        questionMap.set(key, item.question);
+      });
+    }
 
     const clarifyLines = Object.entries(answers)
       .filter(([, value]) => value?.trim())
@@ -275,6 +282,13 @@ export function buildTaskAiDetails(draft: Record<string, any>) {
       }
     });
   }
+  if (Array.isArray(draft.workQuestions)) {
+    draft.workQuestions.forEach((item: any) => {
+      if (!item?.question) return;
+      const key = item.field_key?.trim() || `work_q_${item.id}`;
+      questionMap.set(key, item.question);
+    });
+  }
 
   const question_answers = Object.entries(answers)
     .filter(([, value]) => value?.trim())
@@ -286,10 +300,11 @@ export function buildTaskAiDetails(draft: Record<string, any>) {
 
   return {
     prompt: draft.prompt || null,
-    title: aiDraft?.title || null,
-    category_id: aiDraft?.category_id || null,
-    category_slug: aiDraft?.category_slug || null,
-    work_id: aiDraft?.work_id || null,
+    title: draft.title || aiDraft?.title || null,
+    category_id: draft.category_id || aiDraft?.category_id || null,
+    category_slug: draft.category_slug || aiDraft?.category_slug || null,
+    work_id: draft.work_id || aiDraft?.work_id || null,
+    work_title: draft.work_title || null,
     city: draft.city || aiDraft?.city || null,
     urgency: draft.deadline || aiDraft?.urgency || null,
     master_summary: aiDraft?.master_summary || null,
@@ -300,8 +315,8 @@ export function buildTaskAiDetails(draft: Record<string, any>) {
 }
 
 export function resolveTaskCategory(draft: Record<string, any>): string {
-  if (draft.aiDraft?.category_id) {
-    return draft.aiDraft.category_id;
+  if (draft.category_slug) {
+    return draft.category_slug;
   }
   if (draft.aiDraft?.category_slug && draft.aiDraft.category_slug !== 'other') {
     return draft.aiDraft.category_slug;
@@ -309,14 +324,30 @@ export function resolveTaskCategory(draft: Record<string, any>): string {
   if (draft.category) {
     return categoryLabelToSlug(draft.category);
   }
+  if (draft.category_id) {
+    return String(draft.category_id);
+  }
   return 'other';
 }
 
 export function resolveTaskTitle(draft: Record<string, any>, fallback: string): string {
+  const aiTitle = String(draft.aiDraft?.title || '').trim();
+  const genericAiTitle =
+    !aiTitle ||
+    aiTitle.toLowerCase().includes('заявка для специалиста') ||
+    aiTitle.toLowerCase().includes('request for specialist');
+  const promptTitle = String(draft.prompt || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(/[.!?\n]/)
+    .find(Boolean)
+    ?.trim();
+
   return (
-    draft.aiDraft?.title ||
+    String(draft.title || '').trim() ||
+    (!genericAiTitle ? aiTitle : '') ||
+    (promptTitle ? promptTitle.slice(0, 96) : '') ||
     draft.category ||
-    draft.prompt?.slice(0, 80) ||
     fallback
   );
 }
@@ -335,7 +366,13 @@ export function parseBudgetInput(value: string): number | null {
 export type WizardDraft = Record<string, any> & {
   id?: string;
   prompt?: string;
+  title?: string;
   category?: string;
+  category_id?: string | null;
+  category_slug?: string | null;
+  work_id?: number | string | null;
+  work_title?: string | null;
+  workQuestions?: any[];
   city?: string;
   address?: string;
   lat?: number | null;

@@ -160,7 +160,7 @@ function JobCard({
       ref={cardRef}
       className={`${marketplace.card} transition ${dimmed ? 'opacity-70' : ''} ${highlighted ? 'ring-2 ring-[#D9F36B] ring-offset-2' : ''}`}
     >
-      <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_clamp(150px,18%,230px)_260px]">
+      <div className="grid gap-0 2xl:grid-cols-[minmax(0,1fr)_clamp(150px,18%,230px)_260px]">
         <div className="p-3 sm:p-4">
           <div className="flex gap-3 sm:gap-4">
             <div className="relative h-[64px] w-[64px] shrink-0 overflow-hidden rounded-[16px] bg-[#F3F4F6] sm:h-[72px] sm:w-[72px]">
@@ -176,7 +176,7 @@ function JobCard({
                 {job.brand}
               </div>
               <Link href={routes.taskUrl(task || { id: job.id, title: job.title })}>
-                <h3 className="mt-1.5 break-words text-[17px] font-[300] leading-[1.08] tracking-[-0.025em] text-[#1F2430] transition hover:underline sm:text-[20px] xl:text-[21px]">
+                <h3 className="mt-1.5 line-clamp-3 break-words text-[17px] font-[300] leading-[1.12] text-[#1F2430] transition hover:underline sm:text-[20px] 2xl:text-[21px]">
                   {job.title}
                 </h3>
               </Link>
@@ -201,7 +201,7 @@ function JobCard({
           </div>
         </div>
 
-        <div className="hidden items-center border-[#E7E9EC] px-3 py-3 xl:flex">
+        <div className="hidden items-center border-[#E7E9EC] px-3 py-3 2xl:flex">
           {previewPhotos.length ? (
             <div className="grid w-full grid-cols-3 gap-1.5">
               {previewPhotos.map((photo, index) => (
@@ -226,7 +226,7 @@ function JobCard({
           ) : null}
         </div>
 
-        <div className="flex flex-col border-[#E7E9EC] px-3 pb-3 pt-0 sm:px-4 sm:pb-4 xl:my-4 xl:border-l xl:px-4 xl:py-0">
+        <div className="flex flex-col border-[#E7E9EC] px-3 pb-3 pt-0 sm:px-4 sm:pb-4 2xl:my-4 2xl:border-l 2xl:px-4 2xl:py-0">
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <div className="text-[19px] font-[300] leading-none tracking-[-0.03em] text-[#232323] sm:text-[22px]">
               {job.pay}
@@ -788,8 +788,7 @@ export default function JobsMarketplacePage({
                 tasks={liveTasks}
                 heightClassName="h-[320px] sm:h-[380px]"
                 highlightedTaskId={highlightedTaskId}
-                onTaskClick={handleTaskMapClick}
-                navigateOnClick={false}
+                navigateOnClick
               />
             </div>
           ) : null}
@@ -851,7 +850,6 @@ export default function JobsMarketplacePage({
               onToggleFullscreen={toggleMapFullscreen}
               onExitMap={closeMapView}
               highlightedTaskId={highlightedTaskId}
-              onTaskMapClick={handleTaskMapClick}
               onBoundsChange={setMapBounds}
               viewOnMapLabel={text.common.viewOnMap}
               mapFullWidthLabel={text.common.mapFullWidth}

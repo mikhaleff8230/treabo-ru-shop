@@ -44,11 +44,11 @@ function formatRub(value: number) {
 
 function createPlaqueLayout() {
   return window.ymaps.templateLayoutFactory.createClass(
-    `<div style="background:#232323;color:#fff;padding:10px 12px;border-radius:14px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,0.28);max-width:220px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;{{ properties.active ? 'outline:2px solid #D9F36B;outline-offset:2px;' : '' }}">
-      {{ properties.photoUrl ? '<img src="' + properties.photoUrl + '" style="width:100%;height:64px;object-fit:cover;border-radius:8px;margin-bottom:8px;" />' : '' }}
-      <div style="font-size:12px;font-weight:700;white-space:nowrap;">{{ properties.priceLabel }}</div>
-      <div style="font-size:12px;font-weight:800;margin-top:4px;line-height:1.35;">{{ properties.title }}</div>
-      {{ properties.location ? '<div style="font-size:11px;margin-top:4px;line-height:1.35;opacity:0.9;">' + properties.location + '</div>' : '' }}
+    `<div style="background:#232323;color:#fff;padding:7px 9px;border-radius:10px;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,0.18);max-width:176px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;font-size:11px;font-weight:400;{{ properties.active ? 'outline:1px solid #D9F36B;outline-offset:2px;' : '' }}">
+      {{ properties.photoUrl ? '<img src="' + properties.photoUrl + '" style="width:100%;height:46px;object-fit:cover;border-radius:7px;margin-bottom:6px;" />' : '' }}
+      <div style="font-size:11px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ properties.priceLabel }}</div>
+      <div style="font-size:11px;font-weight:500;margin-top:3px;line-height:1.25;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">{{ properties.title }}</div>
+      {{ properties.location ? '<div style="font-size:10px;font-weight:400;margin-top:3px;line-height:1.25;opacity:0.78;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + properties.location + '</div>' : '' }}
       <div style="font-size:10px;margin-top:6px;opacity:0.75;">Открыть задание →</div>
     </div>`,
   );
@@ -56,9 +56,9 @@ function createPlaqueLayout() {
 
 function createCompactPlaqueLayout() {
   return window.ymaps.templateLayoutFactory.createClass(
-    `<div style="width:176px;height:62px;background:#232323;color:#fff;padding:9px 12px;border-radius:14px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,0.28);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;box-sizing:border-box;{{ properties.active ? 'outline:2px solid #D9F36B;outline-offset:2px;' : '' }}">
-      <div style="font-size:12px;font-weight:800;line-height:18px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ properties.title }}</div>
-      <div style="margin-top:5px;display:inline-flex;max-width:152px;height:22px;align-items:center;border-radius:999px;background:#D9F36B;color:#232323;padding:0 9px;font-size:12px;font-weight:900;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-sizing:border-box;">{{ properties.priceLabel }}</div>
+    `<div style="width:148px;min-height:46px;background:#232323;color:#fff;padding:7px 9px;border-radius:10px;cursor:pointer;box-shadow:0 6px 16px rgba(0,0,0,0.18);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;box-sizing:border-box;{{ properties.active ? 'outline:1px solid #D9F36B;outline-offset:2px;' : '' }}">
+      <div style="font-size:11px;font-weight:500;line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ properties.title }}</div>
+      <div style="margin-top:4px;max-width:130px;color:#D9F36B;font-size:10px;font-weight:400;line-height:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ properties.priceLabel }}</div>
     </div>`,
   );
 }
@@ -326,6 +326,23 @@ export default function TreaboTasksMap({
     });
     clustererRef.current = clusterer;
 
+    clusterer.events.add('click', (event: any) => {
+      const target = event.get('target');
+      if (!target || typeof target.getGeoObjects !== 'function') return;
+
+      const geoObjects = target.getGeoObjects();
+      if (!geoObjects || geoObjects.length < 2) return;
+
+      const bounds = window.ymaps.geoQuery(geoObjects).getBounds();
+      if (!bounds) return;
+
+      mapInstanceRef.current.setBounds(bounds, {
+        checkZoomRange: true,
+        zoomMargin: 48,
+        duration: 250,
+      });
+    });
+
     points.forEach((point) => {
       const task = tasksRef.current.find((item) => String(item.id) === point.id);
       const active = highlightedTaskId === point.id;
@@ -358,7 +375,6 @@ export default function TreaboTasksMap({
         if (!task) return;
         if (onTaskClickRef.current) {
           onTaskClickRef.current(task);
-          return;
         }
         if (navigateOnClickRef.current) {
           window.location.href = routes.taskUrl(task);
