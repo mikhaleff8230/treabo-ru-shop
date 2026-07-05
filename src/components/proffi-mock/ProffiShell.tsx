@@ -19,6 +19,7 @@ export function ProffiHeader() {
   const { unreadCount } = useTreaboUnreadChats(auth.isAuthenticated);
   const [authOpen, setAuthOpen] = useState(false);
   const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
+  const showLocationSelector = router.pathname !== '/';
 
   function openAuth(tab: 'login' | 'register') {
     setAuthTab(tab);
@@ -58,9 +59,9 @@ export function ProffiHeader() {
             />
           </Link>
 
-          <div className="hidden lg:block">
+          {showLocationSelector ? <div className="hidden lg:block">
             <TreaboLocationSelector />
-          </div>
+          </div> : null}
 
           <nav className="hidden items-center gap-2 text-sm font-semibold text-[#232323] md:flex">
             {headerLinks.map(({ href, label, icon: Icon }) => {
@@ -93,9 +94,9 @@ export function ProffiHeader() {
           </nav>
 
           <div className="flex items-center gap-2">
-            <div className="block lg:hidden">
+            {showLocationSelector ? <div className="block lg:hidden">
               <TreaboLocationSelector />
-            </div>
+            </div> : null}
             <Link
               href="/request/new"
               className="hidden rounded-full bg-[#d9f36b] px-4 py-2 text-xs font-semibold text-[#232323] shadow-[0_8px_18px_rgba(132,204,22,0.14)] transition hover:bg-[#c7e85a] sm:inline-flex"

@@ -1,5 +1,6 @@
 import { useSettings } from '@/data/settings';
 import { NextSeo as NextDefaultSeo } from 'next-seo';
+
 type Props = {
   title?: string;
   description?: string;
@@ -13,6 +14,7 @@ type Props = {
 
 export const TitleSeo = (props: Props) => {
   const { settings } = useSettings();
+  const siteTitle = 'Treabo';
 
   return (
     <NextDefaultSeo
@@ -51,39 +53,33 @@ export const TitleSeo = (props: Props) => {
         },
       ]}
       title={props.title ?? settings?.seo?.metaTitle}
-      titleTemplate={`%s | ${
-        settings?.seo?.metaTitle ||
-        settings?.siteTitle ||
-        'Платформа для продажи авторских вещей, брендов и хендмейда.'
-      }`}
-      defaultTitle="Treabo — маркетплейс услуг и специалистов"
+      titleTemplate={props.title ? '%s' : `%s | ${siteTitle}`}
+      defaultTitle="Treabo - маркетплейс услуг и специалистов"
       description={props.description || settings?.seo?.metaDescription || settings?.siteSubtitle}
-      // Используем только переданный canonical, без fallback на settings
-      // чтобы избежать дублирования с DefaultSeo
       canonical={props.canonical}
-      languageAlternates={props.hreflang ? props.hreflang.map(tag => ({
+      languageAlternates={props.hreflang ? props.hreflang.map((tag) => ({
         hrefLang: tag.hreflang,
         href: tag.href,
       })) : undefined}
       openGraph={{
         url: props.canonical || settings?.seo?.canonicalUrl,
-        title: props.title || settings?.seo?.ogTitle,
+        title: props.title || settings?.seo?.ogTitle || siteTitle,
         description: props.description || settings?.seo?.ogDescription,
         type: props.ogType || 'website',
         locale: 'ru_RU',
-        site_name: settings?.siteTitle,
+        site_name: siteTitle,
         images: [
           {
-            url: props.ogImage || settings?.seo?.ogImage?.original ?? '',
+            url: props.ogImage || settings?.seo?.ogImage?.original || '',
             width: 800,
             height: 600,
-            alt: props.title || settings?.seo?.ogTitle,
+            alt: props.title || settings?.seo?.ogTitle || siteTitle,
           },
         ],
       }}
       twitter={{
         handle: settings?.seo?.twitterHandle,
-        site: settings?.siteTitle,
+        site: siteTitle,
         cardType: settings?.seo?.twitterCardType,
       }}
     />

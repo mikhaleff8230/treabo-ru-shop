@@ -17,7 +17,14 @@ import team3 from '@/assets/images/team/3.png';
 import team4 from '@/assets/images/team/4.png';
 import team5 from '@/assets/images/team/5.png';
 import team6 from '@/assets/images/team/6.png';
-import { normalizeTreaboAssetUrl, type TreaboCategory, type TreaboSpecialist } from '@/data/treabo';
+import {
+  contactTreaboSpecialist,
+  normalizeTreaboAssetUrl,
+  type TreaboCategory,
+  type TreaboSpecialist,
+} from '@/data/treabo';
+import { getStoredTreaboToken } from '@/data/treabo-auth';
+import routes from '@/config/routes';
 import { getTreaboText } from '@/lib/treabo/i18n';
 import RussiaCityInput from '@/components/treabo/RussiaCityInput';
 import TreaboCategorySearchInput from '@/components/treabo/TreaboCategorySearchInput';
@@ -37,6 +44,7 @@ import {
 import { ProffiFooter, ProffiHeader } from './ProffiShell';
 
 type Specialist = {
+  id: string;
   name: string;
   online: string;
   rating: string;
@@ -66,16 +74,15 @@ function buildSpecialists(
       const serviceLabels = resolveServiceLabels(serviceIds, categories);
 
       return {
+        id: String(item.id),
         name: item.name || 'Специалист Treabo',
-        online: item.last_seen ? 'Был в сети недавно' : 'Онлайн',
+        online: item.last_seen_label || (item.is_online ? 'Сейчас в сети' : 'Был в сети давно'),
         rating: Number(item.rating || 0).toFixed(1).replace('.', ','),
         reviews: `${item.reviews_count || 0} отзывов`,
-        praise: 'Профиль Treabo',
+        praise: item.bio?.slice(0, 80) || '',
         team: 'Выезд к клиенту',
-        verified: item.email ? 'Профиль проверен' : 'Анкета заполнена',
-        qualification:
-          item.bio ||
-          'Специалист принимает заявки Treabo. Портфолио и услуги можно заполнить в анкете мастера.',
+        verified: item.passport_verified ? 'Паспорт проверен' : 'Паспорт не подтвержден',
+        qualification: item.bio || '',
         location: item.city || 'Москва',
         services: serviceLabels.length ? serviceLabels : ['Ремонт', 'Сантехника', 'Плитка'],
         serviceIds: serviceIds.length ? serviceIds : [],
@@ -115,27 +122,60 @@ function SpecialistCard({ specialist }: { specialist: Specialist }) {
   const router = useRouter();
   const text = getTreaboText(router.locale);
   const [saved, setSaved] = useState(false);
+  const [offering, setOffering] = useState(false);
   const previewPhotos = specialist.photos.slice(0, 3);
+  const profileHref = routes.specialistUrl({ id: specialist.id, name: specialist.name });
+
+  async function handleOfferTask() {
+    const token = getStoredTreaboToken();
+    if (!token) {
+      router.push('/request/new');
+      return;
+    }
+
+    setOffering(true);
+    try {
+      const result = await contactTreaboSpecialist(specialist.id, token);
+      router.push(result.chat_id ? `/treabo/chats?id=${result.chat_id}` : '/treabo/chats');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '';
+      if (message.includes('заявку') || message.includes('task')) {
+        router.push('/request/new');
+        return;
+      }
+      router.push('/treabo/chats');
+    } finally {
+      setOffering(false);
+    }
+  }
 
   return (
     <article className={marketplace.card}>
       <div className="grid gap-3 p-3.5 sm:p-4 lg:grid-cols-[minmax(0,1fr)_clamp(108px,12vw,154px)_238px] lg:items-center">
         <div className="min-w-0">
           <div className="flex gap-3 sm:gap-4">
-            <SmartImage
-              src={specialist.avatar}
-              alt={specialist.name}
-              width={64}
-              height={64}
-              className="h-[58px] w-[58px] shrink-0 rounded-[16px] object-cover sm:h-[64px] sm:w-[64px]"
-            />
+            <Link href={profileHref} className="shrink-0">
+              <SmartImage
+                src={specialist.avatar}
+                alt={specialist.name}
+                width={64}
+                height={64}
+                className="h-[58px] w-[58px] shrink-0 rounded-[16px] object-cover transition hover:opacity-90 sm:h-[64px] sm:w-[64px]"
+              />
+            </Link>
             <div className="min-w-0 flex-1">
-              <div className="text-[9px] font-[300] leading-4 text-[#9AA1AD] sm:text-[10px]">
+              <div
+                className={`text-[9px] font-[300] leading-4 sm:text-[10px] ${
+                  specialist.online.startsWith('Сейчас') ? 'text-emerald-600' : 'text-[#9AA1AD]'
+                }`}
+              >
                 {specialist.online}
               </div>
-              <h2 className="mt-0.5 truncate text-[19px] font-[400] leading-tight text-[#232323] sm:text-[20px]">
-                {specialist.name}
-              </h2>
+              <Link href={profileHref}>
+                <h2 className="mt-0.5 truncate text-[19px] font-[400] leading-tight text-[#232323] transition hover:underline sm:text-[20px]">
+                  {specialist.name}
+                </h2>
+              </Link>
               <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px] font-medium text-[#686F7D] sm:text-[12px]">
                 <span className="inline-flex items-center gap-1 rounded-[8px] bg-[#F4F5FA] px-1.5 py-0.5 text-[#566074]">
                   <Star className="h-3.5 w-3.5 fill-yellow-400 text-yellow-400" />
@@ -199,9 +239,11 @@ function SpecialistCard({ specialist }: { specialist: Specialist }) {
             </div>
             <button
               type="button"
-              className="mt-2 min-h-[36px] w-full whitespace-nowrap rounded-[14px] bg-[#D9F36B] px-4 py-2 text-[12px] font-semibold text-[#232323] transition hover:bg-[#c7e85a]"
+              onClick={handleOfferTask}
+              disabled={offering}
+              className="mt-2 min-h-[36px] w-full whitespace-nowrap rounded-[14px] bg-[#D9F36B] px-4 py-2 text-[12px] font-semibold text-[#232323] transition hover:bg-[#c7e85a] disabled:opacity-60"
             >
-              Предложить задачу
+              {offering ? 'Открываем чат…' : 'Предложить задачу'}
             </button>
           </div>
           <button
@@ -304,11 +346,14 @@ export default function SpecialistsMarketplacePage({
   const [serviceQuery, setServiceQuery] = useState(selectedQuery || legacyService);
   const [categoryId, setCategoryId] = useState(selectedCategoryId);
   const [sidebarCategoryQuery, setSidebarCategoryQuery] = useState(selectedQuery || legacyService);
-  const [city, setCity] = useState(selectedCity || text.city);
+  const [city, setCity] = useState(selectedCity);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [openSections, setOpenSections] = useState<Set<string>>(() => new Set(['category', text.specialists.filters[0]?.title]));
   const [visualSelections, setVisualSelections] = useState<Set<string>>(() => new Set());
   const categoryOptions = flattenCategoryOptions(categories);
+  const pageTitle = selectedCity
+    ? `Найти специалиста в ${selectedCity}`
+    : text.specialists.title;
 
   function runSearch(next?: { q?: string; category_id?: string | null; city?: string }) {
     const query = buildMarketplaceSearchQuery({
@@ -373,7 +418,7 @@ export default function SpecialistsMarketplacePage({
           <div className={`mx-auto ${marketplace.maxWidth} px-4 py-5 sm:px-6 lg:px-8`}>
             <div className="grid gap-4 lg:grid-cols-[1fr_270px] lg:items-end">
               <div>
-                <h1 className="text-[28px] font-[400] leading-[1.06] text-[#232323] sm:text-[36px]">{text.specialists.title}</h1>
+                <h1 className="text-[28px] font-[400] leading-[1.06] text-[#232323] sm:text-[36px]">{pageTitle}</h1>
                 <p className="mt-2 max-w-2xl text-[13px] leading-6 text-[#777D88] sm:text-sm">{text.specialists.subtitle}</p>
               </div>
               <div className="rounded-[20px] border border-[#E7E9EC] bg-[#D9F36B] p-4">

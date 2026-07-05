@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import {
   ArrowRight,
   ArrowUpDown,
@@ -20,7 +20,15 @@ import TreaboTasksMap, { filterTasksByMapBounds, type TreaboMapBounds } from '@/
 import JobsMarketplaceMapLayout from '@/components/proffi-mock/JobsMarketplaceMapLayout';
 import TreaboCategorySearchInput from '@/components/treabo/TreaboCategorySearchInput';
 import RussiaCityInput from '@/components/treabo/RussiaCityInput';
-import type { TreaboCategory, TreaboTask, TreaboTaskFilters } from '@/data/treabo';
+import {
+  addTreaboFavorite,
+  fetchTreaboTasksWithToken,
+  removeTreaboFavorite,
+  type TreaboCategory,
+  type TreaboTask,
+  type TreaboTaskFilters,
+} from '@/data/treabo';
+import { getStoredTreaboToken } from '@/data/treabo-auth';
 import routes from '@/config/routes';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
 import { getTreaboText } from '@/lib/treabo/i18n';
@@ -82,7 +90,7 @@ function mapTaskToCard(task: TreaboTask, categories: TreaboCategory[], locale: s
     id: String(task.id),
     title: task.title,
     brand: taskCustomerName(task),
-    location: [task.city || text.city, task.address].filter(Boolean).join(', '),
+    location: [task.city, task.address].filter(Boolean).join(', ') || text.common.addressUnknown,
     time: task.deadline || text.works.agreementTerm,
     pay: budget > 0 ? `${money.format(budget)} ₽` : text.works.negotiablePrice,
     priceNote: budget > 0 ? 'Начальная цена' : 'Цена по договоренности',
@@ -113,6 +121,7 @@ function buildQuery(filters: TreaboTaskFilters, mapViewEnabled = false, mapFulls
   if (filters.q) params.set('q', filters.q);
   if (filters.budget_min != null) params.set('budget_min', String(filters.budget_min));
   if (filters.budget_max != null) params.set('budget_max', String(filters.budget_max));
+  if (filters.favorites) params.set('favorites', '1');
   if (mapViewEnabled) params.set('map', '1');
   if (mapFullscreen) params.set('map_full', '1');
   return params.toString();
@@ -125,6 +134,7 @@ function JobCard({
   text,
   auth,
   onAuthOpen,
+  onToggleFavorite,
   highlighted,
   cardRef,
 }: {
@@ -134,23 +144,27 @@ function JobCard({
   text: ReturnType<typeof getTreaboText>;
   auth: ReturnType<typeof useTreaboAuth>;
   onAuthOpen: () => void;
+  onToggleFavorite: (task: TreaboTask) => void;
   highlighted?: boolean;
   cardRef?: (node: HTMLElement | null) => void;
 }) {
-  const [saved, setSaved] = useState(false);
   const primaryPhoto = job.photos[0] || '/proffi/task-preview-default.svg';
   const previewPhotos = job.photos.slice(1, 4);
+  const hasApplied = Boolean(task?.has_applied);
+  const isClosed = Boolean(task?.is_closed) || ['cancelled', 'closed', 'done', 'completed'].includes(String(task?.status || ''));
+  const disabledLabel = isClosed ? 'Закрыто' : hasApplied ? 'Вы откликнулись' : '';
+  const dimmed = hasApplied || isClosed;
 
   return (
     <article
       ref={cardRef}
-      className={`${marketplace.card} transition ${highlighted ? 'ring-2 ring-[#D9F36B] ring-offset-2' : ''}`}
+      className={`${marketplace.card} transition ${dimmed ? 'opacity-70' : ''} ${highlighted ? 'ring-2 ring-[#D9F36B] ring-offset-2' : ''}`}
     >
       <div className="grid gap-0 xl:grid-cols-[minmax(0,1fr)_clamp(150px,18%,230px)_260px]">
         <div className="p-3 sm:p-4">
           <div className="flex gap-3 sm:gap-4">
             <div className="relative h-[64px] w-[64px] shrink-0 overflow-hidden rounded-[16px] bg-[#F3F4F6] sm:h-[72px] sm:w-[72px]">
-              <img src={primaryPhoto} alt={`${job.title} preview`} className="h-full w-full object-cover" loading="lazy" />
+              <img src={primaryPhoto} alt={`${job.title} preview`} className={`h-full w-full object-cover ${dimmed ? 'grayscale opacity-70' : ''}`} loading="lazy" />
               {job.photos.length > 1 ? (
                 <span className="absolute bottom-1 right-1 rounded-full bg-white/90 px-1.5 py-0.5 text-[9px] font-medium leading-none text-[#20242D]">
                   +{job.photos.length - 1}
@@ -161,9 +175,11 @@ function JobCard({
               <div className="text-[9px] font-[400] uppercase leading-none tracking-[0.055em] text-[#7D828D] sm:text-[10px]">
                 {job.brand}
               </div>
-              <h3 className="mt-1.5 break-words text-[17px] font-[300] leading-[1.08] tracking-[-0.025em] text-[#1F2430] sm:text-[20px] xl:text-[21px]">
-                {job.title}
-              </h3>
+              <Link href={routes.taskUrl(task || { id: job.id, title: job.title })}>
+                <h3 className="mt-1.5 break-words text-[17px] font-[300] leading-[1.08] tracking-[-0.025em] text-[#1F2430] transition hover:underline sm:text-[20px] xl:text-[21px]">
+                  {job.title}
+                </h3>
+              </Link>
               <div className="mt-2 flex flex-col gap-1.5 text-[11px] font-[300] leading-none text-[#777D88] sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-4 sm:gap-y-1.5 sm:text-[12px]">
                 <span className="inline-flex items-center gap-1.5">
                   <MapPin className="h-[14px] w-[14px] shrink-0 stroke-[1.8] text-[#525862]" />
@@ -207,14 +223,7 @@ function JobCard({
                 </div>
               ))}
             </div>
-          ) : (
-            <img
-              src="/proffi/task-preview-default.svg"
-              alt={`${job.title} default preview`}
-              className="h-[76px] w-full rounded-[14px] object-cover"
-              loading="lazy"
-            />
-          )}
+          ) : null}
         </div>
 
         <div className="flex flex-col border-[#E7E9EC] px-3 pb-3 pt-0 sm:px-4 sm:pb-4 xl:my-4 xl:border-l xl:px-4 xl:py-0">
@@ -227,13 +236,23 @@ function JobCard({
             </div>
           </div>
           <div className="mt-3 flex gap-2">
-            {auth.isSpecialist && task ? (
+            {auth.isSpecialist && task && !disabledLabel ? (
               <Link
                 href={routes.taskUrl(task)}
                 className="inline-flex min-h-[34px] flex-1 items-center justify-between rounded-[11px] bg-[#D9F36B] px-3 text-[12px] font-[300] text-[#20242D] transition hover:bg-[#c7e85a] sm:min-h-[36px] sm:text-[13px]"
               >
                 {text.works.apply}
                 <ArrowRight className="h-4 w-4 stroke-[1.8]" />
+              </Link>
+            ) : auth.isSpecialist && task && disabledLabel ? (
+              <Link
+                href={routes.taskUrl(task)}
+                className={`inline-flex min-h-[34px] flex-1 items-center justify-between rounded-[11px] px-3 text-[12px] font-[300] text-white transition sm:min-h-[36px] sm:text-[13px] ${
+                  isClosed ? 'bg-[#232323]' : 'bg-[#6b7280]'
+                }`}
+              >
+                {disabledLabel}
+                <Info className="h-4 w-4 stroke-[1.8]" />
               </Link>
             ) : auth.isAuthenticated ? null : (
               <button
@@ -247,13 +266,13 @@ function JobCard({
             )}
             <button
               type="button"
-              onClick={() => setSaved((v) => !v)}
-              aria-pressed={saved}
+              onClick={() => (task && auth.isSpecialist ? onToggleFavorite(task) : setAuthOpenSafe(auth, onAuthOpen))}
+              aria-pressed={Boolean(task?.is_favorite)}
               className={`flex h-[34px] w-[34px] shrink-0 items-center justify-center rounded-[11px] border bg-white transition sm:h-[36px] sm:w-[36px] ${
-                saved ? 'border-[#D9F36B] text-[#232323]' : 'border-[#E7E9EC] text-[#777D88]'
+                task?.is_favorite ? 'border-[#D9F36B] text-[#232323]' : 'border-[#E7E9EC] text-[#777D88]'
               }`}
             >
-              <Bookmark className={`h-4 w-4 stroke-[1.8] ${saved ? 'fill-[#232323]' : ''}`} />
+              <Bookmark className={`h-4 w-4 stroke-[1.8] ${task?.is_favorite ? 'fill-[#232323]' : ''}`} />
             </button>
             <Link
               href={routes.taskUrl(task || { id: job.id, title: job.title })}
@@ -268,6 +287,10 @@ function JobCard({
       </div>
     </article>
   );
+}
+
+function setAuthOpenSafe(auth: ReturnType<typeof useTreaboAuth>, onAuthOpen: () => void) {
+  if (!auth.isAuthenticated) onAuthOpen();
 }
 
 function WorksFiltersPanel({
@@ -408,6 +431,8 @@ export default function JobsMarketplacePage({
   const text = getTreaboText(router.locale);
   const auth = useTreaboAuth();
   const [authOpen, setAuthOpen] = useState(false);
+  const [liveTasks, setLiveTasks] = useState<TreaboTask[]>(tasks);
+  const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [mapViewEnabled, setMapViewEnabled] = useState(false);
   const [mapFullscreen, setMapFullscreen] = useState(false);
   const [mapBounds, setMapBounds] = useState<TreaboMapBounds | null>(null);
@@ -416,7 +441,6 @@ export default function JobsMarketplacePage({
     () => new Set(['category', 'city', 'budget']),
   );
   const [filters, setFilters] = useState<TreaboTaskFilters>({
-    city: initialFilters.city || text.city,
     ...initialFilters,
   });
   const [serviceQuery, setServiceQuery] = useState(initialFilters.q || '');
@@ -440,19 +464,47 @@ export default function JobsMarketplacePage({
   }, [mapFullscreen]);
 
   const mapVisibleTasks = useMemo(
-    () => filterTasksByMapBounds(tasks, mapBounds),
-    [tasks, mapBounds],
+    () => filterTasksByMapBounds(liveTasks, mapBounds),
+    [liveTasks, mapBounds],
   );
-  const visibleJobs = useMemo(() => buildJobCards(tasks, categories, 'ru'), [tasks, categories]);
+  const visibleJobs = useMemo(() => buildJobCards(liveTasks, categories, 'ru'), [liveTasks, categories]);
   const mapVisibleJobs = useMemo(
     () => buildJobCards(mapVisibleTasks, categories, 'ru'),
     [mapVisibleTasks, categories],
   );
-  const availableCount = tasks.length || visibleJobs.length;
+  const availableCount = liveTasks.length || visibleJobs.length;
+  const selectedCity = filters.city?.trim();
+  const pageTitle = selectedCity
+    ? `Задания и заказы в ${selectedCity}`
+    : 'Задания и заказы';
 
   const categoryOptions = categories.length
     ? flattenCategoryOptions(categories)
     : [];
+
+  useEffect(() => {
+    setLiveTasks(tasks);
+  }, [tasks]);
+
+  const loadLiveTasks = useCallback(async (nextFilters = filters, onlyFavorites = favoritesOnly) => {
+    if (!auth.isSpecialist) return;
+    const token = getStoredTreaboToken();
+    if (!token) return;
+
+    try {
+      const fresh = await fetchTreaboTasksWithToken(
+        { ...nextFilters, favorites: onlyFavorites || undefined },
+        token,
+      );
+      setLiveTasks(fresh);
+    } catch {
+      // keep SSR tasks visible if the authorized refresh fails
+    }
+  }, [auth.isSpecialist, favoritesOnly, filters]);
+
+  useEffect(() => {
+    loadLiveTasks();
+  }, [loadLiveTasks]);
 
   function handleTaskMapClick(task: TreaboTask) {
     const id = String(task.id);
@@ -476,6 +528,7 @@ export default function JobsMarketplacePage({
   function applyFilters(next: TreaboTaskFilters, nextMapView = mapViewEnabled, nextMapFullscreen = mapFullscreen) {
     const query = buildQuery(next, nextMapView, nextMapFullscreen);
     router.push(query ? `${routes.works}?${query}` : routes.works);
+    loadLiveTasks(next, favoritesOnly);
   }
 
   function openMapView() {
@@ -496,11 +549,47 @@ export default function JobsMarketplacePage({
   }
 
   function resetFilters() {
-    const next = { city: text.city };
+    const next = {};
     setFilters(next);
     setServiceQuery('');
     setSearchCategoryId('');
     applyFilters(next);
+  }
+
+  async function toggleFavoritesOnly() {
+    const next = !favoritesOnly;
+    setFavoritesOnly(next);
+    await loadLiveTasks(filters, next);
+  }
+
+  async function toggleFavorite(task: TreaboTask) {
+    if (!auth.isSpecialist) {
+      setAuthOpen(true);
+      return;
+    }
+
+    const token = getStoredTreaboToken();
+    if (!token) return;
+    const nextFavorite = !task.is_favorite;
+
+    setLiveTasks((current) => current.map((item) => (
+      String(item.id) === String(task.id) ? { ...item, is_favorite: nextFavorite } : item
+    )));
+
+    try {
+      if (nextFavorite) {
+        await addTreaboFavorite(String(task.id), token);
+      } else {
+        await removeTreaboFavorite(String(task.id), token);
+      }
+      if (favoritesOnly && !nextFavorite) {
+        setLiveTasks((current) => current.filter((item) => String(item.id) !== String(task.id)));
+      }
+    } catch {
+      setLiveTasks((current) => current.map((item) => (
+        String(item.id) === String(task.id) ? { ...item, is_favorite: !nextFavorite } : item
+      )));
+    }
   }
 
   function toggleCategory(categoryId: string) {
@@ -560,6 +649,7 @@ export default function JobsMarketplacePage({
             text={text}
             auth={auth}
             onAuthOpen={() => setAuthOpen(true)}
+            onToggleFavorite={toggleFavorite}
             highlighted={highlightedTaskId === job.id}
             cardRef={(node) => {
               if (node) cardRefs.set(job.id, node);
@@ -618,12 +708,16 @@ export default function JobsMarketplacePage({
                     {text.common.home}
                   </Link>
                   <span>/</span>
-                  <span>{filters.city || text.city}</span>
-                  <span>/</span>
+                  {selectedCity ? (
+                    <>
+                      <span>{selectedCity}</span>
+                      <span>/</span>
+                    </>
+                  ) : null}
                   <span className="text-[#232323]">{text.common.allTasks}</span>
                 </div>
                 <h1 className="break-words text-[28px] font-[400] leading-[1.06] text-[#232323] sm:text-[36px]">
-                  {interpolate(text.works.title, { city: filters.city || text.city })}
+                  {pageTitle}
                 </h1>
                 <p className="mt-2 max-w-2xl text-[13px] leading-6 text-[#777D88] sm:text-sm">{text.works.subtitle}</p>
               </div>
@@ -671,10 +765,27 @@ export default function JobsMarketplacePage({
                   <div className="text-sm font-bold text-[#232323]">{text.common.map}</div>
                   <div className="text-xs text-[#777D88]">Чёрные плашки — цена и название задания</div>
                 </div>
-                {mapControls}
+                <div className="flex flex-wrap items-center gap-2">
+                  {auth.isSpecialist ? (
+                    <button
+                      type="button"
+                      onClick={toggleFavoritesOnly}
+                      aria-pressed={favoritesOnly}
+                      className={`inline-flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-semibold transition ${
+                        favoritesOnly
+                          ? 'border-[#232323] bg-[#232323] text-white'
+                          : 'border-[#E7E9EC] bg-white text-[#232323] hover:bg-[#FAFAFA]'
+                      }`}
+                    >
+                      <Bookmark className={`h-4 w-4 ${favoritesOnly ? 'fill-white' : ''}`} />
+                      Избранное
+                    </button>
+                  ) : null}
+                  {mapControls}
+                </div>
               </div>
               <TreaboTasksMap
-                tasks={tasks}
+                tasks={liveTasks}
                 heightClassName="h-[320px] sm:h-[380px]"
                 highlightedTaskId={highlightedTaskId}
                 onTaskClick={handleTaskMapClick}
@@ -735,7 +846,7 @@ export default function JobsMarketplacePage({
 
           {mapViewEnabled ? (
             <JobsMarketplaceMapLayout
-              tasks={tasks}
+              tasks={liveTasks}
               mapFullscreen={mapFullscreen}
               onToggleFullscreen={toggleMapFullscreen}
               onExitMap={closeMapView}

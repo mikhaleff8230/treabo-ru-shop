@@ -23,7 +23,11 @@ export type TreaboTask = {
   ai_details?: Record<string, any> | null;
   city?: string | null;
   address?: string | null;
+  budget_type?: 'fixed' | 'range' | string | null;
   budget?: number | null;
+  budget_min?: number | null;
+  budget_max?: number | null;
+  budget_label?: string | null;
   deadline?: string | null;
   status?: string | null;
   photos?: Array<string | TreaboUpload>;
@@ -32,6 +36,9 @@ export type TreaboTask = {
   client_name?: string | null;
   user?: { name?: string | null } | null;
   applications_count?: number;
+  has_applied?: boolean;
+  is_closed?: boolean;
+  is_favorite?: boolean;
   response_price_mdl?: number | null;
   customer_id?: string | null;
   photos_count?: number;
@@ -56,14 +63,46 @@ export type TreaboApplication = {
 export type TreaboApplicationPreview = {
   has_applied: boolean;
   free_daily_limit: number;
+  free_per_task_limit?: number;
   free_used_today: number;
+  free_used_on_task?: number;
   free_remaining_before: number;
+  free_remaining_on_task?: number;
   free_remaining_after: number;
+  within_paid_period?: boolean;
   charge_required: boolean;
   is_free: boolean;
   response_fee_mdl: number;
   default_response_price_mdl: number;
   currency: 'RUB';
+};
+
+export type TreaboRecommendedSpecialist = TreaboSpecialist & {
+  score?: number;
+  rank?: number;
+};
+
+export type TreaboSpecialistReview = {
+  id: string;
+  task_id?: string | null;
+  task_title?: string | null;
+  customer_name?: string | null;
+  rating: number;
+  comment?: string | null;
+  photos?: string[];
+  created_at?: string | null;
+};
+
+export type TreaboSpecialistReviewsResponse = {
+  rating: number;
+  reviews_count: number;
+  data: TreaboSpecialistReview[];
+};
+
+export type TreaboContactSpecialistResponse = {
+  chat_id: string;
+  task_id: string;
+  specialist_id: string;
 };
 
 export type TreaboChat = {
@@ -131,6 +170,13 @@ export type TreaboStats = {
   reviews_count?: number;
 };
 
+export type TreaboHomeStats = {
+  categories_count?: number;
+  reviews_count?: number;
+  average_rating?: number;
+  open_tasks?: number;
+};
+
 export type TreaboYookassaDeposit = {
   success: boolean;
   message?: string;
@@ -175,6 +221,11 @@ export type TreaboSpecialist = {
   lat?: number | null;
   lng?: number | null;
   last_seen?: string | null;
+  min_price?: number | null;
+  last_seen_label?: string | null;
+  is_online?: boolean;
+  passport_verified?: boolean;
+  identity_status?: string | null;
 };
 
 export type TreaboSpecialistFilters = {
@@ -191,6 +242,7 @@ export type TreaboTaskFilters = {
   q?: string | null;
   budget_min?: number | null;
   budget_max?: number | null;
+  favorites?: boolean | null;
 };
 
 const trimSlash = (value: string) => value.replace(/\/+$/, '');
@@ -226,6 +278,9 @@ function buildQuery(filters?: TreaboTaskFilters) {
   if (filters.category_id) params.set('category_id', filters.category_id);
   if (filters.city) params.set('city', filters.city);
   if (filters.q) params.set('q', filters.q);
+  if (filters.budget_min != null) params.set('budget_min', String(filters.budget_min));
+  if (filters.budget_max != null) params.set('budget_max', String(filters.budget_max));
+  if (filters.favorites) params.set('favorites', '1');
   const query = params.toString();
   return query ? `?${query}` : '';
 }
@@ -237,7 +292,7 @@ type FetchJsonOptions = {
 
 async function fetchJson<T>(path: string, options: FetchJsonOptions = {}): Promise<T | null> {
   const retries = options.retries ?? 1;
-  const timeoutMs = options.timeoutMs ?? 12000;
+  const timeoutMs = options.timeoutMs ?? 30000;
 
   for (const baseUrl of apiCandidates()) {
     for (let attempt = 0; attempt <= retries; attempt += 1) {
@@ -379,6 +434,10 @@ export async function fetchTreaboTasks(filters?: TreaboTaskFilters) {
   return (await fetchJson<TreaboTask[]>(`/tasks${buildQuery(filters)}`)) ?? [];
 }
 
+export async function fetchTreaboTasksWithToken(filters: TreaboTaskFilters | undefined, token: string) {
+  return treaboApiRequest<TreaboTask[]>(`/tasks${buildQuery(filters)}`, { token });
+}
+
 export async function fetchTreaboSpecialists(filters?: TreaboSpecialistFilters) {
   const params = new URLSearchParams();
   if (filters?.city) params.set('city', filters.city);
@@ -387,6 +446,14 @@ export async function fetchTreaboSpecialists(filters?: TreaboSpecialistFilters) 
   if (!filters?.q && filters?.service) params.set('service', filters.service);
   const query = params.toString();
   return (await fetchJson<TreaboSpecialist[]>(`/specialists${query ? `?${query}` : ''}`)) ?? [];
+}
+
+export async function fetchTreaboTopSpecialists(limit = 3) {
+  return (await fetchJson<TreaboSpecialist[]>(`/home/top-specialists?limit=${encodeURIComponent(String(limit))}`)) ?? [];
+}
+
+export async function fetchTreaboHomeStats() {
+  return fetchJson<TreaboHomeStats>('/home/stats');
 }
 
 export async function createTreaboTask(token: string, input: Partial<TreaboTask>) {
@@ -399,6 +466,42 @@ export async function createTreaboTask(token: string, input: Partial<TreaboTask>
 
 export async function fetchMyTreaboTasks(token: string) {
   return treaboApiRequest<TreaboTask[]>('/tasks/mine', { token });
+}
+
+export async function updateTreaboTaskBudget(
+  taskId: string,
+  token: string,
+  input: Pick<Partial<TreaboTask>, 'budget' | 'budget_type' | 'budget_min' | 'budget_max'>,
+) {
+  return treaboApiRequest<TreaboTask>(`/tasks/${encodeURIComponent(taskId)}/budget`, {
+    method: 'PATCH',
+    token,
+    body: JSON.stringify(input),
+  });
+}
+
+export async function closeTreaboTask(taskId: string, token: string) {
+  return treaboApiRequest<TreaboTask>(`/tasks/${encodeURIComponent(taskId)}/close`, {
+    method: 'POST',
+    token,
+    body: JSON.stringify({}),
+  });
+}
+
+export async function addTreaboFavorite(taskId: string, token: string) {
+  return treaboApiRequest<{ ok?: boolean }>(`/favorites/${encodeURIComponent(taskId)}`, {
+    method: 'POST',
+    token,
+    body: JSON.stringify({}),
+  });
+}
+
+export async function removeTreaboFavorite(taskId: string, token: string) {
+  return treaboApiRequest<{ ok?: boolean }>(`/favorites/${encodeURIComponent(taskId)}`, {
+    method: 'DELETE',
+    token,
+    body: JSON.stringify({}),
+  });
 }
 
 export async function fetchTreaboTask(id: string) {
@@ -425,6 +528,46 @@ export async function fetchTreaboTaskApplicationPreview(taskId: string, token: s
   return treaboApiRequest<TreaboApplicationPreview>(
     `/tasks/${encodeURIComponent(taskId)}/applications/preview`,
     { token },
+  );
+}
+
+export async function fetchTreaboTaskRecommendedSpecialists(taskId: string) {
+  return (await fetchJson<TreaboRecommendedSpecialist[]>(
+    `/tasks/${encodeURIComponent(taskId)}/recommended-specialists`,
+    { retries: 2 },
+  )) ?? [];
+}
+
+export async function fetchTreaboSpecialist(id: string) {
+  return fetchJson<TreaboSpecialist>(`/specialists/${encodeURIComponent(id)}`, { retries: 2 });
+}
+
+export async function fetchTreaboSpecialistReviews(id: string) {
+  return fetchJson<TreaboSpecialistReviewsResponse>(
+    `/specialists/${encodeURIComponent(id)}/reviews`,
+    { retries: 2 },
+  );
+}
+
+export async function contactTreaboTaskSpecialist(taskId: string, specialistId: string, token: string) {
+  return treaboApiRequest<TreaboContactSpecialistResponse>(
+    `/tasks/${encodeURIComponent(taskId)}/contact-specialist/${encodeURIComponent(specialistId)}`,
+    { method: 'POST', token, body: JSON.stringify({}) },
+  );
+}
+
+export async function contactTreaboSpecialist(
+  specialistId: string,
+  token: string,
+  input: { task_id?: string } = {},
+) {
+  return treaboApiRequest<TreaboContactSpecialistResponse>(
+    `/specialists/${encodeURIComponent(specialistId)}/contact`,
+    {
+      method: 'POST',
+      token,
+      body: JSON.stringify(input),
+    },
   );
 }
 
@@ -507,20 +650,25 @@ export async function checkTreaboPendingDeposit(token: string) {
 }
 
 export async function fetchTreaboLandingData(filters?: TreaboTaskFilters) {
-  const [categories, tasks] = await Promise.all([
+  const [categories, tasks, topSpecialists] = await Promise.all([
     fetchTreaboCategories(),
     fetchTreaboTasks(filters),
+    fetchTreaboTopSpecialists(3),
   ]);
 
-  return { categories, tasks };
+  return { categories, tasks, topSpecialists };
 }
 
 export function filterTasksClientSide(tasks: TreaboTask[], filters: TreaboTaskFilters) {
   return tasks.filter((task) => {
-    if (filters.budget_min != null && Number(task.budget || 0) < filters.budget_min) {
+    const values = [task.budget, task.budget_min, task.budget_max]
+      .map((value) => (value != null ? Number(value) : null))
+      .filter((value): value is number => value != null && Number.isFinite(value));
+
+    if (filters.budget_min != null && values.length && Math.max(...values) < filters.budget_min) {
       return false;
     }
-    if (filters.budget_max != null && Number(task.budget || 0) > filters.budget_max) {
+    if (filters.budget_max != null && values.length && Math.min(...values) > filters.budget_max) {
       return false;
     }
     return true;

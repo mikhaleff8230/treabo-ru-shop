@@ -8,6 +8,7 @@ import {
 import TreaboAuthModal from '@/components/auth/treabo-auth-modal';
 import TreaboApplyConfirmModal from '@/components/treabo/TreaboApplyConfirmModal';
 import TreaboTaskMap from '@/components/treabo/TreaboTaskMap';
+import TreaboTaskSpecialistSearch from '@/components/treabo/TreaboTaskSpecialistSearch';
 import { ProffiHeader } from '@/components/proffi-mock/ProffiShell';
 import { TitleSeo } from '@/components/seo/title-seo';
 import routes from '@/config/routes';
@@ -85,7 +86,7 @@ function buildTaskSeo(task: TreaboTask, photos: string[], locale?: string) {
   const budget = Number(task.budget || 0);
   const cleanDescription = stripHtml(task.description);
   const fallbackDescription = [
-    `${text.task.treaboTask}: ${task.title}.`,
+    task.title,
     location ? `${text.task.address}: ${location}.` : '',
     budget > 0 ? `${text.task.facts.budget}: ${money.format(budget)} ₽.` : text.task.facts.negotiable,
   ].filter(Boolean).join(' ');
@@ -401,10 +402,9 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
           </div>
 
           <section className="rounded-[30px] bg-white p-4 shadow-sm sm:p-6">
-            <div className="mb-4 flex flex-wrap items-center gap-2 text-xs font-[400] uppercase tracking-wide text-[#7d849b]">
-              <span>{text.task.privateCustomer}</span>
-              <span className="rounded-full bg-[#d9f36b] px-3 py-1 text-[#232323]">{text.task.treaboTask}</span>
-            </div>
+            <p className="mb-3 text-sm font-normal text-[#7d849b]">
+              {data.customer_name ? `Заказчик ${data.customer_name}` : text.task.privateCustomer}
+            </p>
             <h1 className="text-2xl font-[400] leading-tight sm:text-4xl">{data.title}</h1>
             <div className="mt-4 grid gap-3 text-sm font-[400] text-[#232323] sm:grid-cols-2">
               <span className="inline-flex items-center gap-2"><MapPin className="h-4 w-4" /> {[data.city, data.address].filter(Boolean).join(', ') || text.common.addressUnknown}</span>
@@ -431,6 +431,8 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
                   </div>
                 ))}
               </section>
+
+              <TreaboTaskSpecialistSearch taskId={String(data.id)} isCustomer={isOwnTask} />
 
               <section className="mt-4 rounded-[30px] bg-white p-5 shadow-sm sm:p-6">
                 <h2 className="flex items-center gap-2 text-lg font-[400]"><MapPin className="h-5 w-5" />{text.task.address}</h2>

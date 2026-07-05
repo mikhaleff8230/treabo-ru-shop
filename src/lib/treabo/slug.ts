@@ -28,6 +28,16 @@ export function taskSlugFromTitle(title: string, id: string | number): string {
   return slug ? `${slug}-${numericId}` : numericId;
 }
 
+export function specialistSlugFromName(name: string, id: string | number): string {
+  const slug = slugifyTitle(name || 'specialist');
+  const numericId = String(id);
+  return slug ? `${slug}-${numericId}` : numericId;
+}
+
+export function parseSpecialistIdFromSlug(slugOrId: string): string {
+  return parseTaskIdFromSlug(slugOrId);
+}
+
 export function parseTaskIdFromSlug(slugOrId: string): string {
   const value = decodeURIComponent(slugOrId).trim();
   if (/^\d+$/.test(value)) return value;

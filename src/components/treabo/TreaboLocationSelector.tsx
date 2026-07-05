@@ -31,7 +31,7 @@ export default function TreaboLocationSelector() {
   }, []);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) return undefined;
 
     setLoading(true);
 

@@ -18,7 +18,7 @@ import {
   Wrench,
   Zap,
 } from 'lucide-react';
-import type { TreaboCategory, TreaboTask } from '@/data/treabo';
+import { normalizeTreaboAssetUrl, type TreaboCategory, type TreaboHomeStats, type TreaboSpecialist } from '@/data/treabo';
 import team1 from '@/assets/images/team/1.png';
 import team2 from '@/assets/images/team/2.png';
 import team3 from '@/assets/images/team/3.png';
@@ -26,7 +26,8 @@ import { FloatingMobileCTA, ProffiFooter, ProffiHeader } from './ProffiShell';
 
 type CustomerHomePageProps = {
   categories?: TreaboCategory[];
-  tasks?: TreaboTask[];
+  topSpecialists?: TreaboSpecialist[];
+  homeStats?: TreaboHomeStats | null;
 };
 
 const categoryIcons: Record<string, any> = {
@@ -61,7 +62,7 @@ function buildCategories(
   }));
 }
 
-export default function CustomerHomePage({ categories = [], tasks = [] }: CustomerHomePageProps) {
+export default function CustomerHomePage({ categories = [], topSpecialists = [], homeStats = null }: CustomerHomePageProps) {
   const router = useRouter();
   const { t } = useTranslation('common');
   const [prompt, setPrompt] = useState('');
@@ -74,10 +75,25 @@ export default function CustomerHomePage({ categories = [], tasks = [] }: Custom
   const visibleSearches = categories.length
     ? categories.slice(0, 8).map((category) => category.name_ru)
     : fallbackSearches;
-  const openTasksCount = tasks.length || 248;
-  const firstTask = tasks[0];
+  const openTasksCount = homeStats?.open_tasks || 0;
   const isPromptOpen = prompt.trim().length > 0;
   const specialistAvatars = [team1, team2, team3];
+  const realSpecialists = topSpecialists.slice(0, 3);
+  const visibleSpecialists = realSpecialists.length
+    ? realSpecialists.map((specialist, index) => ({
+        name: specialist.name,
+        role: specialist.services?.[0] || specialist.bio?.split(/[.!?]/)[0] || 'Специалист Treabo',
+        rating: Number(specialist.rating || 0) > 0 ? Number(specialist.rating).toFixed(1) : 'Новый',
+        reviews: `${Number(specialist.reviews_count || 0)} отзывов`,
+        price: specialist.min_price ? `от ${Number(specialist.min_price).toLocaleString('ru-RU')} ₽` : 'Цена по задаче',
+        avatar: specialist.avatar ? normalizeTreaboAssetUrl(specialist.avatar) : specialistAvatars[index] || team1,
+        tags: specialist.services?.length ? specialist.services.slice(0, 3) : ['Профиль Treabo'],
+      }))
+    : localizedSpecialists.map((person, index) => ({
+        ...person,
+        rating: '4.9',
+        avatar: specialistAvatars[index] || team1,
+      }));
 
   function startRequest(event?: FormEvent) {
     event?.preventDefault();
@@ -117,7 +133,7 @@ export default function CustomerHomePage({ categories = [], tasks = [] }: Custom
                   </label>
                   <label className="flex min-h-[58px] items-center gap-3 rounded-2xl bg-zinc-50 px-4">
                     <MapPin className="h-5 w-5 text-[#232323]" />
-                    <input className="w-full bg-transparent text-base font-bold text-[#232323] outline-none placeholder:text-[#232323]" placeholder={t('treabo.common.city')} />
+                    <input className="w-full bg-transparent text-base font-bold text-[#232323] outline-none placeholder:text-[#232323]" placeholder="Город" />
                   </label>
                 </div>
                 {isPromptOpen && (
@@ -146,14 +162,17 @@ export default function CustomerHomePage({ categories = [], tasks = [] }: Custom
                     <div className="mb-4 flex items-center justify-between">
                       <div>
                         <div className="text-xs font-bold text-[#232323]">{t('treabo.home.nearbyTask')}</div>
-                        <div className="font-black">{firstTask?.title || t('treabo.home.defaultTaskTitle')}</div>
+                        <div className="font-black">{t('treabo.home.defaultTaskTitle')}</div>
                       </div>
-                      <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">{t('treabo.home.taskResponses')}</span>
                     </div>
                     <div className="space-y-3">
-                      {localizedSpecialists.map((person, index) => (
+                      {visibleSpecialists.map((person) => (
                         <div key={person.name} className="flex items-center gap-3 rounded-2xl bg-zinc-50 p-3">
-                          <Image src={specialistAvatars[index] || team1} alt={person.name} width={46} height={46} className="rounded-full object-cover" />
+                          {typeof person.avatar === 'string' ? (
+                            <img src={person.avatar} alt={person.name} width={46} height={46} className="h-[46px] w-[46px] rounded-full object-cover" />
+                          ) : (
+                            <Image src={person.avatar} alt={person.name} width={46} height={46} className="rounded-full object-cover" />
+                          )}
                           <div className="min-w-0 flex-1">
                             <div className="font-bold">{person.name}</div>
                             <div className="truncate text-xs text-[#232323]">{person.role}</div>
@@ -161,7 +180,7 @@ export default function CustomerHomePage({ categories = [], tasks = [] }: Custom
                           <div className="text-right">
                             <div className="flex items-center gap-1 text-sm font-black">
                               <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
-                              4.9
+                              {person.rating}
                             </div>
                             <div className="text-xs text-[#232323]">{person.price}</div>
                           </div>
@@ -240,9 +259,13 @@ export default function CustomerHomePage({ categories = [], tasks = [] }: Custom
               <p className="mt-3 text-[#232323]">{t('treabo.home.specialistText')}</p>
             </div>
             <div className="grid gap-4 md:grid-cols-3">
-              {localizedSpecialists.map((person, index) => (
+              {visibleSpecialists.map((person) => (
                 <article key={person.name} className="rounded-[30px] bg-white p-5 shadow-sm">
-                  <Image src={specialistAvatars[index] || team1} alt={person.name} width={72} height={72} className="rounded-3xl object-cover" />
+                  {typeof person.avatar === 'string' ? (
+                    <img src={person.avatar} alt={person.name} width={72} height={72} className="h-[72px] w-[72px] rounded-3xl object-cover" />
+                  ) : (
+                    <Image src={person.avatar} alt={person.name} width={72} height={72} className="rounded-3xl object-cover" />
+                  )}
                   <div className="mt-4 flex items-center justify-between gap-3">
                     <div>
                       <h3 className="font-black">{person.name}</h3>
@@ -250,7 +273,7 @@ export default function CustomerHomePage({ categories = [], tasks = [] }: Custom
                     </div>
                     <div className="flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-1 text-xs font-black">
                       <Star className="h-3.5 w-3.5 fill-yellow-500 text-yellow-500" />
-                      4.9
+                      {person.rating}
                     </div>
                   </div>
                   <div className="mt-4 flex flex-wrap gap-2">

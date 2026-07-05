@@ -341,6 +341,9 @@ export type WizardDraft = Record<string, any> & {
   lat?: number | null;
   lng?: number | null;
   budget?: string;
+  budget_type?: 'fixed' | 'range';
+  budget_min?: string;
+  budget_max?: string;
   deadline?: string;
   details?: string;
   phone?: string;

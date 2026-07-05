@@ -1,4 +1,4 @@
-import { taskSlugFromTitle } from '@/lib/treabo/slug';
+import { specialistSlugFromName, taskSlugFromTitle } from '@/lib/treabo/slug';
 
 const routes = {
   home: '/',
@@ -56,6 +56,15 @@ const routes = {
       return `/tasks/${encodeURIComponent(slug)}`;
     }
     return `/tasks/${encodeURIComponent(String(taskOrSlug))}`;
+  },
+  specialistUrl: (
+    specialistOrSlug: string | number | { id: string | number; name?: string | null },
+  ) => {
+    if (typeof specialistOrSlug === 'object') {
+      const slug = specialistSlugFromName(specialistOrSlug.name || 'specialist', specialistOrSlug.id);
+      return `/specialists/${encodeURIComponent(slug)}`;
+    }
+    return `/specialists/${encodeURIComponent(String(specialistOrSlug))}`;
   },
   categoryUrl: (slug: string) => `/categories/${slug}`,
   tagUrl: (slug: string) => `/products/tags/${slug}`,

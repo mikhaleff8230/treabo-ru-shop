@@ -19,6 +19,29 @@ function getMapZoom(pointsCount: number) {
   return pointsCount ? 11 : 10;
 }
 
+function escapeMapText(value: unknown): string {
+  return String(value ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;')
+    .replace(/`/g, '&#096;');
+}
+
+function safeMapPhotoUrl(value?: string | null): string | null {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (/^(https?:)?\/\//i.test(trimmed) || trimmed.startsWith('/') || trimmed.startsWith('data:image/')) {
+    return escapeMapText(trimmed);
+  }
+  return null;
+}
+
+function formatRub(value: number) {
+  return new Intl.NumberFormat('ru-RU').format(value);
+}
+
 function createPlaqueLayout() {
   return window.ymaps.templateLayoutFactory.createClass(
     `<div style="background:#232323;color:#fff;padding:10px 12px;border-radius:14px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,0.28);max-width:220px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;{{ properties.active ? 'outline:2px solid #D9F36B;outline-offset:2px;' : '' }}">
@@ -81,8 +104,16 @@ export type TreaboTasksMapPoint = {
 };
 
 export function formatTaskPriceLabel(task: TreaboTask) {
+  if (task.budget_label) return task.budget_label;
+  if (task.budget_type === 'range') {
+    const min = task.budget_min != null ? Number(task.budget_min) : null;
+    const max = task.budget_max != null ? Number(task.budget_max) : null;
+    if (min != null && max != null) return `от ${formatRub(min)} до ${formatRub(max)} ₽`;
+    if (min != null) return `от ${formatRub(min)} ₽`;
+    if (max != null) return `до ${formatRub(max)} ₽`;
+  }
   if (task.budget && task.budget > 0) {
-    return `от ${new Intl.NumberFormat('ru-RU').format(task.budget)} ₽`;
+    return `от ${formatRub(task.budget)} ₽`;
   }
   return 'Цена договорная';
 }
@@ -128,14 +159,14 @@ export function buildTaskMapPoints(tasks: TreaboTask[]): TreaboTasksMapPoint[] {
 
       return {
         id: String(task.id),
-        title: task.title,
+        title: escapeMapText(task.title),
         lat: Number(task.lat),
         lng: Number(task.lng),
-        priceLabel: formatTaskPriceLabel(task),
-        city: task.city,
-        address: task.address,
-        category: task.category,
-        photoUrl,
+        priceLabel: escapeMapText(formatTaskPriceLabel(task)),
+        city: task.city ? escapeMapText(task.city) : null,
+        address: task.address ? escapeMapText(task.address) : null,
+        category: task.category ? escapeMapText(task.category) : null,
+        photoUrl: safeMapPhotoUrl(photoUrl),
       };
     });
 }

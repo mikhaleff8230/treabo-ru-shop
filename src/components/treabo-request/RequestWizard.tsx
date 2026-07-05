@@ -9,7 +9,6 @@ import {
   ListChecks,
   MapPin,
   Plus,
-  Send,
 } from 'lucide-react';
 import routes from '@/config/routes';
 import TreaboPhoneInput from '@/components/treabo/TreaboPhoneInput';
@@ -108,6 +107,7 @@ export default function RequestWizard() {
   const [submitError, setSubmitError] = useState('');
   const [taskCreated, setTaskCreated] = useState(false);
   const [createdTaskId, setCreatedTaskId] = useState<string | null>(null);
+  const [createdTaskUrl, setCreatedTaskUrl] = useState<string | null>(null);
   const [addressConfirmed, setAddressConfirmed] = useState(false);
 
   const [phone, setPhone] = useState('7');
@@ -123,7 +123,7 @@ export default function RequestWizard() {
 
   const step = steps[stepIndex];
   const clarifyFields = useMemo(() => buildClarifyFields(aiDraft), [aiDraft]);
-  const taskName = draft.category || aiDraft?.title || draft.prompt || text.request.newRequest;
+  const taskName = aiDraft?.title || draft.category || draft.prompt || text.request.newRequest;
 
   useEffect(() => {
     const queryPrompt = typeof router.query.q === 'string' ? router.query.q : '';
@@ -198,7 +198,10 @@ export default function RequestWizard() {
 
   async function createTaskFromDraft(currentDraft: WizardDraft, token: string) {
     const photos = await uploadAllPhotos(token, currentDraft);
-    const budget = parseBudgetInput(String(currentDraft.budget || ''));
+    const budgetType = currentDraft.budget_type === 'range' ? 'range' : 'fixed';
+    const budget = budgetType === 'fixed' ? parseBudgetInput(String(currentDraft.budget || '')) : null;
+    const budgetMin = budgetType === 'range' ? parseBudgetInput(String(currentDraft.budget_min || '')) : null;
+    const budgetMax = budgetType === 'range' ? parseBudgetInput(String(currentDraft.budget_max || '')) : null;
 
     return createTreaboTask(token, {
       title: resolveTaskTitle(currentDraft, text.request.newRequest),
@@ -211,6 +214,9 @@ export default function RequestWizard() {
       lat: currentDraft.lat ?? undefined,
       lng: currentDraft.lng ?? undefined,
       budget,
+      budget_type: budgetType,
+      budget_min: budgetMin,
+      budget_max: budgetMax,
       deadline: currentDraft.deadline || null,
       photos,
     });
@@ -223,9 +229,9 @@ export default function RequestWizard() {
       try {
         const task = await createTaskFromDraft(draft, token);
         setCreatedTaskId(String(task.id));
+        setCreatedTaskUrl(routes.taskUrl(task));
         setTaskCreated(true);
         setDraft((current) => ({ ...current, taskId: String(task.id), pendingPhotoFiles: [] }));
-        router.push(routes.taskUrl(task));
       } catch (error) {
         const message = error instanceof Error ? error.message : text.request.taskCreateError;
         setSubmitError(message);
@@ -689,21 +695,24 @@ export default function RequestWizard() {
   }
 
   function renderStep() {
-    if (taskCreated && createdTaskId) {
+    if (taskCreated && createdTaskUrl) {
       return (
         <div className="flex min-h-[520px] flex-col justify-center">
           <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-[#d9f36b]">
             <CheckCircle2 className="h-9 w-9 text-[#232323]" />
           </div>
-          <h1 className="mt-7 max-w-2xl text-4xl font-black leading-tight text-[#232323] md:text-5xl">
+          <p className="mt-7 text-sm font-bold uppercase tracking-wide text-[#7d849b]">
+            {text.request.taskCreatedSubtitle}
+          </p>
+          <h1 className="mt-2 max-w-2xl text-4xl font-black leading-tight text-[#232323] md:text-5xl">
             {text.request.taskCreatedTitle}
           </h1>
           <p className="mt-4 max-w-xl text-base leading-7 text-[#232323]">{text.request.taskCreatedText}</p>
           <Link
-            href={routes.taskUrl(createdTaskId)}
+            href={createdTaskUrl}
             className="mt-8 inline-flex h-12 items-center gap-3 rounded-xl bg-[#d9f36b] px-6 text-base font-black text-[#232323]"
           >
-            {text.request.viewTasks} <ArrowRight className="h-5 w-5" />
+            {text.request.viewTask} <ArrowRight className="h-5 w-5" />
           </Link>
         </div>
       );
@@ -718,16 +727,23 @@ export default function RequestWizard() {
               <textarea
                 value={draft.prompt || ''}
                 onChange={(event) => update('prompt', event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    submitPrompt();
+                  }
+                }}
                 placeholder={text.request.firstPromptPlaceholder}
                 className="block min-h-[150px] w-full resize-none appearance-none border-0 bg-transparent px-3 py-3 text-lg font-semibold text-[#232323] outline-none placeholder:text-[#8b92a8] focus:border-0 focus:outline-none focus:ring-0"
               />
               <div className="flex justify-end">
                 <button
+                  type="button"
                   onClick={submitPrompt}
                   disabled={aiLoading}
-                  className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#d9f36b] text-[#232323] disabled:cursor-wait disabled:opacity-60"
+                  className="flex h-12 items-center justify-center rounded-2xl bg-[#d9f36b] px-5 text-sm font-black text-[#232323] disabled:cursor-wait disabled:opacity-60"
                 >
-                  <Send className="h-5 w-5" />
+                  Проверить
                 </button>
               </div>
             </div>
@@ -745,15 +761,9 @@ export default function RequestWizard() {
               <div className="mt-5 max-w-3xl rounded-3xl border border-[#dfe4ee] bg-white p-5 shadow-sm">
                 <div className="text-sm font-black uppercase tracking-wide text-[#7d849b]">Детали заявки</div>
                 <h2 className="mt-2 text-2xl font-black text-[#232323]">{aiDraft.title}</h2>
-                <div className="mt-4 grid gap-3 text-sm font-semibold text-[#232323] sm:grid-cols-3">
-                  <span className="rounded-2xl bg-[#f3f5fa] px-4 py-3">
-                    {text.request.category}: {categorySlugToLabel(aiDraft.category_slug)}
-                  </span>
+                <div className="mt-4 grid gap-3 text-sm font-semibold text-[#232323] sm:grid-cols-2">
                   <span className="rounded-2xl bg-[#f3f5fa] px-4 py-3">
                     {text.request.city}: {aiDraft.city || draft.city || text.request.unknownCity}
-                  </span>
-                  <span className="rounded-2xl bg-[#f3f5fa] px-4 py-3">
-                    {text.request.urgency}: {urgencyToLabel(aiDraft.urgency)}
                   </span>
                 </div>
                 {renderAiClarifications()}
@@ -810,24 +820,48 @@ export default function RequestWizard() {
           <>
             <h1 className="max-w-3xl text-4xl font-black leading-tight text-[#232323] md:text-5xl">{step.title}</h1>
             {step.subtitle ? <p className="mt-4 text-lg text-[#232323]">{step.subtitle}</p> : null}
-            <input
-              value={draft.budget || ''}
-              onChange={(event) => update('budget', event.target.value)}
-              placeholder={text.request.budgetPlaceholder}
-              className={`${inputClass} mt-8 max-w-[290px]`}
-            />
-            <div className="mt-4 flex flex-wrap gap-2">
-              {text.request.budgetPresets.map((preset) => (
-                <button
-                  key={preset}
-                  type="button"
-                  onClick={() => update('budget', preset.replace(/[^\d–\-]/g, '').split('–')[0] || preset)}
-                  className="rounded-xl bg-[#eef1f7] px-4 py-2 text-sm font-bold text-[#232323] hover:bg-[#e3e7f1]"
-                >
-                  {preset}
-                </button>
-              ))}
+            <div className="mt-8 max-w-xl rounded-3xl bg-[#f3f5fa] p-2">
+              <div className="grid grid-cols-2 gap-2">
+                {(['fixed', 'range'] as const).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => update('budget_type', type)}
+                    className={`rounded-2xl px-4 py-3 text-sm font-black ${
+                      (draft.budget_type || 'fixed') === type ? 'bg-white text-[#232323] shadow-sm' : 'text-[#7d849b]'
+                    }`}
+                  >
+                    {type === 'fixed' ? 'Точная сумма' : 'Интервал'}
+                  </button>
+                ))}
+              </div>
             </div>
+            {(draft.budget_type || 'fixed') === 'range' ? (
+              <div className="mt-4 grid max-w-xl gap-3 sm:grid-cols-2">
+                <input
+                  value={draft.budget_min || ''}
+                  onChange={(event) => update('budget_min', event.target.value.replace(/\D/g, ''))}
+                  placeholder="От, ₽"
+                  inputMode="numeric"
+                  className={inputClass}
+                />
+                <input
+                  value={draft.budget_max || ''}
+                  onChange={(event) => update('budget_max', event.target.value.replace(/\D/g, ''))}
+                  placeholder="До, ₽"
+                  inputMode="numeric"
+                  className={inputClass}
+                />
+              </div>
+            ) : (
+              <input
+                value={draft.budget || ''}
+                onChange={(event) => update('budget', event.target.value.replace(/\D/g, ''))}
+                placeholder={text.request.budgetPlaceholder}
+                inputMode="numeric"
+                className={`${inputClass} mt-4 max-w-[290px]`}
+              />
+            )}
           </>
         );
       case 'details':
@@ -1049,7 +1083,10 @@ export default function RequestWizard() {
                 onClick={next}
                 className="inline-flex h-12 items-center gap-3 rounded-xl bg-[#d9f36b] px-6 text-base font-black text-[#232323] transition hover:bg-[#c7e85a]"
               >
-                {step.action || text.request.continue} <ArrowRight className="h-5 w-5" />
+                {step.key === 'details' && (draft.details || draft.photos?.length || draft.pendingPhotoFiles?.length)
+                  ? text.request.continue
+                  : step.action || text.request.continue}{' '}
+                <ArrowRight className="h-5 w-5" />
               </button>
             )}
           </div>
