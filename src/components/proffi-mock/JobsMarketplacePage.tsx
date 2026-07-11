@@ -29,6 +29,7 @@ import {
   type TreaboTaskFilters,
 } from '@/data/treabo';
 import { getStoredTreaboToken } from '@/data/treabo-auth';
+import { getLocationDisplayName, readStoredTreaboLocation } from '@/data/russia-locations';
 import routes from '@/config/routes';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
 import { getTreaboText } from '@/lib/treabo/i18n';
@@ -137,6 +138,7 @@ function JobCard({
   onToggleFavorite,
   highlighted,
   cardRef,
+  compact = false,
 }: {
   job: Omit<UiJobCard, 'icon' | 'task'>;
   task?: TreaboTask;
@@ -147,6 +149,7 @@ function JobCard({
   onToggleFavorite: (task: TreaboTask) => void;
   highlighted?: boolean;
   cardRef?: (node: HTMLElement | null) => void;
+  compact?: boolean;
 }) {
   const primaryPhoto = job.photos[0] || '/proffi/task-preview-default.svg';
   const previewPhotos = job.photos.slice(1, 4);
@@ -160,10 +163,10 @@ function JobCard({
       ref={cardRef}
       className={`${marketplace.card} transition ${dimmed ? 'opacity-70' : ''} ${highlighted ? 'ring-2 ring-[#D9F36B] ring-offset-2' : ''}`}
     >
-      <div className="grid gap-0 2xl:grid-cols-[minmax(0,1fr)_clamp(150px,18%,230px)_260px]">
-        <div className="p-3 sm:p-4">
+      <div className={`grid min-w-0 gap-0 ${compact ? 'grid-cols-1' : '2xl:grid-cols-[minmax(0,1fr)_clamp(150px,18%,230px)_260px]'}`}>
+        <div className={compact ? 'min-w-0 p-3' : 'p-3 sm:p-4'}>
           <div className="flex gap-3 sm:gap-4">
-            <div className="relative h-[64px] w-[64px] shrink-0 overflow-hidden rounded-[16px] bg-[#F3F4F6] sm:h-[72px] sm:w-[72px]">
+            <div className={`relative shrink-0 overflow-hidden rounded-[16px] bg-[#F3F4F6] ${compact ? 'h-14 w-14' : 'h-[64px] w-[64px] sm:h-[72px] sm:w-[72px]'}`}>
               <img src={primaryPhoto} alt={`${job.title} preview`} className={`h-full w-full object-cover ${dimmed ? 'grayscale opacity-70' : ''}`} loading="lazy" />
               {job.photos.length > 1 ? (
                 <span className="absolute bottom-1 right-1 rounded-full bg-white/90 px-1.5 py-0.5 text-[9px] font-medium leading-none text-[#20242D]">
@@ -176,7 +179,7 @@ function JobCard({
                 {job.brand}
               </div>
               <Link href={routes.taskUrl(task || { id: job.id, title: job.title })}>
-                <h3 className="mt-1.5 line-clamp-3 break-words text-[17px] font-[300] leading-[1.12] text-[#1F2430] transition hover:underline sm:text-[20px] 2xl:text-[21px]">
+                <h3 className={`mt-1.5 line-clamp-3 break-words font-[300] leading-[1.12] text-[#1F2430] transition hover:underline ${compact ? 'text-[16px]' : 'text-[17px] sm:text-[20px] 2xl:text-[21px]'}`}>
                   {job.title}
                 </h3>
               </Link>
@@ -190,7 +193,7 @@ function JobCard({
                   {job.time}
                 </span>
               </div>
-              <div className="mt-2.5 flex flex-wrap gap-1.5">
+              <div className={`mt-2.5 flex flex-wrap gap-1.5 ${compact ? 'hidden min-[340px]:flex' : ''}`}>
                 {job.tags.map((tag) => (
                   <span key={tag} className={marketplace.chip}>
                     {tag}
@@ -201,7 +204,7 @@ function JobCard({
           </div>
         </div>
 
-        <div className="hidden items-center border-[#E7E9EC] px-3 py-3 2xl:flex">
+        <div className={`${compact ? 'hidden' : 'hidden items-center border-[#E7E9EC] px-3 py-3 2xl:flex'}`}>
           {previewPhotos.length ? (
             <div className="grid w-full grid-cols-3 gap-1.5">
               {previewPhotos.map((photo, index) => (
@@ -226,7 +229,7 @@ function JobCard({
           ) : null}
         </div>
 
-        <div className="flex flex-col border-[#E7E9EC] px-3 pb-3 pt-0 sm:px-4 sm:pb-4 2xl:my-4 2xl:border-l 2xl:px-4 2xl:py-0">
+        <div className={`flex min-w-0 flex-col border-[#E7E9EC] px-3 pb-3 pt-0 ${compact ? '' : 'sm:px-4 sm:pb-4 2xl:my-4 2xl:border-l 2xl:px-4 2xl:py-0'}`}>
           <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
             <div className="text-[19px] font-[300] leading-none tracking-[-0.03em] text-[#232323] sm:text-[22px]">
               {job.pay}
@@ -455,6 +458,23 @@ export default function JobsMarketplacePage({
   }, [router.query.map, router.query.map_full]);
 
   useEffect(() => {
+    if (!router.isReady) return;
+    const queryCity = typeof router.query.city === 'string' ? router.query.city.trim() : '';
+    if (queryCity) {
+      setFilters((current) => current.city === queryCity ? current : { ...current, city: queryCity });
+      return;
+    }
+
+    const storedCity = getLocationDisplayName(readStoredTreaboLocation(), 'ru').trim();
+    if (!storedCity) return;
+    const next = { ...filters, city: storedCity };
+    setFilters(next);
+    applyFilters(next);
+    // The stored header location is the single source of truth when the URL has no city yet.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router.isReady, router.query.city]);
+
+  useEffect(() => {
     if (!mapFullscreen) return undefined;
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -651,6 +671,7 @@ export default function JobsMarketplacePage({
             onAuthOpen={() => setAuthOpen(true)}
             onToggleFavorite={toggleFavorite}
             highlighted={highlightedTaskId === job.id}
+            compact={mapViewEnabled}
             cardRef={(node) => {
               if (node) cardRefs.set(job.id, node);
               else cardRefs.delete(job.id);
@@ -728,7 +749,7 @@ export default function JobsMarketplacePage({
               </div>
             </div>
 
-            <div className="mt-5 grid gap-2 rounded-[22px] border border-[#E7E9EC] bg-white p-2 shadow-[0_8px_24px_rgba(24,28,35,0.045)] sm:grid-cols-[1fr_205px_130px]">
+            <div className="mt-5 grid gap-2 rounded-[22px] border border-[#E7E9EC] bg-white p-2 shadow-[0_8px_24px_rgba(24,28,35,0.045)] sm:grid-cols-[minmax(0,1fr)_130px]">
               <TreaboCategorySearchInput
                 categories={categories}
                 value={serviceQuery}
@@ -737,18 +758,10 @@ export default function JobsMarketplacePage({
                 onCategoryIdChange={setSearchCategoryId}
                 placeholder={text.common.servicePlaceholder}
               />
-              <label className="flex h-11 items-center gap-2.5 rounded-[16px] bg-[#F6F7F5] px-3.5">
-                <MapPin className="h-4 w-4 text-[#777D88]" />
-                <RussiaCityInput
-                  value={filters.city || ''}
-                  onChange={(city) => setFilters((current) => ({ ...current, city }))}
-                  placeholder={text.city}
-                />
-              </label>
               <button
                 type="button"
                 onClick={runSearch}
-                className="rounded-[16px] bg-[#232323] px-4 text-xs font-semibold text-white"
+                className="h-11 w-full rounded-[16px] bg-[#232323] px-4 text-sm font-semibold text-white transition hover:bg-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#D9F36B]"
               >
                 {text.common.search}
               </button>

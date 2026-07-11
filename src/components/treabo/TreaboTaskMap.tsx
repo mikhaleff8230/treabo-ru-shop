@@ -33,7 +33,11 @@ export default function TreaboTaskMap({ task }: { task: TreaboTask }) {
 
         if (task.lat != null && task.lng != null) {
           mapInstanceRef.current.geoObjects.add(
-            new window.ymaps!.Placemark(center, { hintContent: task.title }, { preset: 'islands#darkGreenDotIcon' }),
+            new window.ymaps!.Placemark(
+              center,
+              { hintContent: task.title, iconContent: task.title },
+              { preset: 'islands#darkGreenStretchyIcon' },
+            ),
           );
         }
 

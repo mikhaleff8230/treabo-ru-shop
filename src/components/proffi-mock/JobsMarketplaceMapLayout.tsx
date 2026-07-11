@@ -71,8 +71,8 @@ export default function JobsMarketplaceMapLayout({
     <aside
       className={`order-2 flex min-h-0 flex-col border-[#E7E9EC] bg-white md:order-1 ${
         mapFullscreen
-          ? 'h-full w-full shrink-0 border-r md:w-[min(100%,320px)] lg:w-[360px]'
-          : 'max-h-[42vh] w-full shrink-0 border-t md:max-h-none md:w-[min(100%,320px)] md:border-b-0 md:border-r md:border-t-0 lg:w-[360px]'
+          ? 'h-full w-full min-w-0 shrink-0 border-r md:w-[clamp(280px,28vw,380px)]'
+          : 'max-h-[42vh] w-full min-w-0 shrink-0 border-t md:max-h-none md:w-[clamp(280px,28vw,380px)] md:border-b-0 md:border-r md:border-t-0'
       }`}
     >
       <div className="shrink-0 border-b border-[#E7E9EC] px-4 py-3">

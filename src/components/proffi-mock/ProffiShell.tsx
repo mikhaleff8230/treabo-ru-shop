@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { useState } from 'react';
-import { CircleHelp, ClipboardList, LogOut, Map, Menu, MessageCircle, UserRound, Wallet } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { CircleHelp, ClipboardList, LogOut, Map, Menu, MessageCircle, UserRound, Wallet, X } from 'lucide-react';
 import TreaboAuthModal from '@/components/auth/treabo-auth-modal';
 import TreaboLocationSelector from '@/components/treabo/TreaboLocationSelector';
 import routes from '@/config/routes';
@@ -19,12 +19,29 @@ export function ProffiHeader() {
   const { unreadCount } = useTreaboUnreadChats(auth.isAuthenticated);
   const [authOpen, setAuthOpen] = useState(false);
   const [authTab, setAuthTab] = useState<'login' | 'register'>('login');
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const showLocationSelector = router.pathname !== '/';
 
   function openAuth(tab: 'login' | 'register') {
+    setMobileMenuOpen(false);
     setAuthTab(tab);
     setAuthOpen(true);
   }
+
+  useEffect(() => {
+    const closeMenu = () => setMobileMenuOpen(false);
+    router.events.on('routeChangeStart', closeMenu);
+    return () => router.events.off('routeChangeStart', closeMenu);
+  }, [router.events]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMobileMenuOpen(false);
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [mobileMenuOpen]);
 
   const headerLinks = auth.isAuthenticated
     ? auth.isSpecialist
@@ -171,11 +188,50 @@ export function ProffiHeader() {
               <UserRound className="h-4 w-4" />
             </button>
           ) : null}
-            <button className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 md:hidden" aria-label="Menu">
-              <Menu className="h-4 w-4" />
+            <button
+              type="button"
+              onClick={() => setMobileMenuOpen((open) => !open)}
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-zinc-200 md:hidden"
+              aria-label={mobileMenuOpen ? 'Закрыть меню' : 'Открыть меню'}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="treabo-mobile-menu"
+            >
+              {mobileMenuOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
             </button>
           </div>
         </div>
+        {mobileMenuOpen ? (
+          <div id="treabo-mobile-menu" className="border-t border-zinc-200 bg-white px-4 py-4 shadow-xl md:hidden">
+            <nav className="mx-auto flex max-w-[1160px] flex-col gap-1" aria-label="Мобильная навигация">
+              {headerLinks.map(({ href, label, icon: Icon }) => (
+                <Link key={href} href={href} className="flex min-h-[46px] items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold text-[#232323] hover:bg-[#f5f6f1]">
+                  {Icon ? <Icon className="h-4 w-4" /> : null}
+                  <span className="min-w-0 flex-1">{label}</span>
+                  {href === '/treabo/chats' && unreadCount > 0 ? (
+                    <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#ff405c] px-1.5 text-[11px] font-black text-white">{unreadCount > 9 ? '9+' : unreadCount}</span>
+                  ) : null}
+                </Link>
+              ))}
+              <Link href="/request/new" className="mt-2 flex min-h-[46px] items-center justify-center rounded-2xl bg-[#d9f36b] px-4 py-3 text-sm font-bold text-[#232323]">
+                {text.header.createRequest}
+              </Link>
+              {auth.isAuthenticated ? (
+                <>
+                  <div className="my-2 border-t border-zinc-200" />
+                  <Link href="/treabo/profile" className="flex min-h-[46px] items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold hover:bg-[#f5f6f1]"><ClipboardList className="h-4 w-4" />{text.header.questionnaire}</Link>
+                  <Link href="/treabo/balance" className="flex min-h-[46px] items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold hover:bg-[#f5f6f1]"><Wallet className="h-4 w-4" />{text.header.balance}</Link>
+                  <Link href="/treabo/support" className="flex min-h-[46px] items-center gap-3 rounded-2xl px-4 py-3 text-sm font-bold hover:bg-[#f5f6f1]"><CircleHelp className="h-4 w-4" />{text.header.support}</Link>
+                  <button type="button" onClick={() => { setMobileMenuOpen(false); auth.logout(); }} className="flex min-h-[46px] items-center gap-3 rounded-2xl px-4 py-3 text-left text-sm font-bold text-red-600 hover:bg-red-50"><LogOut className="h-4 w-4" />{text.header.logout}</button>
+                </>
+              ) : (
+                <div className="mt-2 grid grid-cols-2 gap-2">
+                  <button type="button" onClick={() => openAuth('login')} className="min-h-[44px] rounded-2xl border border-zinc-300 px-3 text-sm font-bold">{text.header.login}</button>
+                  <button type="button" onClick={() => openAuth('register')} className="min-h-[44px] rounded-2xl bg-[#232323] px-3 text-sm font-bold text-white">Регистрация</button>
+                </div>
+              )}
+            </nav>
+          </div>
+        ) : null}
       </header>
 
       <TreaboAuthModal
@@ -197,14 +253,42 @@ export function ProffiFooter() {
   const text = getTreaboText(router.locale);
   const { src: logoSrc, alt: logoAlt } = useTreaboBrandLogo();
   const footerColumns = [
-    text.header.findSpecialist,
-    text.header.tasks,
-    text.header.masterLogin,
-    text.header.support,
+    {
+      title: text.header.findSpecialist,
+      links: [
+        { href: '/specialists', label: 'Каталог специалистов' },
+        { href: '/request/new', label: text.header.createRequest },
+        { href: '/master-registration', label: 'Стать специалистом' },
+      ],
+    },
+    {
+      title: text.header.tasks,
+      links: [
+        { href: routes.works, label: 'Все задания' },
+        { href: `${routes.works}?map=1`, label: 'Задания на карте' },
+        { href: '/treabo/tasks', label: 'Мои задания' },
+      ],
+    },
+    {
+      title: 'Общение',
+      links: [
+        { href: '/treabo/chats', label: text.header.chats },
+        { href: '/treabo/reviews', label: 'Отзывы' },
+        { href: '/treabo/profile', label: text.header.profile },
+      ],
+    },
+    {
+      title: text.header.support,
+      links: [
+        { href: '/treabo/support', label: 'Центр поддержки' },
+        { href: '/treabo/profile', label: 'Настройки профиля' },
+        { href: '/', label: 'Главная' },
+      ],
+    },
   ];
 
   return (
-    <footer className="border-t border-zinc-200 bg-white">
+    <footer className="border-t border-zinc-200 bg-white pb-24 sm:pb-0">
       <div className="mx-auto grid max-w-[1160px] gap-6 px-4 py-6 sm:px-6 md:grid-cols-[1fr_2fr] lg:px-8">
         <div>
           <div className="mb-2 flex items-center">
@@ -222,13 +306,15 @@ export function ProffiFooter() {
           </p>
         </div>
         <div className="grid grid-cols-2 gap-4 text-xs sm:grid-cols-4">
-          {footerColumns.map((title) => (
-            <div key={title}>
-              <div className="mb-2 font-semibold text-[#232323]">{title}</div>
+          {footerColumns.map((column) => (
+            <div key={column.title}>
+              <div className="mb-2 font-semibold text-[#232323]">{column.title}</div>
               <div className="space-y-1.5 text-[#777D88]">
-                <div>{text.common.category}</div>
-                <div>{text.header.chats}</div>
-                <div>{text.header.support}</div>
+                {column.links.map((link) => (
+                  <Link key={link.href + link.label} href={link.href} className="block transition hover:text-[#232323] hover:underline">
+                    {link.label}
+                  </Link>
+                ))}
               </div>
             </div>
           ))}
