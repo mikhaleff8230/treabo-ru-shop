@@ -119,6 +119,36 @@ function Option({
   );
 }
 
+function PendingPhotoPreview({
+  file,
+  children,
+}: {
+  file: File;
+  children: React.ReactNode;
+}) {
+  const [previewUrl, setPreviewUrl] = useState('');
+
+  useEffect(() => {
+    if (!file.type.startsWith('image/')) return;
+    const objectUrl = URL.createObjectURL(file);
+    setPreviewUrl(objectUrl);
+    return () => URL.revokeObjectURL(objectUrl);
+  }, [file]);
+
+  return (
+    <div className="group relative overflow-hidden rounded-2xl bg-[#eef1f7]">
+      {previewUrl ? (
+        <img src={previewUrl} alt={file.name} className="h-24 w-full object-cover" />
+      ) : (
+        <div className="flex h-24 items-center justify-center px-2 text-center text-xs font-semibold text-[#7d849b]">
+          {file.name}
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
 export default function RequestWizard() {
   const router = useRouter();
   const text = getTreaboText(router.locale);
@@ -203,9 +233,15 @@ export default function RequestWizard() {
 
   const visibleSteps = useMemo(() => {
     const result: Step[] = [];
+    const questionsStep: Step | null = workQuestions.length
+      ? { key: 'work_questions', title: 'Уточните детали работы', progress: 90 }
+      : null;
 
     normalizedSteps.forEach((item) => {
       if (item.key === 'work' || item.key === 'work_questions') return;
+
+      // Questions belong at the end of the wizard, immediately before contacts.
+      if (item.key === 'contacts' && questionsStep) result.push(questionsStep);
       result.push(item);
 
       if (item.key === 'category' && works.length) {
@@ -213,20 +249,6 @@ export default function RequestWizard() {
           key: 'work',
           title: 'Какая именно работа нужна?',
           progress: 35,
-        });
-
-        if (workQuestions.length) {
-          result.push({
-            key: 'work_questions',
-            title: 'Уточните детали работы',
-            progress: 40,
-          });
-        }
-      } else if (item.key === 'category' && workQuestions.length) {
-        result.push({
-          key: 'work_questions',
-          title: 'Уточните детали работы',
-          progress: 40,
         });
       }
     });
@@ -1022,7 +1044,6 @@ export default function RequestWizard() {
                     {text.request.city}: {aiDraft.city || draft.city || text.request.unknownCity}
                   </span>
                 </div>
-                {renderAiClarifications()}
                 <button
                   onClick={next}
                   className="mt-5 inline-flex h-12 items-center gap-3 rounded-xl bg-[#d9f36b] px-6 text-base font-black text-[#232323] transition hover:bg-[#c7e85a]"
@@ -1211,10 +1232,7 @@ export default function RequestWizard() {
                   );
                 })}
                 {(draft.pendingPhotoFiles || []).map((file, index) => (
-                  <div key={`${file.name}-${index}`} className="group relative overflow-hidden rounded-2xl bg-[#eef1f7]">
-                    <div className="flex h-24 items-center justify-center px-2 text-center text-xs font-semibold text-[#7d849b]">
-                      {file.name}
-                    </div>
+                  <PendingPhotoPreview key={`${file.name}-${file.lastModified}-${index}`} file={file}>
                     <button
                       type="button"
                       onClick={() => removePendingPhoto(index)}
@@ -1222,7 +1240,7 @@ export default function RequestWizard() {
                     >
                       ×
                     </button>
-                  </div>
+                  </PendingPhotoPreview>
                 ))}
               </div>
             ) : null}

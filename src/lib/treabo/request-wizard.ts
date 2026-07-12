@@ -203,12 +203,9 @@ export function generateLocalAiDraft(text: string, defaultCity = 'Москва')
     urgency: isUrgent ? 'urgent' : 'unknown',
     description: `Клиент описал задачу так: ${text}. Нужны дополнительные детали для оценки стоимости и сроков.`,
     master_summary: `${hasBath ? 'Ванная' : hasTile ? 'Плитка' : hasPaint ? 'Покраска' : 'Работа'}, ${isUrgent ? 'срочно' : 'срок уточнить'}${city ? `, ${city}` : `, ${defaultCity}`}.`,
-    missing_questions: [
-      'Какая площадь работ?',
-      'Есть ли фотографии?',
-      'Материалы уже куплены?',
-      'Когда специалист может приехать на осмотр?',
-    ],
+    // The fallback only classifies the request. Clarifying questions must be
+    // configured for the selected work in admin, never fabricated generically.
+    missing_questions: [],
     confidence: 0.55,
   };
 }

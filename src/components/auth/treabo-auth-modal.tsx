@@ -235,7 +235,13 @@ export default function TreaboAuthModal({
           <div>
             <div className="text-sm font-bold text-[#7d849b]">Treabo</div>
             <h2 className="text-2xl font-black text-[#232323]">
-              {otpStep ? 'Подтверждение телефона' : tab === 'login' ? 'Вход' : 'Регистрация'}
+              {otpStep
+                ? 'Подтверждение телефона'
+                : tab === 'login'
+                  ? 'Вход'
+                  : role === 'specialist'
+                    ? 'Регистрация специалиста'
+                    : 'Регистрация клиента'}
             </h2>
           </div>
           <button
@@ -283,33 +289,6 @@ export default function TreaboAuthModal({
                     />
                   </label>
 
-                  <div className="space-y-2">
-                    <span className="text-sm font-bold text-[#232323]">Роль</span>
-                    <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        disabled
-                        className={`rounded-2xl border px-3 py-3 text-sm font-bold ${
-                          role === 'customer'
-                            ? 'border-[#D9F36B] bg-[#D9F36B] text-[#232323]'
-                            : 'border-zinc-200 text-[#232323]'
-                        }`}
-                      >
-                        Заказчик
-                      </button>
-                      <button
-                        type="button"
-                        disabled
-                        className={`rounded-2xl border px-3 py-3 text-sm font-bold ${
-                          role === 'specialist'
-                            ? 'border-[#D9F36B] bg-[#D9F36B] text-[#232323]'
-                            : 'border-zinc-200 text-[#232323]'
-                        }`}
-                      >
-                        Специалист
-                      </button>
-                    </div>
-                  </div>
                 </>
               ) : null}
 
