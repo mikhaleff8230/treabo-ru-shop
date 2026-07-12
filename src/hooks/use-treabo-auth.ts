@@ -30,6 +30,7 @@ export function useTreaboAuth() {
       const data = await treaboLogin({
         email: process.env.NEXT_PUBLIC_TREABO_DEV_AUTO_EMAIL || 'local.customer@treabo.local',
         password: 'local-dev',
+        role: 'customer',
       }).catch(() => null);
 
       fresh = data && !isTreaboOtpSentResponse(data) ? data.user : null;
@@ -65,16 +66,16 @@ export function useTreaboAuth() {
       purpose: 'login' | 'register';
       password?: string;
       name?: string;
-      role?: 'customer' | 'specialist';
+      role: 'customer' | 'specialist';
       email?: string;
       city?: string;
     }): Promise<TreaboOtpSentResponse> => treaboSendPhoneOtp(input),
-    verifyOtp: async (input: { phone: string; otp_id: string; code: string }) => {
+    verifyOtp: async (input: { phone: string; otp_id: string; code: string; role: 'customer' | 'specialist' }) => {
       const data = await treaboVerifyPhoneOtp(input);
       setUser(data.user);
       return data;
     },
-    login: async (input: { phone?: string; email?: string; password: string }): Promise<TreaboAuthResult> => {
+    login: async (input: { phone?: string; email?: string; password: string; role: 'customer' | 'specialist' }): Promise<TreaboAuthResult> => {
       const data = await treaboLogin(input);
       if (!isTreaboOtpSentResponse(data)) {
         return completeAuth(data);

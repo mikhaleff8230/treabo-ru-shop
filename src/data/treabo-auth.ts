@@ -126,11 +126,11 @@ export async function treaboSendPhoneOtp(input: {
   purpose: 'login' | 'register';
   password?: string;
   name?: string;
-  role?: 'customer' | 'specialist';
+  role: 'customer' | 'specialist';
   email?: string;
   city?: string;
 }) {
-  return authFetch<TreaboOtpSentResponse>('/auth/phone/send-otp', {
+  return authFetch<TreaboOtpSentResponse>(`/auth/${input.role}/phone/send-otp`, {
     method: 'POST',
     body: JSON.stringify({
       ...input,
@@ -139,8 +139,8 @@ export async function treaboSendPhoneOtp(input: {
   });
 }
 
-export async function treaboVerifyPhoneOtp(input: { phone: string; otp_id: string; code: string }) {
-  const data = await authFetch<TreaboAuthResponse>('/auth/phone/verify-otp', {
+export async function treaboVerifyPhoneOtp(input: { phone: string; otp_id: string; code: string; role: 'customer' | 'specialist' }) {
+  const data = await authFetch<TreaboAuthResponse>(`/auth/${input.role}/phone/verify-otp`, {
     method: 'POST',
     body: JSON.stringify({
       ...input,
@@ -160,7 +160,7 @@ export async function treaboRegister(input: {
   email?: string;
   city?: string;
 }): Promise<TreaboAuthResult> {
-  const payload = await authFetch<TreaboAuthResult>('/auth/register-phone', {
+  const payload = await authFetch<TreaboAuthResult>(`/auth/${input.role}/register-phone`, {
     method: 'POST',
     body: JSON.stringify({
       ...input,
@@ -179,6 +179,7 @@ export async function treaboLogin(input: {
   phone?: string;
   email?: string;
   password: string;
+  role: 'customer' | 'specialist';
 }): Promise<TreaboAuthResult> {
   const body: Record<string, string> = { password: input.password };
 
@@ -188,7 +189,8 @@ export async function treaboLogin(input: {
     body.phone = normalizeTreaboPhone(input.phone);
   }
 
-  const payload = await authFetch<TreaboAuthResult>('/auth/login', {
+  body.role = input.role;
+  const payload = await authFetch<TreaboAuthResult>(`/auth/${input.role}/login`, {
     method: 'POST',
     body: JSON.stringify(body),
   });
@@ -249,4 +251,16 @@ export function isTreaboSpecialist(user?: TreaboUser | null) {
 
 export function isTreaboCustomer(user?: TreaboUser | null) {
   return user?.role === 'customer';
+}
+
+export async function treaboRequestPushLogin(phone: string) {
+  return authFetch<{ request_id: string; status: string; expires_in: number }>('/auth/specialist/push-login/request', {
+    method: 'POST', body: JSON.stringify({ phone: normalizeTreaboPhone(phone) }),
+  });
+}
+
+export async function treaboPollPushLogin(requestId: string): Promise<{ status: string; token?: string; user?: TreaboUser }> {
+  const result = await authFetch<{ status: string; token?: string; user?: TreaboUser }>(`/auth/specialist/push-login/${encodeURIComponent(requestId)}`);
+  if (result.status === 'approved' && result.token && result.user) persistTreaboSession({ token: result.token, user: result.user });
+  return result;
 }

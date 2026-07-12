@@ -58,7 +58,7 @@ export function ProffiHeader() {
     : [
         { href: '/specialists', label: text.header.findSpecialist },
         { href: routes.works, label: text.header.tasks },
-        { href: '/master-registration', label: text.header.masterLogin },
+        { href: '/auth/master', label: text.header.masterLogin },
       ];
 
   return (
@@ -102,7 +102,7 @@ export function ProffiHeader() {
             {!auth.isAuthenticated ? (
               <button
                 type="button"
-                onClick={() => openAuth('login')}
+                onClick={() => { window.location.href = '/auth/client'; }}
                 className="rounded-xl px-3 py-2 transition hover:bg-[#d9f36b] hover:text-[#232323]"
               >
                 {text.header.login}
@@ -181,7 +181,7 @@ export function ProffiHeader() {
             {!auth.isAuthenticated ? (
               <button
                 type="button"
-                onClick={() => openAuth('login')}
+                onClick={() => { window.location.href = '/auth/client'; }}
               className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-zinc-950 text-white"
                 aria-label={text.header.login}
               >
@@ -225,8 +225,8 @@ export function ProffiHeader() {
                 </>
               ) : (
                 <div className="mt-2 grid grid-cols-2 gap-2">
-                  <button type="button" onClick={() => openAuth('login')} className="min-h-[44px] rounded-2xl border border-zinc-300 px-3 text-sm font-bold">{text.header.login}</button>
-                  <button type="button" onClick={() => openAuth('register')} className="min-h-[44px] rounded-2xl bg-[#232323] px-3 text-sm font-bold text-white">Регистрация</button>
+                  <Link href="/auth/client" onClick={() => setMobileMenuOpen(false)} className="flex min-h-[44px] items-center justify-center rounded-2xl border border-zinc-300 px-3 text-sm font-bold">{text.header.login}</Link>
+                  <Link href="/auth/client?tab=register" onClick={() => setMobileMenuOpen(false)} className="flex min-h-[44px] items-center justify-center rounded-2xl bg-[#d9f36b] px-3 text-sm font-bold text-[#232323]">Регистрация</Link>
                 </div>
               )}
             </nav>

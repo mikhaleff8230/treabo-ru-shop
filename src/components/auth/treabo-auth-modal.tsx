@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { X } from 'lucide-react';
 import TreaboPhoneInput from '@/components/treabo/TreaboPhoneInput';
 import OtpCodeInput from '@/components/auth/otp-code-input';
-import { isTreaboOtpSentResponse } from '@/data/treabo-auth';
+import { isTreaboOtpSentResponse, treaboPollPushLogin, treaboRequestPushLogin } from '@/data/treabo-auth';
 import { normalizeTreaboPhone } from '@/lib/treabo/phone';
 
 type TreaboAuthModalProps = {
@@ -11,7 +11,7 @@ type TreaboAuthModalProps = {
   initialTab?: 'login' | 'register';
   initialRole?: 'customer' | 'specialist';
   onSuccess?: () => void;
-  login: (input: { phone?: string; email?: string; password: string }) => Promise<unknown>;
+  login: (input: { phone?: string; email?: string; password: string; role: 'customer' | 'specialist' }) => Promise<unknown>;
   register: (input: {
     name: string;
     phone: string;
@@ -24,10 +24,10 @@ type TreaboAuthModalProps = {
     purpose: 'login' | 'register';
     password?: string;
     name?: string;
-    role?: 'customer' | 'specialist';
+    role: 'customer' | 'specialist';
     email?: string;
   }) => Promise<{ status: 'otp_sent'; phone: string; otp_id: string }>;
-  verifyOtp: (input: { phone: string; otp_id: string; code: string }) => Promise<unknown>;
+  verifyOtp: (input: { phone: string; otp_id: string; code: string; role: 'customer' | 'specialist' }) => Promise<unknown>;
 };
 
 const RESEND_SECONDS = 60;
@@ -57,6 +57,7 @@ export default function TreaboAuthModal({
   const [otpCode, setOtpCode] = useState('');
   const [otpPurpose, setOtpPurpose] = useState<'login' | 'register'>('login');
   const [resendTimer, setResendTimer] = useState(0);
+  const [pushWaiting, setPushWaiting] = useState(false);
 
   useEffect(() => {
     if (open) {
@@ -121,6 +122,7 @@ export default function TreaboAuthModal({
         const result = await login({
           phone: normalizedPhone,
           password,
+          role,
         });
 
         if (isTreaboOtpSentResponse(result)) {
@@ -138,6 +140,28 @@ export default function TreaboAuthModal({
     }
   }
 
+  async function handlePushLogin() {
+    setError('');
+    setSubmitting(true);
+    try {
+      const request = await treaboRequestPushLogin(normalizedPhone);
+      setPushWaiting(true);
+      const deadline = Date.now() + request.expires_in * 1000;
+      while (Date.now() < deadline) {
+        await new Promise((resolve) => window.setTimeout(resolve, 2000));
+        const result = await treaboPollPushLogin(request.request_id);
+        if (result.status === 'approved') { onSuccess?.(); onClose(); return; }
+        if (result.status === 'rejected' || result.status === 'expired') throw new Error('Вход отклонён или время подтверждения истекло');
+      }
+      throw new Error('Время подтверждения истекло');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось отправить push');
+    } finally {
+      setPushWaiting(false);
+      setSubmitting(false);
+    }
+  }
+
   async function handleVerifyOtp(code: string) {
     if (!otpId) return;
 
@@ -149,6 +173,7 @@ export default function TreaboAuthModal({
         phone: otpPhone,
         otp_id: otpId,
         code,
+        role,
       });
 
       onSuccess?.();
@@ -181,6 +206,7 @@ export default function TreaboAuthModal({
               phone: otpPhone,
               purpose: 'login',
               password,
+              role,
             });
 
       setOtpId(payload.otp_id);
@@ -262,7 +288,7 @@ export default function TreaboAuthModal({
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => setRole('customer')}
+                        disabled
                         className={`rounded-2xl border px-3 py-3 text-sm font-bold ${
                           role === 'customer'
                             ? 'border-[#D9F36B] bg-[#D9F36B] text-[#232323]'
@@ -273,7 +299,7 @@ export default function TreaboAuthModal({
                       </button>
                       <button
                         type="button"
-                        onClick={() => setRole('specialist')}
+                        disabled
                         className={`rounded-2xl border px-3 py-3 text-sm font-bold ${
                           role === 'specialist'
                             ? 'border-[#D9F36B] bg-[#D9F36B] text-[#232323]'
@@ -323,10 +349,15 @@ export default function TreaboAuthModal({
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full rounded-2xl bg-[#d9f36b] px-5 py-3 text-base font-black text-[#232323] transition hover:bg-[#c7e85a] disabled:opacity-60"
+                className={`w-full rounded-2xl px-5 py-3 text-base font-black transition disabled:opacity-60 ${role === 'specialist' ? 'bg-[#232323] text-white hover:bg-black' : 'bg-[#d9f36b] text-[#232323] hover:bg-[#c7e85a]'}`}
               >
                 {submitting ? 'Подождите…' : tab === 'login' ? 'Войти' : 'Зарегистрироваться'}
               </button>
+              {tab === 'login' && role === 'specialist' ? (
+                <button type="button" onClick={handlePushLogin} disabled={submitting || !normalizedPhone} className="w-full rounded-2xl bg-[#232323] px-5 py-3 text-base font-black text-white disabled:opacity-60">
+                  {pushWaiting ? 'Подтвердите вход в приложении…' : 'Войти через приложение Treabo'}
+                </button>
+              ) : null}
             </form>
           </>
         ) : (
