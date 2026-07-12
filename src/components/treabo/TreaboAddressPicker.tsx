@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import RussiaCityInput from '@/components/treabo/RussiaCityInput';
 import {
   autoDetectAddress,
   type GeoAddressResult,
@@ -72,7 +71,7 @@ export default function TreaboAddressPicker({
   onAddressChange,
   onCoordinatesChange,
   onConfirmedChange,
-  addressPlaceholder = 'Улица и номер дома',
+  addressPlaceholder = 'Начните вводить адрес',
   mapHint = 'Перетащите маркер или выберите адрес из подсказок',
 }: TreaboAddressPickerProps) {
   const apiKey = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY || '';
@@ -100,7 +99,7 @@ export default function TreaboAddressPicker({
     (result: GeoAddressResult) => {
       if (result.city) onCityChange(result.city);
       if (result.address || result.full_address) {
-        onAddressChange(result.address || result.full_address || '');
+        onAddressChange(result.full_address || result.address || '');
       }
       if (result.lat != null && result.lng != null) {
         onCoordinatesChange(result.lat, result.lng);
@@ -216,7 +215,7 @@ export default function TreaboAddressPicker({
       }
       setLoading(true);
       try {
-        const items = await suggestAddresses(text, { city, count: 8 });
+        const items = await suggestAddresses(text, { count: 8 });
         setSuggestions(items);
         setSuggestOpen(true);
       } catch {
@@ -225,7 +224,7 @@ export default function TreaboAddressPicker({
         setLoading(false);
       }
     },
-    [city],
+    [],
   );
 
   useEffect(() => {
@@ -309,7 +308,7 @@ export default function TreaboAddressPicker({
 
     if (lat == null || lng == null) {
       try {
-        const [first] = await suggestAddresses(address || city, { city, count: 1 });
+        const [first] = await suggestAddresses(address, { count: 1 });
         if (first?.lat != null && first?.lng != null) {
           confirmedResult = first;
           setDetected(first);
@@ -412,7 +411,7 @@ export default function TreaboAddressPicker({
         <div className="rounded-2xl border border-[#d9f36b] bg-[#f8fce8] px-5 py-4">
           <div className="text-sm font-bold text-[#232323]">Адрес подтверждён</div>
           <p className="mt-1 text-sm text-[#5a6070]">
-            {[city, address].filter(Boolean).join(', ') || formatDetectedLabel(detected || { needs_confirmation: false, source: 'manual', city, region: null, country: null, address, full_address: null, lat: lat ?? null, lng: lng ?? null })}
+            {address || formatDetectedLabel(detected || { needs_confirmation: false, source: 'manual', city, region: null, country: null, address, full_address: null, lat: lat ?? null, lng: lng ?? null })}
           </p>
           <button
             type="button"
@@ -429,20 +428,6 @@ export default function TreaboAddressPicker({
 
       {(editMode || !showConfirmBlock) && !confirmed ? (
         <>
-          <div>
-            <div className="mb-2 text-sm font-bold text-[#232323]">Город</div>
-            <div className={`${inputClass} !py-3`}>
-              <RussiaCityInput
-                value={city}
-                onChange={(nextCity) => {
-                  onCityChange(nextCity);
-                  setConfirmedState(false);
-                }}
-                inputClassName="w-full bg-transparent text-base text-[#232323] outline-none"
-              />
-            </div>
-          </div>
-
           <div ref={wrapRef} className="relative">
             <div className="mb-2 text-sm font-bold text-[#232323]">Адрес</div>
             <input
