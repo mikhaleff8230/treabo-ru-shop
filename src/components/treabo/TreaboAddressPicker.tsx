@@ -183,7 +183,9 @@ export default function TreaboAddressPicker({
         setDetected(nextResult);
         setGpsUsed(false);
         applyResult(nextResult);
-        setEditMode(false);
+        // Keep the single address input visible after a map click/drag so the
+        // reverse-geocoded DaData value is immediately visible and editable.
+        setEditMode(true);
       } catch {
         setDetected((current) => ({
           city: city || current?.city || null,
