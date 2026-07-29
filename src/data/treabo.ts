@@ -13,6 +13,7 @@ export type TreaboCategory = {
 export type TreaboWork = {
   id: number | string;
   category_id?: string | null;
+  category_name?: string | null;
   title: string;
   slug?: string | null;
   aliases?: string[] | null;

@@ -84,7 +84,7 @@ function mapTaskToCard(task: TreaboTask, categories: TreaboCategory[], locale: s
   const category = categories.find(
     (item) => item.id === task.category_id || item.id === task.category || item.slug === task.category,
   );
-  const categoryLabel = categoryName(category) || text.works.taskTag;
+  const categoryLabel = categoryName(category) || task.category_name || text.works.taskTag;
   const budget = Number(task.budget || 0);
 
   return {
@@ -98,6 +98,7 @@ function mapTaskToCard(task: TreaboTask, categories: TreaboCategory[], locale: s
     duration: task.status === 'open' ? text.works.open : task.status || text.works.newOrder,
     tags: [
       categoryLabel,
+      task.work_title || task.work?.title,
       task.photos?.length ? text.works.objectPhoto : text.works.clarifyDetails,
       task.updated_at ? text.works.updatedRecently : text.works.new,
     ].filter(Boolean) as string[],

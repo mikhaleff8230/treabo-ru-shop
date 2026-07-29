@@ -322,6 +322,7 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
   const seo = buildTaskSeo(data, photos, router.locale);
   const jsonLd = buildTaskJsonLd(data, seo, router.locale);
   const isOwnTask = Boolean(auth.user?.id && data.customer_id && String(auth.user.id) === String(data.customer_id));
+  const canSeeResponsePrice = auth.isAuthenticated && auth.isSpecialist;
 
   async function openApplyModal() {
     if (isOwnTask) {
@@ -406,6 +407,20 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
               {data.customer_name ? `Заказчик ${data.customer_name}` : text.task.privateCustomer}
             </p>
             <h1 className="text-2xl font-[400] leading-tight sm:text-4xl">{data.title}</h1>
+            {(data.category_name || data.work_title || data.work?.title) ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                {data.category_name ? (
+                  <span className="rounded-full bg-[#f3f5fa] px-3 py-1.5 text-xs font-bold text-[#525862]">
+                    {data.category_name}
+                  </span>
+                ) : null}
+                {data.work_title || data.work?.title ? (
+                  <span className="rounded-full bg-[#d9f36b] px-3 py-1.5 text-xs font-bold text-[#232323]">
+                    {data.work_title || data.work?.title}
+                  </span>
+                ) : null}
+              </div>
+            ) : null}
             <div className="mt-4 grid gap-3 text-sm font-[400] text-[#232323] sm:grid-cols-2">
               <span className="inline-flex items-center gap-2"><MapPin className="h-4 w-4" /> {[data.city, data.address].filter(Boolean).join(', ') || text.common.addressUnknown}</span>
               <span className="inline-flex items-center gap-2"><Clock3 className="h-4 w-4" /> {text.common.updated} {formatDate(data.updated_at || data.created_at, router.locale)}</span>
@@ -481,10 +496,12 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
                     <span className="text-[#7d849b]">{text.task.facts.status}</span>
                     <span className="text-right font-[400]">{data.status === 'open' ? text.task.facts.open : data.status || text.task.facts.new}</span>
                   </div>
-                  <div className="flex items-center justify-between gap-3">
-                    <span className="text-[#7d849b]">Отклик</span>
-                    <span className="text-right font-[400]">{responsePrice > 0 ? `${money.format(responsePrice)} ₽` : 'бесплатно'}</span>
-                  </div>
+                  {canSeeResponsePrice ? (
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-[#7d849b]">Отклик</span>
+                      <span className="text-right font-[400]">{responsePrice > 0 ? `${money.format(responsePrice)} ₽` : 'бесплатно'}</span>
+                    </div>
+                  ) : null}
                 </div>
                 {!isOwnTask ? (
                   <button

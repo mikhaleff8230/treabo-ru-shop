@@ -3,12 +3,16 @@ import Link from 'next/link';
 import { Camera, CheckCircle2, ImagePlus, Pencil, ShieldCheck, Star, Trash2 } from 'lucide-react';
 import TreaboAccountShell from '@/components/treabo/TreaboAccountShell';
 import {
+  fetchTreaboCategories,
   fetchTreaboSpecialistReviews,
   fetchTreaboStats,
+  fetchTreaboWorks,
   treaboApiRequest,
   uploadTreaboFile,
+  type TreaboCategory,
   type TreaboSpecialistReview,
   type TreaboStats,
+  type TreaboWork,
 } from '@/data/treabo';
 import { getStoredTreaboToken } from '@/data/treabo-auth';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
@@ -67,7 +71,11 @@ export default function TreaboProfilePage() {
   const [verification, setVerification] = useState<IdentityVerification | null>(null);
   const [reviews, setReviews] = useState<TreaboSpecialistReview[]>([]);
   const [bio, setBio] = useState('');
-  const [services, setServices] = useState('');
+  const [services, setServices] = useState<string[]>([]);
+  const [categories, setCategories] = useState<TreaboCategory[]>([]);
+  const [works, setWorks] = useState<TreaboWork[]>([]);
+  const [servicesLoading, setServicesLoading] = useState(true);
+  const [serviceSearch, setServiceSearch] = useState('');
   const [city, setCity] = useState('');
 
   const portfolio = auth.user?.portfolio || [];
@@ -78,9 +86,33 @@ export default function TreaboProfilePage() {
 
   useEffect(() => {
     setBio(auth.user?.bio || '');
-    setServices((auth.user?.services || []).join(', '));
     setCity(auth.user?.city || '');
-  }, [auth.user?.bio, auth.user?.city, auth.user?.services]);
+  }, [auth.user?.bio, auth.user?.city]);
+
+  useEffect(() => {
+    Promise.all([fetchTreaboCategories(), fetchTreaboWorks()])
+      .then(([categoryItems, workItems]) => {
+        const activeWorks = workItems.filter((work) => work.is_active !== false);
+        const allowedServices = new Set([
+          ...categoryItems.map((category) => category.name_ru),
+          ...activeWorks.map((work) => work.title),
+        ]);
+        setCategories(categoryItems);
+        setWorks(activeWorks);
+        setServices((current) => current.filter((service) => allowedServices.has(service)));
+      })
+      .catch(() => setError('Не удалось загрузить список категорий и работ'))
+      .finally(() => setServicesLoading(false));
+  }, []);
+
+  useEffect(() => {
+    if (servicesLoading) return;
+    const allowedServices = new Set([
+      ...categories.map((category) => category.name_ru),
+      ...works.map((work) => work.title),
+    ]);
+    setServices((auth.user?.services || []).filter((service) => allowedServices.has(service)));
+  }, [auth.user?.services, categories, servicesLoading, works]);
 
   useEffect(() => {
     const token = getStoredTreaboToken();
@@ -99,10 +131,25 @@ export default function TreaboProfilePage() {
       .catch(() => setReviews([]));
   }, [auth.user?.id]);
 
-  const serviceList = useMemo(
-    () => services.split(',').map((item) => item.trim()).filter(Boolean),
-    [services],
-  );
+  const filteredCategories = useMemo(() => {
+    const query = serviceSearch.trim().toLocaleLowerCase('ru-RU');
+    if (!query) return categories;
+    return categories.filter((category) => {
+      const categoryMatches = category.name_ru.toLocaleLowerCase('ru-RU').includes(query);
+      const workMatches = works.some(
+        (work) =>
+          String(work.category_id) === String(category.id) &&
+          work.title.toLocaleLowerCase('ru-RU').includes(query),
+      );
+      return categoryMatches || workMatches;
+    });
+  }, [categories, serviceSearch, works]);
+
+  function toggleService(value: string) {
+    setServices((current) =>
+      current.includes(value) ? current.filter((item) => item !== value) : [...current, value],
+    );
+  }
 
   async function saveProfile() {
     setSavingProfile(true);
@@ -110,7 +157,7 @@ export default function TreaboProfilePage() {
     try {
       await auth.updateProfile({
         bio,
-        services: serviceList,
+        services,
         city: city.trim() || undefined,
       });
     } catch (saveError) {
@@ -240,15 +287,78 @@ export default function TreaboProfilePage() {
                 placeholder="Опишите опыт, сильные стороны, с какими задачами работаете"
               />
             </label>
-            <label className="block">
-              <span className="text-sm font-bold text-[#7d849b]">Услуги через запятую</span>
+            <div className="block">
+              <span className="text-sm font-bold text-[#7d849b]">Категории и работы</span>
+              <p className="mt-1 text-xs leading-5 text-[#9298a8]">
+                Выберите только те услуги, которые готовы выполнять. Произвольный текст добавить нельзя.
+              </p>
               <input
-                value={services}
-                onChange={(event) => setServices(event.target.value)}
-                className="mt-2 w-full rounded-2xl bg-[#f3f5fa] px-4 py-3 text-base outline-none focus:ring-2 focus:ring-[#d9f36b]"
-                placeholder="Сантехника, электрика, ремонт ванной"
+                value={serviceSearch}
+                onChange={(event) => setServiceSearch(event.target.value)}
+                className="mt-3 w-full rounded-2xl bg-[#f3f5fa] px-4 py-3 text-base outline-none focus:ring-2 focus:ring-[#d9f36b]"
+                placeholder="Найти категорию или работу"
               />
-            </label>
+              {services.length ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {services.map((service) => (
+                    <button
+                      key={service}
+                      type="button"
+                      onClick={() => toggleService(service)}
+                      className="rounded-full bg-[#232323] px-3 py-1.5 text-xs font-bold text-white"
+                      title="Нажмите, чтобы убрать"
+                    >
+                      {service} ×
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <div className="mt-3 max-h-80 space-y-2 overflow-y-auto rounded-2xl border border-[#e2e5ec] bg-[#fafbfc] p-2">
+                {servicesLoading ? (
+                  <div className="px-3 py-5 text-center text-sm text-[#7d849b]">Загружаем услуги…</div>
+                ) : filteredCategories.length ? (
+                  filteredCategories.map((category) => {
+                    const categoryWorks = works.filter(
+                      (work) =>
+                        String(work.category_id) === String(category.id) &&
+                        (!serviceSearch.trim() ||
+                          category.name_ru.toLocaleLowerCase('ru-RU').includes(serviceSearch.trim().toLocaleLowerCase('ru-RU')) ||
+                          work.title.toLocaleLowerCase('ru-RU').includes(serviceSearch.trim().toLocaleLowerCase('ru-RU'))),
+                    );
+                    return (
+                      <div key={category.id} className="rounded-xl bg-white p-3">
+                        <label className="flex cursor-pointer items-center gap-3 font-bold text-[#232323]">
+                          <input
+                            type="checkbox"
+                            checked={services.includes(category.name_ru)}
+                            onChange={() => toggleService(category.name_ru)}
+                            className="h-4 w-4 rounded border-zinc-300 text-[#232323] focus:ring-[#d9f36b]"
+                          />
+                          {category.name_ru}
+                        </label>
+                        {categoryWorks.length ? (
+                          <div className="mt-2 grid gap-1 pl-7 sm:grid-cols-2">
+                            {categoryWorks.map((work) => (
+                              <label key={work.id} className="flex cursor-pointer items-start gap-2 rounded-lg px-2 py-1.5 text-sm hover:bg-[#f5f6f1]">
+                                <input
+                                  type="checkbox"
+                                  checked={services.includes(work.title)}
+                                  onChange={() => toggleService(work.title)}
+                                  className="mt-0.5 h-4 w-4 rounded border-zinc-300 text-[#232323] focus:ring-[#d9f36b]"
+                                />
+                                <span>{work.title}</span>
+                              </label>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="px-3 py-5 text-center text-sm text-[#7d849b]">Ничего не найдено</div>
+                )}
+              </div>
+            </div>
             <label className="block">
               <span className="text-sm font-bold text-[#7d849b]">Город</span>
               <input

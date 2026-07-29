@@ -24,6 +24,7 @@ export type TreaboOtpSentResponse = {
   status: 'otp_sent';
   phone: string;
   otp_id: string;
+  channel?: 'sms' | 'telegram';
 };
 
 export type TreaboAuthResult = TreaboAuthResponse | TreaboOtpSentResponse;
@@ -129,6 +130,7 @@ export async function treaboSendPhoneOtp(input: {
   role: 'customer' | 'specialist';
   email?: string;
   city?: string;
+  channel?: 'sms' | 'telegram';
 }) {
   return authFetch<TreaboOtpSentResponse>(`/auth/${input.role}/phone/send-otp`, {
     method: 'POST',
@@ -263,4 +265,31 @@ export async function treaboPollPushLogin(requestId: string): Promise<{ status: 
   const result = await authFetch<{ status: string; token?: string; user?: TreaboUser }>(`/auth/specialist/push-login/${encodeURIComponent(requestId)}`);
   if (result.status === 'approved' && result.token && result.user) persistTreaboSession({ token: result.token, user: result.user });
   return result;
+}
+
+export async function treaboSendCustomerPasswordResetCode(phone: string) {
+  return authFetch<TreaboOtpSentResponse>('/auth/customer/password/send-code', {
+    method: 'POST',
+    body: JSON.stringify({ phone: normalizeTreaboPhone(phone), channel: 'telegram' }),
+  });
+}
+
+export async function treaboResetCustomerPassword(input: {
+  phone: string;
+  otp_id: string;
+  code: string;
+  password: string;
+}) {
+  const data = await authFetch<TreaboAuthResponse>('/auth/customer/password/reset', {
+    method: 'POST',
+    body: JSON.stringify({
+      phone: normalizeTreaboPhone(input.phone),
+      otp_id: input.otp_id,
+      code: input.code,
+      password: input.password,
+      password_confirmation: input.password,
+    }),
+  });
+  persistTreaboSession(data);
+  return data;
 }

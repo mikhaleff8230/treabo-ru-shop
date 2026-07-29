@@ -114,12 +114,14 @@ export function ProffiHeader() {
             {showLocationSelector ? <div className="block lg:hidden">
               <TreaboLocationSelector />
             </div> : null}
-            <Link
-              href="/request/new"
-              className="hidden rounded-full bg-[#d9f36b] px-4 py-2 text-xs font-semibold text-[#232323] shadow-[0_8px_18px_rgba(132,204,22,0.14)] transition hover:bg-[#c7e85a] sm:inline-flex"
-            >
-              {text.header.createRequest}
-            </Link>
+            {!auth.isSpecialist ? (
+              <Link
+                href="/request/new"
+                className="hidden rounded-full bg-[#d9f36b] px-4 py-2 text-xs font-semibold text-[#232323] shadow-[0_8px_18px_rgba(132,204,22,0.14)] transition hover:bg-[#c7e85a] sm:inline-flex"
+              >
+                {text.header.createRequest}
+              </Link>
+            ) : null}
 
             {auth.isAuthenticated ? (
               <div className="group relative hidden sm:block">
@@ -212,9 +214,11 @@ export function ProffiHeader() {
                   ) : null}
                 </Link>
               ))}
-              <Link href="/request/new" className="mt-2 flex min-h-[46px] items-center justify-center rounded-2xl bg-[#d9f36b] px-4 py-3 text-sm font-bold text-[#232323]">
-                {text.header.createRequest}
-              </Link>
+              {!auth.isSpecialist ? (
+                <Link href="/request/new" className="mt-2 flex min-h-[46px] items-center justify-center rounded-2xl bg-[#d9f36b] px-4 py-3 text-sm font-bold text-[#232323]">
+                  {text.header.createRequest}
+                </Link>
+              ) : null}
               {auth.isAuthenticated ? (
                 <>
                   <div className="my-2 border-t border-zinc-200" />
@@ -251,6 +255,7 @@ export function ProffiHeader() {
 export function ProffiFooter() {
   const router = useRouter();
   const text = getTreaboText(router.locale);
+  const auth = useTreaboAuth();
   const { src: logoSrc, alt: logoAlt } = useTreaboBrandLogo();
   const footerColumns = [
     {
@@ -310,7 +315,7 @@ export function ProffiFooter() {
             <div key={column.title}>
               <div className="mb-2 font-semibold text-[#232323]">{column.title}</div>
               <div className="space-y-1.5 text-[#777D88]">
-                {column.links.map((link) => (
+                {column.links.filter((link) => !(auth.isSpecialist && link.href === '/request/new')).map((link) => (
                   <Link key={link.href + link.label} href={link.href} className="block transition hover:text-[#232323] hover:underline">
                     {link.label}
                   </Link>
@@ -327,14 +332,17 @@ export function ProffiFooter() {
 export function FloatingMobileCTA() {
   const router = useRouter();
   const text = getTreaboText(router.locale);
+  const auth = useTreaboAuth();
 
   return (
     <div className="fixed inset-x-0 bottom-0 z-50 border-t border-zinc-200 bg-white/95 p-3 shadow-[0_-10px_30px_rgba(0,0,0,0.08)] backdrop-blur sm:hidden">
       <div className="mx-auto flex max-w-md gap-2">
-        <Link href="/request/new" className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#d9f36b] px-4 py-3 text-sm font-bold text-[#232323]">
-          <MessageCircle className="h-4 w-4" />
-          {text.header.createRequest}
-        </Link>
+        {!auth.isSpecialist ? (
+          <Link href="/request/new" className="flex flex-1 items-center justify-center gap-2 rounded-2xl bg-[#d9f36b] px-4 py-3 text-sm font-bold text-[#232323]">
+            <MessageCircle className="h-4 w-4" />
+            {text.header.createRequest}
+          </Link>
+        ) : null}
         <Link href={routes.works} className="rounded-2xl border border-zinc-300 px-4 py-3 text-sm font-bold text-[#232323]">
           {text.header.tasks}
         </Link>

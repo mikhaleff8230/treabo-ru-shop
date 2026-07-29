@@ -1,8 +1,14 @@
 import { useEffect, useState } from 'react';
-import { X } from 'lucide-react';
+import { Smartphone, X } from 'lucide-react';
 import TreaboPhoneInput from '@/components/treabo/TreaboPhoneInput';
 import OtpCodeInput from '@/components/auth/otp-code-input';
-import { isTreaboOtpSentResponse, treaboPollPushLogin, treaboRequestPushLogin } from '@/data/treabo-auth';
+import {
+  isTreaboOtpSentResponse,
+  treaboPollPushLogin,
+  treaboRequestPushLogin,
+  treaboResetCustomerPassword,
+  treaboSendCustomerPasswordResetCode,
+} from '@/data/treabo-auth';
 import { normalizeTreaboPhone } from '@/lib/treabo/phone';
 
 type TreaboAuthModalProps = {
@@ -26,11 +32,14 @@ type TreaboAuthModalProps = {
     name?: string;
     role: 'customer' | 'specialist';
     email?: string;
+    channel?: 'sms' | 'telegram';
   }) => Promise<{ status: 'otp_sent'; phone: string; otp_id: string }>;
   verifyOtp: (input: { phone: string; otp_id: string; code: string; role: 'customer' | 'specialist' }) => Promise<unknown>;
 };
 
 const RESEND_SECONDS = 60;
+const MASTER_APP_DOWNLOAD_URL =
+  process.env.NEXT_PUBLIC_TREABO_APP_APK_URL || '/downloads/treabo-proffi.apk';
 
 export default function TreaboAuthModal({
   open,
@@ -56,8 +65,9 @@ export default function TreaboAuthModal({
   const [otpPhone, setOtpPhone] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [otpPurpose, setOtpPurpose] = useState<'login' | 'register'>('login');
+  const [passwordReset, setPasswordReset] = useState(false);
   const [resendTimer, setResendTimer] = useState(0);
-  const [pushWaiting, setPushWaiting] = useState(false);
+  const isSpecialistPushLogin = tab === 'login' && role === 'specialist';
 
   useEffect(() => {
     if (open) {
@@ -69,6 +79,7 @@ export default function TreaboAuthModal({
       setOtpPhone('');
       setOtpCode('');
       setResendTimer(0);
+      setPasswordReset(false);
     }
   }, [open, initialRole, initialTab]);
 
@@ -101,6 +112,11 @@ export default function TreaboAuthModal({
 
   async function handleSubmit(event: React.FormEvent) {
     event.preventDefault();
+    if (isSpecialistPushLogin) {
+      await handlePushLogin();
+      return;
+    }
+
     setError('');
     setSubmitting(true);
 
@@ -145,7 +161,6 @@ export default function TreaboAuthModal({
     setSubmitting(true);
     try {
       const request = await treaboRequestPushLogin(normalizedPhone);
-      setPushWaiting(true);
       const deadline = Date.now() + request.expires_in * 1000;
       while (Date.now() < deadline) {
         await new Promise((resolve) => window.setTimeout(resolve, 2000));
@@ -157,7 +172,6 @@ export default function TreaboAuthModal({
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Не удалось отправить push');
     } finally {
-      setPushWaiting(false);
       setSubmitting(false);
     }
   }
@@ -169,17 +183,44 @@ export default function TreaboAuthModal({
     setSubmitting(true);
 
     try {
-      await verifyOtp({
-        phone: otpPhone,
-        otp_id: otpId,
-        code,
-        role,
-      });
+      if (passwordReset) {
+        await treaboResetCustomerPassword({
+          phone: otpPhone,
+          otp_id: otpId,
+          code,
+          password,
+        });
+      } else {
+        await verifyOtp({
+          phone: otpPhone,
+          otp_id: otpId,
+          code,
+          role,
+        });
+      }
 
       onSuccess?.();
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Неверный код');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    setError('');
+    setSubmitting(true);
+    try {
+      const payload = await treaboSendCustomerPasswordResetCode(normalizedPhone);
+      setPasswordReset(true);
+      setOtpStep(true);
+      setOtpId(payload.otp_id);
+      setOtpPhone(payload.phone);
+      setOtpCode('');
+      setResendTimer(RESEND_SECONDS);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Не удалось отправить код в Telegram');
     } finally {
       setSubmitting(false);
     }
@@ -192,8 +233,9 @@ export default function TreaboAuthModal({
     setSubmitting(true);
 
     try {
-      const payload =
-        otpPurpose === 'register'
+      const payload = passwordReset
+        ? await treaboSendCustomerPasswordResetCode(otpPhone)
+        : otpPurpose === 'register'
           ? await sendOtp({
               phone: otpPhone,
               purpose: 'register',
@@ -201,12 +243,14 @@ export default function TreaboAuthModal({
               name: name.trim(),
               role,
               email: email.trim() || undefined,
+              channel: 'telegram',
             })
           : await sendOtp({
               phone: otpPhone,
               purpose: 'login',
               password,
               role,
+              channel: 'telegram',
             });
 
       setOtpId(payload.otp_id);
@@ -225,6 +269,7 @@ export default function TreaboAuthModal({
     setOtpCode('');
     setError('');
     setResendTimer(0);
+    setPasswordReset(false);
   }
 
   return (
@@ -309,17 +354,35 @@ export default function TreaboAuthModal({
                 </label>
               ) : null}
 
-              <label className="block space-y-2">
-                <span className="text-sm font-bold text-[#232323]">Пароль</span>
-                <input
-                  type="password"
-                  className={inputClass}
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  required
-                  minLength={4}
-                />
-              </label>
+              {!isSpecialistPushLogin ? (
+                <label className="block space-y-2">
+                  <span className="text-sm font-bold text-[#232323]">Пароль</span>
+                  <input
+                    type="password"
+                    className={inputClass}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    required
+                    minLength={4}
+                    autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
+                  />
+                </label>
+              ) : (
+                <div className="rounded-2xl bg-[#f3f5fa] px-4 py-3 text-sm leading-6 text-[#5f6678]">
+                  Мы отправим бесплатное push-уведомление в приложение Treabo. Подтвердите вход на своём телефоне.
+                </div>
+              )}
+
+              {tab === 'login' && role === 'customer' ? (
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={submitting || !normalizedPhone}
+                  className="text-left text-sm font-bold text-[#5f6678] hover:text-[#232323] disabled:opacity-50"
+                >
+                  Забыли пароль? Получить код в Telegram
+                </button>
+              ) : null}
 
               {error ? (
                 <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm text-red-700">{error}</div>
@@ -330,21 +393,62 @@ export default function TreaboAuthModal({
                 disabled={submitting}
                 className={`w-full rounded-2xl px-5 py-3 text-base font-black transition disabled:opacity-60 ${role === 'specialist' ? 'bg-[#232323] text-white hover:bg-black' : 'bg-[#d9f36b] text-[#232323] hover:bg-[#c7e85a]'}`}
               >
-                {submitting ? 'Подождите…' : tab === 'login' ? 'Войти' : 'Зарегистрироваться'}
+                {submitting
+                  ? isSpecialistPushLogin
+                    ? 'Ожидаем подтверждение…'
+                    : 'Подождите…'
+                  : isSpecialistPushLogin
+                    ? 'Подтвердить вход в приложении'
+                    : tab === 'login'
+                      ? 'Войти'
+                      : 'Зарегистрироваться'}
               </button>
-              {tab === 'login' && role === 'specialist' ? (
-                <button type="button" onClick={handlePushLogin} disabled={submitting || !normalizedPhone} className="w-full rounded-2xl bg-[#232323] px-5 py-3 text-base font-black text-white disabled:opacity-60">
-                  {pushWaiting ? 'Подтвердите вход в приложении…' : 'Войти через приложение Treabo'}
-                </button>
+              {isSpecialistPushLogin ? (
+                <p className="text-center text-xs leading-5 text-[#7d849b]">
+                  Первый вход и привязка телефона выполняются при регистрации. SMS при обычном входе мастера не отправляется.
+                </p>
+              ) : null}
+
+              {tab === 'register' && role === 'specialist' ? (
+                <a
+                  href={MASTER_APP_DOWNLOAD_URL}
+                  download
+                  className="flex items-center gap-3 rounded-2xl border border-[#dfe5c5] bg-[#f8fbe9] px-4 py-3 transition hover:border-[#c7d97c] hover:bg-[#f3f8d9]"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#d9f36b] text-[#232323]">
+                    <Smartphone className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-black text-[#232323]">Скачать приложение Treabo</span>
+                    <span className="mt-0.5 block text-xs leading-5 text-[#6f765d]">
+                      Скачайте приложение для входа в кабинет специалиста
+                    </span>
+                  </span>
+                </a>
               ) : null}
             </form>
           </>
         ) : (
           <div className="space-y-4">
             <p className="text-sm leading-6 text-[#7d849b]">
-              Мы отправили SMS-код на{' '}
+              {passwordReset ? 'Код для восстановления пароля отправлен через Telegram на ' : 'Мы отправили код подтверждения на '}
               <span className="font-bold text-[#232323]">{otpPhone}</span>
             </p>
+
+            {passwordReset ? (
+              <label className="block space-y-2">
+                <span className="text-sm font-bold text-[#232323]">Новый пароль</span>
+                <input
+                  type="password"
+                  className={inputClass}
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  required
+                  minLength={6}
+                  autoComplete="new-password"
+                />
+              </label>
+            ) : null}
 
             <OtpCodeInput
               value={otpCode}
@@ -368,14 +472,14 @@ export default function TreaboAuthModal({
                 disabled={resendTimer > 0 || submitting}
                 className="text-sm font-bold text-[#232323] disabled:text-[#b8bcc8]"
               >
-                {resendTimer > 0 ? `Отправить код ещё раз (${resendTimer}с)` : 'Отправить код ещё раз'}
+                {resendTimer > 0 ? `Получить код в Telegram (${resendTimer}с)` : 'Получить код в Telegram'}
               </button>
             </div>
 
             <button
               type="button"
               onClick={() => handleVerifyOtp(otpCode)}
-              disabled={submitting || otpCode.length < 6}
+              disabled={submitting || otpCode.length < 6 || (passwordReset && password.length < 6)}
               className="w-full rounded-2xl bg-[#d9f36b] px-5 py-3 text-base font-black text-[#232323] transition hover:bg-[#c7e85a] disabled:opacity-60"
             >
               {submitting ? 'Проверяем…' : 'Подтвердить'}

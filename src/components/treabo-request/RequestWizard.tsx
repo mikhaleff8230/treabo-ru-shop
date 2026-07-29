@@ -153,7 +153,7 @@ export default function RequestWizard() {
   const router = useRouter();
   const text = getTreaboText(router.locale);
   const steps = text.request.steps as Step[];
-  const { user, isAuthenticated, login, register, sendOtp, verifyOtp } = useTreaboAuth();
+  const { user, isAuthenticated, isSpecialist, loading: authLoading, login, register, sendOtp, verifyOtp } = useTreaboAuth();
 
   const [stepIndex, setStepIndex] = useState(0);
   const [draft, setDraft] = useState<WizardDraft>({ city: text.city });
@@ -165,6 +165,8 @@ export default function RequestWizard() {
   const [questionsLoading, setQuestionsLoading] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
+  const [aiMessages, setAiMessages] = useState<Array<{ role: 'user' | 'assistant'; text: string }>>([]);
+  const [aiFollowUp, setAiFollowUp] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
   const [savingTask, setSavingTask] = useState(false);
@@ -184,6 +186,12 @@ export default function RequestWizard() {
   const [otpPurpose, setOtpPurpose] = useState<'login' | 'register'>('login');
   const [resendTimer, setResendTimer] = useState(0);
   const autoCreateAttempted = useRef(false);
+
+  useEffect(() => {
+    if (!authLoading && isSpecialist) {
+      void router.replace('/works');
+    }
+  }, [authLoading, isSpecialist, router]);
 
   const clarifyFields = useMemo(() => buildClarifyFields(aiDraft), [aiDraft]);
   const categoryOptions = useMemo<CategoryOption[]>(() => {
@@ -233,28 +241,40 @@ export default function RequestWizard() {
 
   const visibleSteps = useMemo(() => {
     const result: Step[] = [];
+    const aiResolvedCategory = Boolean(aiDraft?.category_id && Number(aiDraft.confidence || 0) >= 0.65);
+    const aiResolvedWork = Boolean(aiDraft?.work_id && Number(aiDraft.confidence || 0) >= 0.65);
     const questionsStep: Step | null = workQuestions.length
       ? { key: 'work_questions', title: 'Уточните детали работы', progress: 90 }
       : null;
 
     normalizedSteps.forEach((item) => {
       if (item.key === 'work' || item.key === 'work_questions') return;
+      if (item.key === 'category' && aiResolvedCategory) {
+        if (works.length && !aiResolvedWork) {
+          result.push({
+            key: 'work',
+            title: 'Какая именно работа нужна?',
+            progress: 35,
+          });
+        }
+        if (questionsStep) result.push(questionsStep);
+        return;
+      }
 
-      // Questions belong at the end of the wizard, immediately before contacts.
-      if (item.key === 'contacts' && questionsStep) result.push(questionsStep);
       result.push(item);
 
-      if (item.key === 'category' && works.length) {
+      if (item.key === 'category' && works.length && !aiResolvedWork) {
         result.push({
           key: 'work',
           title: 'Какая именно работа нужна?',
           progress: 35,
         });
       }
+      if (item.key === 'category' && questionsStep) result.push(questionsStep);
     });
 
     return result;
-  }, [normalizedSteps, workQuestions.length, works.length]);
+  }, [aiDraft?.category_id, aiDraft?.confidence, aiDraft?.work_id, normalizedSteps, workQuestions.length, works.length]);
 
   const step = visibleSteps[Math.min(stepIndex, Math.max(visibleSteps.length - 1, 0))] || normalizedSteps[0];
   const taskName =
@@ -320,7 +340,16 @@ export default function RequestWizard() {
     setWorksLoading(true);
     fetchTreaboWorks({ category_id: draft.category_id })
       .then((items) => {
-        if (!cancelled) setWorks(items.filter((item) => item.is_active !== false));
+        if (!cancelled) {
+          const activeWorks = items.filter((item) => item.is_active !== false);
+          setWorks(activeWorks);
+          if (draft.work_id) {
+            const selectedWork = activeWorks.find((item) => String(item.id) === String(draft.work_id));
+            if (selectedWork) {
+              setDraft((current) => ({ ...current, work_title: selectedWork.title }));
+            }
+          }
+        }
       })
       .catch(() => {
         if (!cancelled) setWorks([]);
@@ -332,7 +361,7 @@ export default function RequestWizard() {
     return () => {
       cancelled = true;
     };
-  }, [draft.category_id]);
+  }, [draft.category_id, draft.work_id]);
 
   useEffect(() => {
     const filters = draft.work_id
@@ -449,6 +478,10 @@ export default function RequestWizard() {
   }
 
   async function createTaskFromDraft(currentDraft: WizardDraft, token: string) {
+    if (isSpecialist) {
+      throw new Error('Мастер не может создавать заявки. Для этого нужен аккаунт клиента.');
+    }
+
     const photos = await uploadAllPhotos(token, currentDraft);
     const budgetType = currentDraft.budget_type === 'range' ? 'range' : 'fixed';
     const budget = budgetType === 'fixed' ? parseBudgetInput(String(currentDraft.budget || '')) : null;
@@ -584,13 +617,14 @@ export default function RequestWizard() {
               name: name.trim(),
               role: 'customer',
               city: draft.city || text.city,
+              channel: 'telegram',
             })
-          : await sendOtp({ phone: otpPhone, purpose: 'login', password });
+          : await sendOtp({ phone: otpPhone, purpose: 'login', password, role: 'customer', channel: 'telegram' });
       setOtpId(payload.otp_id);
       setOtpCode('');
       setResendTimer(60);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'SMS не отправлено');
+      setSubmitError(error instanceof Error ? error.message : 'Не удалось отправить код в Telegram');
     } finally {
       setSavingTask(false);
     }
@@ -686,14 +720,7 @@ export default function RequestWizard() {
     setStepIndex((value) => Math.max(0, value - 1));
   }
 
-  async function submitPrompt() {
-    const prompt = String(draft.prompt || '').trim();
-    if (prompt.length < 5) {
-      setAiError(text.request.promptTooShort);
-      return;
-    }
-
-    ensureDraftId();
+  async function runAiAssistant(prompt: string, userMessage: string, initial: boolean) {
     setAiLoading(true);
     setAiError('');
 
@@ -707,7 +734,7 @@ export default function RequestWizard() {
         body: JSON.stringify({
           text: prompt,
           city_hint: draft.city || text.city,
-          category_hint: null,
+          category_hint: draft.category_id || null,
           language_hint: 'ru',
         }),
       });
@@ -718,11 +745,47 @@ export default function RequestWizard() {
 
       const generatedDraft = payload.data as AiDraft;
       applyAiDraft(generatedDraft);
-    } catch {
-      applyAiDraft(generateLocalAiDraft(prompt, draft.city || text.city));
+      setAiMessages((current) => [
+        ...(initial ? [] : current),
+        { role: 'user', text: userMessage },
+        ...(generatedDraft.assistant_message
+          ? [{ role: 'assistant' as const, text: generatedDraft.assistant_message }]
+          : []),
+      ]);
+    } catch (error) {
+      if (initial) {
+        const localDraft = generateLocalAiDraft(prompt, draft.city || text.city);
+        applyAiDraft(localDraft);
+        setAiMessages([{ role: 'user', text: userMessage }]);
+      } else {
+        setAiError(error instanceof Error ? error.message : 'AI-помощник временно недоступен');
+      }
     } finally {
       setAiLoading(false);
     }
+  }
+
+  async function submitPrompt() {
+    const prompt = String(draft.prompt || '').trim();
+    if (prompt.length < 5) {
+      setAiError(text.request.promptTooShort);
+      return;
+    }
+
+    ensureDraftId();
+    await runAiAssistant(prompt, prompt, true);
+  }
+
+  async function submitAiFollowUp() {
+    const answer = aiFollowUp.trim();
+    if (!answer || aiLoading) return;
+    const transcript = [...aiMessages, { role: 'user' as const, text: answer }]
+      .map((message) => `${message.role === 'user' ? 'Клиент' : 'Помощник'}: ${message.text}`)
+      .join('\n');
+    const originalRequest = (draft.prompt || '').slice(0, 1500);
+    const recentTranscript = transcript.slice(-1400);
+    setAiFollowUp('');
+    await runAiAssistant(`${originalRequest}\n\nДиалог уточнения:\n${recentTranscript}`, answer, false);
   }
 
   function applyAiDraft(generatedDraft: AiDraft) {
@@ -742,6 +805,7 @@ export default function RequestWizard() {
       category_id: apiCategory?.id || generatedDraft.category_id || current.category_id || null,
       category_slug: apiCategory?.slug || generatedDraft.category_slug || current.category_slug || null,
       work_id: generatedDraft.work_id || current.work_id || null,
+      work_title: null,
       city: generatedDraft.city || current.city || text.city,
       deadline:
         generatedDraft.urgency && generatedDraft.urgency !== 'unknown'
@@ -1044,6 +1108,54 @@ export default function RequestWizard() {
                     {text.request.city}: {aiDraft.city || draft.city || text.request.unknownCity}
                   </span>
                 </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {selectedCategoryLabel ? (
+                    <span className="rounded-full bg-[#f3f5fa] px-3 py-1.5 text-xs font-bold">{selectedCategoryLabel}</span>
+                  ) : null}
+                  {draft.work_title ? (
+                    <span className="rounded-full bg-[#d9f36b] px-3 py-1.5 text-xs font-bold">{draft.work_title}</span>
+                  ) : null}
+                </div>
+                {aiMessages.length ? (
+                  <div className="mt-5 space-y-2">
+                    {aiMessages.slice(-4).map((message, index) => (
+                      <div
+                        key={`${message.role}-${index}-${message.text}`}
+                        className={`max-w-[88%] rounded-2xl px-4 py-3 text-sm leading-6 ${
+                          message.role === 'assistant'
+                            ? 'bg-[#f3f5fa] text-[#232323]'
+                            : 'ml-auto bg-[#232323] text-white'
+                        }`}
+                      >
+                        {message.text}
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+                {aiDraft.needs_clarification ? (
+                  <div className="mt-4 flex gap-2">
+                    <input
+                      value={aiFollowUp}
+                      onChange={(event) => setAiFollowUp(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter') {
+                          event.preventDefault();
+                          void submitAiFollowUp();
+                        }
+                      }}
+                      placeholder="Ответьте помощнику"
+                      className="min-w-0 flex-1 rounded-2xl bg-[#eef1f7] px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#d9f36b]"
+                    />
+                    <button
+                      type="button"
+                      onClick={submitAiFollowUp}
+                      disabled={!aiFollowUp.trim() || aiLoading}
+                      className="rounded-2xl bg-[#232323] px-4 py-3 text-sm font-black text-white disabled:opacity-50"
+                    >
+                      Ответить
+                    </button>
+                  </div>
+                ) : null}
                 <button
                   onClick={next}
                   className="mt-5 inline-flex h-12 items-center gap-3 rounded-xl bg-[#d9f36b] px-6 text-base font-black text-[#232323] transition hover:bg-[#c7e85a]"
@@ -1294,7 +1406,7 @@ export default function RequestWizard() {
                   disabled={resendTimer > 0 || savingTask}
                   className="text-sm font-bold text-[#232323] disabled:text-[#b8bcc8]"
                 >
-                  {resendTimer > 0 ? `${text.request.otpResend} (${resendTimer}с)` : text.request.otpResend}
+                  {resendTimer > 0 ? `Получить код в Telegram (${resendTimer}с)` : 'Получить код в Telegram'}
                 </button>
               </div>
               <button
@@ -1356,6 +1468,22 @@ export default function RequestWizard() {
       default:
         return null;
     }
+  }
+
+  if (!authLoading && isSpecialist) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-[#f5f6f1] px-4">
+        <div className="max-w-md rounded-[28px] bg-white p-6 text-center shadow-sm">
+          <h1 className="text-2xl font-black text-[#232323]">Создание заявки недоступно мастеру</h1>
+          <p className="mt-3 text-sm leading-6 text-[#7d849b]">
+            В аккаунте мастера можно выбирать задания и откликаться на них. Создавать заявки может только клиент.
+          </p>
+          <Link href="/works" className="mt-5 inline-flex rounded-2xl bg-[#232323] px-5 py-3 text-sm font-black text-white">
+            Перейти к заданиям
+          </Link>
+        </div>
+      </main>
+    );
   }
 
   return (

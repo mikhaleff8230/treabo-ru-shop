@@ -23,6 +23,8 @@ export type AiDraft = {
   master_summary: string;
   missing_questions: Array<string | MissingQuestionObject>;
   confidence: number;
+  assistant_message?: string;
+  needs_clarification?: boolean;
 };
 
 export type ClarifyFieldType =
