@@ -20,6 +20,7 @@ import {
   fetchTreaboCategories,
   fetchTreaboWorkQuestions,
   fetchTreaboWorks,
+  getTreaboPublicApiBase,
   uploadTreaboFile,
   type TreaboCategory,
   type TreaboWork,
@@ -37,7 +38,6 @@ import {
   buildTaskAiDetails,
   buildTaskDescription,
   categorySlugToLabel,
-  generateLocalAiDraft,
   mapApiTypeToClarifyType,
   needsManualCategory,
   needsManualCity,
@@ -95,7 +95,7 @@ function createDraftId() {
 }
 
 function treaboApiUrl(path: string) {
-  return `/api/treabo/${path.replace(/^\//, '')}`;
+  return `${getTreaboPublicApiBase()}/${path.replace(/^\//, '')}`;
 }
 
 function Option({
@@ -243,7 +243,7 @@ export default function RequestWizard() {
     const result: Step[] = [];
     const aiResolvedCategory = Boolean(aiDraft?.category_id && Number(aiDraft.confidence || 0) >= 0.65);
     const aiResolvedWork = Boolean(aiDraft?.work_id && Number(aiDraft.confidence || 0) >= 0.65);
-    const questionsStep: Step | null = workQuestions.length
+    const questionsStep: Step | null = draft.work_id || workQuestions.length
       ? { key: 'work_questions', title: 'Уточните детали работы', progress: 90 }
       : null;
 
@@ -274,13 +274,29 @@ export default function RequestWizard() {
     });
 
     return result;
-  }, [aiDraft?.category_id, aiDraft?.confidence, aiDraft?.work_id, normalizedSteps, workQuestions.length, works.length]);
+  }, [
+    aiDraft?.category_id,
+    aiDraft?.confidence,
+    aiDraft?.work_id,
+    draft.work_id,
+    normalizedSteps,
+    workQuestions.length,
+    works.length,
+  ]);
 
   const step = visibleSteps[Math.min(stepIndex, Math.max(visibleSteps.length - 1, 0))] || normalizedSteps[0];
   const taskName =
     !isGenericAiTitle(aiDraft?.title)
       ? aiDraft?.title
       : draft.title || promptTitleFallback(draft.prompt, draft.category || text.request.newRequest);
+  const aiUserTurns = aiMessages.filter((message) => message.role === 'user').length;
+  const aiDraftReady = Boolean(
+    aiDraft &&
+      !aiDraft.needs_clarification &&
+      draft.category_id &&
+      draft.work_id &&
+      Number(aiDraft.confidence || 0) >= 0.65,
+  );
 
   const selectCategory = useCallback((option: CategoryOption) => {
     setDraft((current) => ({
@@ -753,13 +769,7 @@ export default function RequestWizard() {
           : []),
       ]);
     } catch (error) {
-      if (initial) {
-        const localDraft = generateLocalAiDraft(prompt, draft.city || text.city);
-        applyAiDraft(localDraft);
-        setAiMessages([{ role: 'user', text: userMessage }]);
-      } else {
-        setAiError(error instanceof Error ? error.message : 'AI-помощник временно недоступен');
-      }
+      setAiError(error instanceof Error ? error.message : 'AI-помощник временно недоступен');
     } finally {
       setAiLoading(false);
     }
@@ -778,7 +788,7 @@ export default function RequestWizard() {
 
   async function submitAiFollowUp() {
     const answer = aiFollowUp.trim();
-    if (!answer || aiLoading) return;
+    if (!answer || aiLoading || aiUserTurns >= 6) return;
     const transcript = [...aiMessages, { role: 'user' as const, text: answer }]
       .map((message) => `${message.role === 'user' ? 'Клиент' : 'Помощник'}: ${message.text}`)
       .join('\n');
@@ -1132,7 +1142,7 @@ export default function RequestWizard() {
                     ))}
                   </div>
                 ) : null}
-                {aiDraft.needs_clarification ? (
+                {aiDraft.needs_clarification && aiUserTurns < 6 ? (
                   <div className="mt-4 flex gap-2">
                     <input
                       value={aiFollowUp}
@@ -1156,12 +1166,19 @@ export default function RequestWizard() {
                     </button>
                   </div>
                 ) : null}
-                <button
-                  onClick={next}
-                  className="mt-5 inline-flex h-12 items-center gap-3 rounded-xl bg-[#d9f36b] px-6 text-base font-black text-[#232323] transition hover:bg-[#c7e85a]"
-                >
-                  {text.request.continue} <ArrowRight className="h-5 w-5" />
-                </button>
+                {aiDraft.needs_clarification && aiUserTurns >= 6 ? (
+                  <div className="mt-4 rounded-2xl bg-[#fff6dc] px-4 py-3 text-sm font-semibold text-[#232323]">
+                    Не получилось уверенно определить услугу. Выберите категорию вручную — введённое описание сохранится.
+                  </div>
+                ) : null}
+                {aiDraftReady || aiUserTurns >= 6 ? (
+                  <button
+                    onClick={next}
+                    className="mt-5 inline-flex h-12 items-center gap-3 rounded-xl bg-[#d9f36b] px-6 text-base font-black text-[#232323] transition hover:bg-[#c7e85a]"
+                  >
+                    {aiDraftReady ? text.request.continue : 'Выбрать категорию'} <ArrowRight className="h-5 w-5" />
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </>
