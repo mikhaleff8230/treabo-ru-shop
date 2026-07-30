@@ -53,20 +53,42 @@ export function getTreaboApiBase(): string {
 }
 
 async function authFetch<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${getTreaboApiBase()}${path}`, {
-    ...init,
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      ...(init?.headers || {}),
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${getTreaboApiBase()}${path}`, {
+      ...init,
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        ...(init?.headers || {}),
+      },
+    });
+  } catch {
+    throw new Error('Не удалось связаться с сервером. Проверьте интернет-соединение и попробуйте ещё раз');
+  }
 
   const payload = await response.json().catch(() => ({}));
 
   if (!response.ok) {
-    const detail = payload?.detail || payload?.message || 'Request failed';
-    throw new Error(typeof detail === 'string' ? detail : 'Request failed');
+    const detail = typeof payload?.detail === 'string'
+      ? payload.detail
+      : typeof payload?.message === 'string'
+        ? payload.message
+        : '';
+    const localizedMessages: Record<string, string> = {
+      'Invalid phone or password': 'Неверный номер телефона или пароль',
+      'Client account not found': 'Клиент с таким номером не найден',
+      'Account role does not match this login page': 'Для этого номера выбран другой тип аккаунта',
+      'Too Many Attempts.': 'Слишком много попыток. Попробуйте ещё раз через минуту',
+      'Too many attempts': 'Слишком много попыток. Попробуйте ещё раз через минуту',
+      'Server Error': 'Сервис временно недоступен. Попробуйте ещё раз немного позже',
+    };
+
+    if (response.status >= 500) {
+      throw new Error('Сервис временно недоступен. Попробуйте ещё раз немного позже');
+    }
+
+    throw new Error(localizedMessages[detail] || detail || 'Не удалось выполнить запрос. Попробуйте ещё раз');
   }
 
   return payload as T;
