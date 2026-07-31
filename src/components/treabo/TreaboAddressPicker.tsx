@@ -8,12 +8,6 @@ import {
 } from '@/services/geoLocationService';
 import { getStoredTreaboToken } from '@/data/treabo-auth';
 
-declare global {
-  interface Window {
-    ymaps?: any;
-  }
-}
-
 let ymapsLoadPromise: Promise<void> | null = null;
 
 function loadYmaps(apiKey: string): Promise<void> {
@@ -54,6 +48,10 @@ type TreaboAddressPickerProps = {
   onConfirmedChange?: (confirmed: boolean) => void;
   addressPlaceholder?: string;
   mapHint?: string;
+  autoDetect?: boolean;
+  resolveInitialAddress?: boolean;
+  compact?: boolean;
+  deferMapUntilAddress?: boolean;
 };
 
 function formatDetectedLabel(result: GeoAddressResult): string {
@@ -73,6 +71,10 @@ export default function TreaboAddressPicker({
   onConfirmedChange,
   addressPlaceholder = 'Начните вводить адрес',
   mapHint = 'Перетащите маркер или выберите адрес из подсказок',
+  autoDetect = true,
+  resolveInitialAddress = false,
+  compact = false,
+  deferMapUntilAddress = false,
 }: TreaboAddressPickerProps) {
   const apiKey = process.env.NEXT_PUBLIC_YANDEX_MAPS_API_KEY || '';
   const mapRef = useRef<HTMLDivElement>(null);
@@ -80,6 +82,7 @@ export default function TreaboAddressPicker({
   const placemarkRef = useRef<any>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const detectStarted = useRef(false);
+  const initialResolveStarted = useRef(false);
   const chooseMapPointRef = useRef<(lat: number, lng: number) => void>(() => undefined);
 
   const [ready, setReady] = useState(false);
@@ -120,6 +123,11 @@ export default function TreaboAddressPicker({
     if (detectStarted.current) return;
     detectStarted.current = true;
 
+    if (!autoDetect) {
+      setDetecting(false);
+      return;
+    }
+
     autoDetectAddress()
       .then(({ result, gpsUsed: usedGps }) => {
         setDetected(result);
@@ -134,7 +142,30 @@ export default function TreaboAddressPicker({
         setDetected(null);
       })
       .finally(() => setDetecting(false));
-  }, [applyResult, onCityChange]);
+  }, [applyResult, autoDetect, onCityChange]);
+
+  useEffect(() => {
+    if (
+      !resolveInitialAddress
+      || initialResolveStarted.current
+      || editMode
+      || address.trim().length < 3
+    ) return;
+    initialResolveStarted.current = true;
+    setLoading(true);
+    suggestAddresses(address, { city: city || undefined, count: 1 })
+      .then(([result]) => {
+        if (!result || result.lat == null || result.lng == null) {
+          setEditMode(true);
+          return;
+        }
+        setDetected(result);
+        applyResult(result);
+        setConfirmedState(false);
+      })
+      .catch(() => setEditMode(true))
+      .finally(() => setLoading(false));
+  }, [address, applyResult, city, editMode, resolveInitialAddress, setConfirmedState]);
 
   useEffect(() => {
     if (!apiKey) return;
@@ -373,14 +404,20 @@ export default function TreaboAddressPicker({
       {showConfirmBlock ? (
         <div className="rounded-2xl border border-[#dfe4ee] bg-[#f8f9fb] p-5">
           <div className="text-sm font-black uppercase tracking-wide text-[#7d849b]">
-            {gpsUsed ? 'Мы определили адрес' : 'Мы определили ваш город'}
+            {gpsUsed
+              ? 'Мы определили адрес'
+              : detected.full_address || detected.address
+                ? 'Мы нашли адрес'
+                : 'Мы определили ваш город'}
           </div>
           <p className="mt-2 text-base font-semibold leading-7 text-[#232323]">
             {formatDetectedLabel(detected)}
           </p>
           {!gpsUsed ? (
             <p className="mt-2 text-sm text-[#7d849b]">
-              Уточните точный адрес — так специалисты быстрее найдут вас на карте.
+              {detected.full_address || detected.address
+                ? 'Проверьте адрес и точку на карте перед подтверждением.'
+                : 'Уточните точный адрес — так специалисты быстрее найдут вас на карте.'}
             </p>
           ) : null}
           <div className="mt-4 flex flex-wrap gap-3">
@@ -436,6 +473,7 @@ export default function TreaboAddressPicker({
               value={address}
               onChange={(event) => {
                 onAddressChange(event.target.value);
+                setEditMode(true);
                 setSuggestOpen(true);
                 setConfirmError('');
                 setConfirmedState(false);
@@ -485,7 +523,10 @@ export default function TreaboAddressPicker({
         </>
       ) : null}
 
-      <div className="relative h-[360px] overflow-hidden rounded-2xl border border-[#dfe4ee] md:h-[420px]">
+      {(!deferMapUntilAddress || address.trim().length >= 3 || hasCoordinates) && (
+        <div className={`relative overflow-hidden rounded-2xl border border-[#dfe4ee] ${
+          compact ? 'h-[240px] md:h-[280px]' : 'h-[360px] md:h-[420px]'
+        }`}>
         {!apiKey ? (
           <div className="flex h-full items-center justify-center px-6 text-center text-sm text-[#7d849b]">
             Для карты задайте NEXT_PUBLIC_YANDEX_MAPS_API_KEY
@@ -505,7 +546,8 @@ export default function TreaboAddressPicker({
             {Number(lat).toFixed(5)}, {Number(lng).toFixed(5)}
           </div>
         ) : null}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

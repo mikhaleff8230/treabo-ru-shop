@@ -66,6 +66,8 @@ export default function TreaboAuthModal({
   const [otpCode, setOtpCode] = useState('');
   const [otpPurpose, setOtpPurpose] = useState<'login' | 'register'>('login');
   const [passwordReset, setPasswordReset] = useState(false);
+  const [passwordResetChannel, setPasswordResetChannel] = useState<'telegram' | 'email'>('telegram');
+  const [passwordResetDestination, setPasswordResetDestination] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
   const isSpecialistPushLogin = tab === 'login' && role === 'specialist';
 
@@ -80,6 +82,8 @@ export default function TreaboAuthModal({
       setOtpCode('');
       setResendTimer(0);
       setPasswordReset(false);
+      setPasswordResetChannel('telegram');
+      setPasswordResetDestination('');
     }
   }, [open, initialRole, initialTab]);
 
@@ -208,19 +212,21 @@ export default function TreaboAuthModal({
     }
   }
 
-  async function handleForgotPassword() {
+  async function handleForgotPassword(channel: 'telegram' | 'email') {
     setError('');
     setSubmitting(true);
     try {
-      const payload = await treaboSendCustomerPasswordResetCode(normalizedPhone);
+      const payload = await treaboSendCustomerPasswordResetCode(normalizedPhone, channel);
       setPasswordReset(true);
+      setPasswordResetChannel(channel);
+      setPasswordResetDestination(payload.destination || payload.phone);
       setOtpStep(true);
       setOtpId(payload.otp_id);
       setOtpPhone(payload.phone);
       setOtpCode('');
       setResendTimer(RESEND_SECONDS);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Не удалось отправить код в Telegram');
+      setError(err instanceof Error ? err.message : 'Не удалось отправить код восстановления');
     } finally {
       setSubmitting(false);
     }
@@ -234,7 +240,7 @@ export default function TreaboAuthModal({
 
     try {
       const payload = passwordReset
-        ? await treaboSendCustomerPasswordResetCode(otpPhone)
+        ? await treaboSendCustomerPasswordResetCode(otpPhone, passwordResetChannel)
         : otpPurpose === 'register'
           ? await sendOtp({
               phone: otpPhone,
@@ -376,11 +382,21 @@ export default function TreaboAuthModal({
               {tab === 'login' && role === 'customer' ? (
                 <button
                   type="button"
-                  onClick={handleForgotPassword}
+                  onClick={() => handleForgotPassword('telegram')}
                   disabled={submitting || !normalizedPhone}
                   className="text-left text-sm font-bold text-[#5f6678] hover:text-[#232323] disabled:opacity-50"
                 >
-                  Забыли пароль? Получить код в Telegram
+                  Забыли пароль? Код в Telegram
+                </button>
+              ) : null}
+              {tab === 'login' && role === 'customer' ? (
+                <button
+                  type="button"
+                  onClick={() => handleForgotPassword('email')}
+                  disabled={submitting || !normalizedPhone}
+                  className="-mt-2 text-left text-sm font-bold text-[#5f6678] hover:text-[#232323] disabled:opacity-50"
+                >
+                  Нет Telegram? Получить код на email
                 </button>
               ) : null}
 
@@ -431,8 +447,12 @@ export default function TreaboAuthModal({
         ) : (
           <div className="space-y-4">
             <p className="text-sm leading-6 text-[#7d849b]">
-              {passwordReset ? 'Код для восстановления пароля отправлен через Telegram на ' : 'Мы отправили код подтверждения на '}
-              <span className="font-bold text-[#232323]">{otpPhone}</span>
+              {passwordReset
+                ? `Код для восстановления отправлен ${passwordResetChannel === 'email' ? 'на email ' : 'через Telegram на '}`
+                : 'Мы отправили код подтверждения на '}
+              <span className="font-bold text-[#232323]">
+                {passwordReset ? passwordResetDestination : otpPhone}
+              </span>
             </p>
 
             {passwordReset ? (
@@ -472,7 +492,9 @@ export default function TreaboAuthModal({
                 disabled={resendTimer > 0 || submitting}
                 className="text-sm font-bold text-[#232323] disabled:text-[#b8bcc8]"
               >
-                {resendTimer > 0 ? `Получить код в Telegram (${resendTimer}с)` : 'Получить код в Telegram'}
+                {resendTimer > 0
+                  ? `Получить код повторно (${resendTimer}с)`
+                  : `Получить код повторно${passwordResetChannel === 'email' ? ' на email' : ' в Telegram'}`}
               </button>
             </div>
 

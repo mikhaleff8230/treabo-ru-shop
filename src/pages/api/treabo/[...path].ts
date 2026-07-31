@@ -40,6 +40,9 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
         Accept: 'application/json',
         'Content-Type': 'application/json; charset=utf-8',
         ...(req.headers.authorization ? { Authorization: req.headers.authorization } : {}),
+        ...(req.headers['x-draft-recovery-token']
+          ? { 'X-Draft-Recovery-Token': String(req.headers['x-draft-recovery-token']) }
+          : {}),
       },
       body: req.method === 'GET' || req.method === 'HEAD' ? undefined : JSON.stringify(req.body || {}),
     });

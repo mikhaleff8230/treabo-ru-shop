@@ -24,7 +24,8 @@ export type TreaboOtpSentResponse = {
   status: 'otp_sent';
   phone: string;
   otp_id: string;
-  channel?: 'sms' | 'telegram';
+  channel?: 'sms' | 'telegram' | 'email';
+  destination?: string;
 };
 
 export type TreaboAuthResult = TreaboAuthResponse | TreaboOtpSentResponse;
@@ -81,6 +82,8 @@ async function authFetch<T>(path: string, init?: RequestInit): Promise<T> {
       'Account role does not match this login page': 'Для этого номера выбран другой тип аккаунта',
       'Too Many Attempts.': 'Слишком много попыток. Попробуйте ещё раз через минуту',
       'Too many attempts': 'Слишком много попыток. Попробуйте ещё раз через минуту',
+      'Recovery email is not configured': 'Для этого аккаунта не указан email. Используйте Telegram или обратитесь в поддержку',
+      'Recovery email could not be sent': 'Не удалось отправить письмо. Попробуйте позже или используйте Telegram',
       'Server Error': 'Сервис временно недоступен. Попробуйте ещё раз немного позже',
     };
 
@@ -289,10 +292,13 @@ export async function treaboPollPushLogin(requestId: string): Promise<{ status: 
   return result;
 }
 
-export async function treaboSendCustomerPasswordResetCode(phone: string) {
+export async function treaboSendCustomerPasswordResetCode(
+  phone: string,
+  channel: 'telegram' | 'email' = 'telegram',
+) {
   return authFetch<TreaboOtpSentResponse>('/auth/customer/password/send-code', {
     method: 'POST',
-    body: JSON.stringify({ phone: normalizeTreaboPhone(phone), channel: 'telegram' }),
+    body: JSON.stringify({ phone: normalizeTreaboPhone(phone), channel }),
   });
 }
 
