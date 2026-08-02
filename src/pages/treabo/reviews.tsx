@@ -55,7 +55,7 @@ export default function TreaboReviewsPage() {
                 <div>
                   <div className="flex items-center gap-1">{stars(Number(review.rating || 0))}</div>
                   <div className="mt-2 text-sm font-bold text-[#7d849b]">
-                    {review.customer_name || 'Клиент'}
+                    {review.customer_name || 'Заказчик'}
                     {review.task_title ? ` · ${review.task_title}` : ''}
                   </div>
                 </div>

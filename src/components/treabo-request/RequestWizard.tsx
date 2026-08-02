@@ -31,6 +31,7 @@ import { getStoredTreaboToken, isTreaboOtpSentResponse } from '@/data/treabo-aut
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
 import { getTreaboText } from '@/lib/treabo/i18n';
 import { normalizeTreaboPhone } from '@/lib/treabo/phone';
+import { reachYandexMetrikaGoal } from '@/lib/yandex-metrika';
 import {
   type AiDraft,
   type ClarifyField,
@@ -495,7 +496,7 @@ export default function RequestWizard() {
 
   async function createTaskFromDraft(currentDraft: WizardDraft, token: string) {
     if (isSpecialist) {
-      throw new Error('Мастер не может создавать заявки. Для этого нужен аккаунт клиента.');
+      throw new Error('Мастер не может создавать заявки. Для этого нужен аккаунт заказчика.');
     }
 
     const photos = await uploadAllPhotos(token, currentDraft);
@@ -530,6 +531,10 @@ export default function RequestWizard() {
       setSubmitError('');
       try {
         const task = await createTaskFromDraft(draft, token);
+        reachYandexMetrikaGoal('request_created', {
+          task_id: String(task.id),
+          creation_mode: 'manual',
+        });
         setCreatedTaskId(String(task.id));
         setCreatedTaskUrl(routes.taskUrl(task));
         setTaskCreated(true);
@@ -790,7 +795,7 @@ export default function RequestWizard() {
     const answer = aiFollowUp.trim();
     if (!answer || aiLoading || aiUserTurns >= 6) return;
     const transcript = [...aiMessages, { role: 'user' as const, text: answer }]
-      .map((message) => `${message.role === 'user' ? 'Клиент' : 'Помощник'}: ${message.text}`)
+      .map((message) => `${message.role === 'user' ? 'Заказчик' : 'Помощник'}: ${message.text}`)
       .join('\n');
     const originalRequest = (draft.prompt || '').slice(0, 1500);
     const recentTranscript = transcript.slice(-1400);
@@ -1493,7 +1498,7 @@ export default function RequestWizard() {
         <div className="max-w-md rounded-[28px] bg-white p-6 text-center shadow-sm">
           <h1 className="text-2xl font-black text-[#232323]">Создание заявки недоступно мастеру</h1>
           <p className="mt-3 text-sm leading-6 text-[#7d849b]">
-            В аккаунте мастера можно выбирать задания и откликаться на них. Создавать заявки может только клиент.
+            В аккаунте мастера можно выбирать задания и откликаться на них. Создавать заявки может только заказчик.
           </p>
           <Link href="/works" className="mt-5 inline-flex rounded-2xl bg-[#232323] px-5 py-3 text-sm font-black text-white">
             Перейти к заданиям

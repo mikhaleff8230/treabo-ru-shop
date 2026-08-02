@@ -80,7 +80,7 @@ function buildSpecialists(
         rating: Number(item.rating || 0).toFixed(1).replace('.', ','),
         reviews: `${item.reviews_count || 0} отзывов`,
         praise: item.bio?.slice(0, 80) || '',
-        team: 'Выезд к клиенту',
+        team: 'Выезд к заказчику',
         verified: item.passport_verified ? 'Паспорт проверен' : 'Паспорт не подтвержден',
         qualification: item.bio || '',
         location: item.city || 'Москва',

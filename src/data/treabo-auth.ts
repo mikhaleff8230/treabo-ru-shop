@@ -78,7 +78,7 @@ async function authFetch<T>(path: string, init?: RequestInit): Promise<T> {
         : '';
     const localizedMessages: Record<string, string> = {
       'Invalid phone or password': 'Неверный номер телефона или пароль',
-      'Client account not found': 'Клиент с таким номером не найден',
+      'Client account not found': 'Заказчик с таким номером не найден',
       'Account role does not match this login page': 'Для этого номера выбран другой тип аккаунта',
       'Too Many Attempts.': 'Слишком много попыток. Попробуйте ещё раз через минуту',
       'Too many attempts': 'Слишком много попыток. Попробуйте ещё раз через минуту',

@@ -138,8 +138,14 @@ export type TreaboChat = {
   task_title?: string | null;
   customer_id?: string | null;
   customer_name?: string | null;
+  customer_avatar?: string | null;
+  customer_phone_masked?: string | null;
+  customer_city?: string | null;
   specialist_id?: string | null;
   specialist_name?: string | null;
+  specialist_avatar?: string | null;
+  specialist_phone_masked?: string | null;
+  specialist_city?: string | null;
   last_message?: string | null;
   last_message_at?: string | null;
   unread_count?: number;
@@ -623,6 +629,11 @@ export async function fetchTreaboChat(chatId: string, token: string) {
 
 export async function fetchTreaboChatMessages(chatId: string, token: string) {
   return treaboApiRequest<TreaboMessage[]>(`/chats/${encodeURIComponent(chatId)}/messages`, { token });
+}
+
+export async function revealTreaboChatContact(chatId: string, role: 'customer' | 'specialist', token: string) {
+  const endpoint = role === 'specialist' ? 'customer-contact' : 'specialist-contact';
+  return treaboApiRequest<{ phone: string }>(`/chats/${encodeURIComponent(chatId)}/${endpoint}`, { token });
 }
 
 export async function sendTreaboChatMessage(

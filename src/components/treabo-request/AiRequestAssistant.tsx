@@ -35,6 +35,7 @@ import { useTreaboAuth } from '@/hooks/use-treabo-auth';
 import TreaboAddressPicker from '@/components/treabo/TreaboAddressPicker';
 import OtpCodeInput from '@/components/auth/otp-code-input';
 import { isTreaboOtpSentResponse } from '@/data/treabo-auth';
+import { reachYandexMetrikaGoal } from '@/lib/yandex-metrika';
 
 type Message = { role: 'assistant' | 'user'; text: string };
 
@@ -368,17 +369,58 @@ export default function AiRequestAssistant() {
       setResponse(updated);
       setManualMode(null);
       if (label) {
-        setMessages((current) => [
-          ...current,
-          { role: 'user', text: label },
-          { role: 'assistant', text: messageFor(updated) },
-        ]);
+        setMessages((current) => {
+          const selectionChanged = path === '/category/id' || path === '/work/id';
+          const history = selectionChanged
+            ? current.filter((message) => message.role === 'user').slice(0, 1)
+            : current;
+          return [
+            ...history,
+            { role: 'user', text: label },
+            { role: 'assistant', text: messageFor(updated) },
+          ];
+        });
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Изменение не сохранилось.');
     } finally {
       setBusy(false);
     }
+  }
+
+  function editSelection(mode: 'category' | 'work') {
+    setManualMode(mode);
+    setError('');
+    window.requestAnimationFrame(() => {
+      document.getElementById('request-assistant-editor')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }
+
+  function resetRequest() {
+    if (!window.confirm('Начать заявку заново? Текущий черновик и все ответы будут очищены.')) return;
+
+    clearRequestAssistantRecovery();
+    setResponse(null);
+    setMessages([]);
+    setInitialText('');
+    setFollowUp('');
+    setCity('');
+    setError('');
+    setManualMode(null);
+    setPublishedTaskId(null);
+    setReviewCity('');
+    setReviewAddress('');
+    setReviewLat(null);
+    setReviewLng(null);
+    setReviewAddressConfirmed(false);
+    setBudgetType('negotiable');
+    setBudgetAmount('');
+    setBudgetMin('');
+    setBudgetMax('');
+    setReviewStep('location');
+    setAuthOtpId(null);
+    setAuthOtpCode('');
+    void router.replace('/request/new', undefined, { shallow: true });
   }
 
   async function publish() {
@@ -438,6 +480,10 @@ export default function AiRequestAssistant() {
       setResponse(updated);
       publishDraft = updated.data.draft;
       const result = await confirmRequestDraft(publishDraft, token);
+      reachYandexMetrikaGoal('request_created', {
+        task_id: result.data.task_id,
+        creation_mode: 'ai',
+      });
       setPublishedTaskId(result.data.task_id);
       clearRequestAssistantRecovery();
     } catch (caught) {
@@ -703,7 +749,7 @@ export default function AiRequestAssistant() {
             )}
           </div>
 
-          <div className="border-t border-[#edf0f5] bg-[#fbfcfd] p-4 sm:p-6">
+          <div id="request-assistant-editor" className="border-t border-[#edf0f5] bg-[#fbfcfd] p-4 sm:p-6">
             {showCategories && (
               <div className="grid max-h-64 gap-2 overflow-y-auto sm:grid-cols-2">
                 {categories.map((category) => (
@@ -796,7 +842,7 @@ export default function AiRequestAssistant() {
                 </button>
               </div>
             )}
-            {action?.type === 'review' && (
+            {action?.type === 'review' && !manualMode && (
               <div className="space-y-5">
                 <div className="flex items-center gap-2">
                   {reviewSteps.map((step, index, steps) => (
@@ -910,7 +956,7 @@ export default function AiRequestAssistant() {
 
                 {reviewStep === 'auth' && (
                   <div className="rounded-3xl border border-[#e5e8ef] bg-white p-5 sm:p-6">
-                    <div className="text-sm font-bold text-[#30323a]">Шаг 3. Аккаунт клиента</div>
+                    <div className="text-sm font-bold text-[#30323a]">Шаг 3. Аккаунт заказчика</div>
                     <p className="mt-1 text-sm leading-6 text-[#7d8497]">
                       Заявка сохранена. Войдите или зарегистрируйтесь — и мы сразу её опубликуем.
                     </p>
@@ -1030,13 +1076,23 @@ export default function AiRequestAssistant() {
         </section>
 
         <aside className="h-fit rounded-[28px] bg-white p-5 shadow-sm sm:p-6 lg:sticky lg:top-6">
-          <h2 className="text-lg font-bold text-[#24262d]">Черновик заявки</h2>
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-lg font-bold text-[#24262d]">Черновик заявки</h2>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={resetRequest}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-[#e2e5ec] px-3 py-2 text-xs font-semibold text-[#697086] transition hover:border-red-200 hover:bg-red-50 hover:text-red-700 disabled:opacity-50"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Начать заново
+            </button>
+          </div>
           <dl className="mt-5 space-y-4 text-sm">
             <div>
               <dt className="text-[#8a91a3]">Категория</dt>
               <dd className="mt-1 flex items-center justify-between gap-3 font-semibold text-[#30323a]">
                 <span>{currentDraft.category?.name || 'Не определена'}</span>
-                <button type="button" onClick={() => setManualMode('category')} aria-label="Изменить категорию">
+                <button type="button" onClick={() => editSelection('category')} aria-label="Изменить категорию">
                   <Pencil className="h-4 w-4 text-[#7d8497]" />
                 </button>
               </dd>
@@ -1046,7 +1102,7 @@ export default function AiRequestAssistant() {
               <dd className="mt-1 flex items-center justify-between gap-3 font-semibold text-[#30323a]">
                 <span>{currentDraft.work?.name || 'Не определена'}</span>
                 {currentDraft.category && (
-                  <button type="button" onClick={() => setManualMode('work')} aria-label="Изменить работу">
+                  <button type="button" onClick={() => editSelection('work')} aria-label="Изменить работу">
                     <Pencil className="h-4 w-4 text-[#7d8497]" />
                   </button>
                 )}
@@ -1065,7 +1121,7 @@ export default function AiRequestAssistant() {
             </button>
           )}
           <div className="mt-6 rounded-2xl bg-[#f4f7e6] p-4 text-sm leading-6 text-[#5f6824]">
-            AI использует только опубликованный справочник Treabo. Итог всегда можно исправить.
+            Не переживайте: категорию и работу можно изменить, а если нужно — начать заявку заново.
           </div>
         </aside>
       </div>

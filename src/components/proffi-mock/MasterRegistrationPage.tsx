@@ -19,7 +19,7 @@ import { treaboMinimal } from './marketplace-ui';
 import { ProffiFooter, ProffiHeader } from './ProffiShell';
 
 const steps = [
-  'Клиент оставляет заявку с описанием работы',
+  'Заказчик оставляет заявку с описанием работы',
   'Вы выбираете подходящий заказ',
   'Обсуждаете детали и договариваетесь',
   'Выполняете работу и получаете оплату',
@@ -43,12 +43,12 @@ const reviewTexts = [
   {
     name: 'Андрей А.',
     role: 'Мастер по ремонту',
-    text: 'Понравилось, что заявки приходят с деталями. Можно быстро понять объем работы и написать клиенту по делу.',
+    text: 'Понравилось, что заявки приходят с деталями. Можно быстро понять объем работы и написать заказчику по делу.',
   },
   {
     name: 'Лена М.',
     role: 'Клининг и дом',
-    text: 'Удобно выбирать район и график. Клиенты задают вопросы в чате, не нужно долго созваниваться.',
+    text: 'Удобно выбирать район и график. Заказчики задают вопросы в чате, не нужно долго созваниваться.',
   },
   {
     name: 'Виктор Б.',
@@ -64,7 +64,7 @@ const APP_QR_URL = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&mar
 const questions = [
   'Какие документы нужны мастеру?',
   'Сколько стоит отклик?',
-  'Как клиент выбирает специалиста?',
+  'Как заказчик выбирает специалиста?',
   'Можно ли работать в своем районе?',
   'Когда появится приложение?',
   'Как пройти проверку профиля?',
@@ -94,11 +94,11 @@ export default function MasterRegistrationPage({ topSpecialists = [] }: MasterRe
           </div>
           <div className="overflow-hidden rounded-[24px] bg-white p-2 shadow-[0_8px_24px_rgba(25,31,42,0.055)]">
             <Image
-              src="/proffi/treabo-app-banner.png"
+              src="/proffi/treabo-specialist-app-banner.png"
               alt="Приложение Treabo для мастера"
-              width={1132}
-              height={869}
-              className="h-56 w-full rounded-[18px] object-cover object-center"
+              width={1536}
+              height={1920}
+              className="h-72 w-full rounded-[18px] bg-black object-contain object-center"
               priority
             />
           </div>
@@ -173,12 +173,12 @@ export default function MasterRegistrationPage({ topSpecialists = [] }: MasterRe
 
         <section className={`${treaboMinimal.section} py-8`}>
           <div className="grid gap-6 rounded-[24px] bg-white p-6 shadow-[0_8px_24px_rgba(25,31,42,0.05)] md:grid-cols-[220px_1fr_150px] md:items-center">
-            <Image src="/proffi/treabo-app-banner.png" alt="Приложение Treabo для мастера" width={1132} height={869} className="mx-auto h-56 w-full rounded-[22px] object-cover object-center" />
+            <Image src="/proffi/treabo-specialist-app-banner.png" alt="Приложение Treabo для мастера" width={1536} height={1920} className="mx-auto h-64 w-full rounded-[22px] bg-black object-contain object-center" />
             <div>
               <h2 className={`${treaboMinimal.h2} max-w-xl`}>
                 С приложением «Treabo для мастера» ещё удобнее
               </h2>
-              <p className={`${treaboMinimal.body} mt-3`}>Заказы и чаты с клиентами всегда под рукой.</p>
+              <p className={`${treaboMinimal.body} mt-3`}>Заказы и чаты с заказчиками всегда под рукой.</p>
               <div className="mt-5 flex flex-wrap gap-2">
                 {['Google Play', 'App Store', 'AppGallery'].map((store) => (
                   <span key={store} className="rounded-[12px] bg-[#232323] px-3.5 py-2 text-xs font-semibold text-white">

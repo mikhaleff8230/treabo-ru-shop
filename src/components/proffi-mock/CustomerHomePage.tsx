@@ -307,11 +307,11 @@ export default function CustomerHomePage({ categories = [], topSpecialists = [],
             </div>
             <div className="relative min-h-[280px] overflow-hidden bg-[linear-gradient(135deg,#bef264,#84cc16)]">
               <Image
-                src="/proffi/treabo-app-banner.png"
+                src="/proffi/treabo-client-app-banner.png"
                 alt={t('treabo.home.ctaTitle')}
-                width={1132}
-                height={869}
-                className="absolute inset-0 h-full w-full object-cover object-center"
+                width={1536}
+                height={1920}
+                className="absolute inset-0 h-full w-full bg-black object-contain object-center"
                 priority
               />
             </div>

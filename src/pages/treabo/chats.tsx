@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
-import { ArrowLeft, Check, CheckCheck, Loader2, MoreHorizontal, Plus, Search, Send } from 'lucide-react';
+import { ArrowLeft, Check, CheckCheck, Copy, Eye, Loader2, MapPin, MoreHorizontal, Phone, Plus, Search, Send, X } from 'lucide-react';
 import Pusher from 'pusher-js';
 import TreaboAccountShell from '@/components/treabo/TreaboAccountShell';
 import {
@@ -8,6 +8,7 @@ import {
   fetchTreaboChats,
   markTreaboChatRead,
   normalizeTreaboAssetUrl,
+  revealTreaboChatContact,
   sendTreaboChatMessage,
   sendTreaboChatTyping,
   sendTreaboPresenceHeartbeat,
@@ -85,6 +86,9 @@ export default function TreaboChatsPage() {
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [typing, setTyping] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [revealedPhone, setRevealedPhone] = useState<string | null>(null);
+  const [contactLoading, setContactLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -109,12 +113,21 @@ export default function TreaboChatsPage() {
       : selectedChat.specialist_name
     : '';
   const status = selectedChat?.other_is_online ? 'в сети' : lastSeenText(selectedChat?.other_last_seen_at);
+  const otherAvatar = selectedChat
+    ? normalizeTreaboAssetUrl(auth.isSpecialist ? selectedChat.customer_avatar : selectedChat.specialist_avatar)
+    : '';
+  const otherMaskedPhone = selectedChat
+    ? auth.isSpecialist ? selectedChat.customer_phone_masked : selectedChat.specialist_phone_masked
+    : null;
+  const otherCity = selectedChat
+    ? auth.isSpecialist ? selectedChat.customer_city : selectedChat.specialist_city
+    : null;
 
   async function loadChats(keepSelection = true) {
     const token = getToken();
     if (!token) {
       setLoading(false);
-      setError('Войдите как специалист или клиент, чтобы увидеть чаты.');
+      setError('Войдите как специалист или заказчик, чтобы увидеть чаты.');
       return;
     }
 
@@ -274,14 +287,42 @@ export default function TreaboChatsPage() {
   }, [messages, typing]);
 
   function openChat(chatId: string) {
+    setProfileOpen(false);
+    setRevealedPhone(null);
     setSelectedId(chatId);
     router.push(`/treabo/chats?id=${chatId}`, undefined, { shallow: true });
   }
 
   function backToList() {
+    setProfileOpen(false);
+    setRevealedPhone(null);
     setSelectedId(null);
     setMessages([]);
     router.push('/treabo/chats', undefined, { shallow: true });
+  }
+
+  async function revealPhone() {
+    const token = getToken();
+    if (!token || !selectedId || contactLoading) return;
+    setContactLoading(true);
+    try {
+      const result = await revealTreaboChatContact(selectedId, auth.isSpecialist ? 'specialist' : 'customer', token);
+      setRevealedPhone(result.phone);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Телефон недоступен');
+    } finally {
+      setContactLoading(false);
+    }
+  }
+
+  async function copyPhone() {
+    if (!revealedPhone) return;
+    await navigator.clipboard.writeText(revealedPhone);
+  }
+
+  function closeProfile() {
+    setProfileOpen(false);
+    setRevealedPhone(null);
   }
 
   function onTextChange(value: string) {
@@ -367,7 +408,7 @@ export default function TreaboChatsPage() {
   }
 
   return (
-    <TreaboAccountShell title="Чаты">
+    <TreaboAccountShell title="Чаты" immersiveMobile={chatOpen}>
       {!chatOpen ? (
         <section className="mx-auto max-w-5xl">
           <div className="mb-6 flex items-center justify-between gap-4">
@@ -413,7 +454,7 @@ export default function TreaboChatsPage() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2">
-                      <span className="truncate text-base font-black">{name || 'Клиент Treabo'}</span>
+                      <span className="truncate text-base font-black">{name || 'Заказчик Treabo'}</span>
                       <span className="shrink-0 text-xs font-bold text-[#7d849b]">{formatDate(chat.last_message_at || chat.updated_at)}</span>
                     </span>
                     <span className="mt-0.5 block truncate text-sm font-bold">{chat.task_title}</span>
@@ -434,22 +475,24 @@ export default function TreaboChatsPage() {
           </div>
         </section>
       ) : (
-        <section className="mx-auto flex min-h-[720px] w-full max-w-6xl flex-col overflow-hidden rounded-[28px] bg-white shadow-sm">
-          <header className="flex h-20 items-center gap-3 border-b border-zinc-100 px-4 sm:px-6">
+        <section className="mx-auto flex h-[100dvh] min-h-0 w-full max-w-6xl flex-col overflow-hidden bg-white lg:h-auto lg:min-h-[720px] lg:rounded-[28px] lg:shadow-sm">
+          <header className="grid min-h-20 shrink-0 grid-cols-[44px_minmax(0,1fr)_44px] items-center border-b border-zinc-100 px-2 sm:px-5">
             <button onClick={backToList} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full hover:bg-[#f5f6f1]">
               <ArrowLeft className="h-6 w-6" />
             </button>
-            <span className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-[#d9f36b] text-lg font-black">
-              {(otherName || selectedChat?.task_title || 'T').charAt(0).toUpperCase()}
-              {selectedChat?.other_is_online ? <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500" /> : null}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="truncate text-lg font-black">{otherName || selectedChat?.task_title || 'Чат Treabo'}</div>
-              <div className="truncate text-sm font-semibold text-[#7d849b]">
-                {typing ? 'печатает...' : `${status}${selectedChat?.task_title ? ` · ${selectedChat.task_title}` : ''}`}
-              </div>
-            </div>
-            <button className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-[#f5f6f1]"><MoreHorizontal className="h-6 w-6" /></button>
+            <button onClick={() => setProfileOpen(true)} className="mx-auto flex min-w-0 max-w-full items-center justify-center gap-3 rounded-2xl px-2 py-1 text-left transition hover:bg-[#f7f8f4]">
+              <span className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#d9f36b] text-lg font-black">
+                {otherAvatar ? <img src={otherAvatar} alt={otherName || 'Профиль'} className="h-full w-full object-cover" /> : (otherName || selectedChat?.task_title || 'T').charAt(0).toUpperCase()}
+                {selectedChat?.other_is_online ? <span className="absolute bottom-0 right-0 h-3.5 w-3.5 rounded-full border-2 border-white bg-emerald-500" /> : null}
+              </span>
+              <span className="min-w-0">
+                <span className="block truncate text-base font-black sm:text-lg">{otherName || selectedChat?.task_title || 'Чат Treabo'}</span>
+                <span className="block max-w-[230px] text-xs font-semibold leading-4 text-[#7d849b] sm:max-w-[520px] sm:text-sm">
+                  {typing ? 'печатает...' : status}{selectedChat?.task_title ? <><span className="mx-1">·</span><span className="line-clamp-2">{selectedChat.task_title}</span></> : null}
+                </span>
+              </span>
+            </button>
+            <button onClick={() => setProfileOpen(true)} aria-label="Открыть профиль" className="flex h-11 w-11 items-center justify-center rounded-full bg-[#f5f6f1] hover:bg-[#eceee7]"><MoreHorizontal className="h-6 w-6" /></button>
           </header>
 
           {error ? (
@@ -542,6 +585,43 @@ export default function TreaboChatsPage() {
           </form>
         </section>
       )}
+
+      {profileOpen && selectedChat ? (
+        <div className="fixed inset-0 z-[80] flex bg-black/35 lg:items-center lg:justify-center lg:p-6" onMouseDown={(event) => { if (event.target === event.currentTarget) closeProfile(); }}>
+          <section className="ml-auto flex h-[100dvh] w-full max-w-md flex-col overflow-y-auto bg-[#f7f7fa] shadow-2xl lg:ml-0 lg:h-auto lg:max-h-[90vh] lg:rounded-[30px]">
+            <header className="sticky top-0 z-10 grid min-h-16 grid-cols-[44px_1fr_44px] items-center border-b border-zinc-100 bg-white px-3">
+              <span />
+              <h2 className="text-center text-lg font-black">Профиль</h2>
+              <button onClick={closeProfile} aria-label="Закрыть профиль" className="flex h-11 w-11 items-center justify-center rounded-full hover:bg-[#f5f6f1]"><X className="h-6 w-6" /></button>
+            </header>
+            <div className="flex flex-1 flex-col items-center px-5 py-8">
+              <div className="flex h-28 w-28 items-center justify-center overflow-hidden rounded-full bg-[#d9f36b] text-4xl font-black">
+                {otherAvatar ? <img src={otherAvatar} alt={otherName || 'Профиль'} className="h-full w-full object-cover" /> : (otherName || 'T').charAt(0).toUpperCase()}
+              </div>
+              <h3 className="mt-4 text-2xl font-black">{otherName || 'Пользователь Treabo'}</h3>
+              <div className="mt-1 text-sm font-bold text-[#7d849b]">{auth.isSpecialist ? 'Заказчик' : 'Мастер'} · {status}</div>
+              {otherCity ? <div className="mt-3 flex items-center gap-1.5 text-sm font-semibold text-[#697086]"><MapPin className="h-4 w-4" />{otherCity}</div> : null}
+              <div className="mt-5 max-w-sm text-center text-sm font-semibold leading-5 text-[#697086]">{selectedChat.task_title}</div>
+
+              <div className="mt-7 w-full rounded-[24px] bg-white p-5 shadow-sm">
+                <div className="text-xs font-black uppercase tracking-wide text-[#7d849b]">Телефон</div>
+                <div className="mt-2 select-text text-2xl font-black">{revealedPhone || otherMaskedPhone || '+7••••••••••'}</div>
+                {!revealedPhone ? (
+                  <button onClick={revealPhone} disabled={contactLoading} className="mt-5 flex min-h-[52px] w-full items-center justify-center gap-2 rounded-2xl bg-[#24262d] font-black text-white disabled:opacity-60">
+                    {contactLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Eye className="h-5 w-5" />} Показать номер
+                  </button>
+                ) : (
+                  <div className="mt-5 grid grid-cols-2 gap-2">
+                    <a href={`tel:${revealedPhone.replace(/[^+\d]/g, '')}`} className="flex min-h-[52px] items-center justify-center gap-2 rounded-2xl bg-[#d9f36b] text-sm font-black"><Phone className="h-5 w-5" />Позвонить</a>
+                    <button onClick={copyPhone} className="flex min-h-[52px] items-center justify-center gap-2 rounded-2xl bg-[#f0f1f5] text-sm font-black"><Copy className="h-5 w-5" />Копировать</button>
+                  </div>
+                )}
+                <p className="mt-4 text-xs font-semibold leading-5 text-[#7d849b]">Номер доступен только участникам этого чата. После закрытия профиля он снова будет скрыт.</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </TreaboAccountShell>
   );
 }

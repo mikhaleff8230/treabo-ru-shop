@@ -14,7 +14,7 @@ const MasterRegistration: NextPageWithLayout<MasterRegistrationProps> = ({ topSp
     <>
       <TitleSeo
         title="Регистрация мастера - Treabo"
-        description="Зарегистрируйтесь как специалист Treabo и получайте заявки от клиентов."
+        description="Зарегистрируйтесь как специалист Treabo и получайте заявки от заказчиков."
         canonical={`${siteUrl}/master-registration`}
       />
       <MasterRegistrationPage topSpecialists={topSpecialists} />

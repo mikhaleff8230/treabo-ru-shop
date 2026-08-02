@@ -10,6 +10,7 @@ import {
   treaboSendCustomerPasswordResetCode,
 } from '@/data/treabo-auth';
 import { normalizeTreaboPhone } from '@/lib/treabo/phone';
+import { reachYandexMetrikaGoal } from '@/lib/yandex-metrika';
 
 type TreaboAuthModalProps = {
   open: boolean;
@@ -40,6 +41,8 @@ type TreaboAuthModalProps = {
 const RESEND_SECONDS = 60;
 const MASTER_APP_DOWNLOAD_URL =
   process.env.NEXT_PUBLIC_TREABO_APP_APK_URL || '/downloads/treabo-proffi.apk';
+const CLIENT_APP_DOWNLOAD_URL =
+  process.env.NEXT_PUBLIC_TREABO_CLIENT_APP_APK_URL || '/downloads/treabo-client.apk';
 
 export default function TreaboAuthModal({
   open,
@@ -151,6 +154,11 @@ export default function TreaboAuthModal({
         }
       }
 
+      if (tab === 'register') {
+        reachYandexMetrikaGoal(
+          role === 'specialist' ? 'specialist_registration' : 'customer_registration',
+        );
+      }
       onSuccess?.();
       onClose();
     } catch (err) {
@@ -203,6 +211,11 @@ export default function TreaboAuthModal({
         });
       }
 
+      if (!passwordReset && otpPurpose === 'register') {
+        reachYandexMetrikaGoal(
+          role === 'specialist' ? 'specialist_registration' : 'customer_registration',
+        );
+      }
       onSuccess?.();
       onClose();
     } catch (err) {
@@ -292,7 +305,7 @@ export default function TreaboAuthModal({
                   ? 'Вход'
                   : role === 'specialist'
                     ? 'Регистрация специалиста'
-                    : 'Регистрация клиента'}
+                    : 'Регистрация заказчика'}
             </h2>
           </div>
           <button
@@ -423,6 +436,24 @@ export default function TreaboAuthModal({
                 <p className="text-center text-xs leading-5 text-[#7d849b]">
                   Первый вход и привязка телефона выполняются при регистрации. SMS при обычном входе мастера не отправляется.
                 </p>
+              ) : null}
+
+              {role === 'customer' ? (
+                <a
+                  href={CLIENT_APP_DOWNLOAD_URL}
+                  download
+                  className="flex items-center gap-3 rounded-2xl border border-[#dfe5c5] bg-[#f8fbe9] px-4 py-3 transition hover:border-[#c7d97c] hover:bg-[#f3f8d9]"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#d9f36b] text-[#232323]">
+                    <Smartphone className="h-5 w-5" />
+                  </span>
+                  <span className="min-w-0">
+                    <span className="block text-sm font-black text-[#232323]">Скачать Treabo-client</span>
+                    <span className="mt-0.5 block text-xs leading-5 text-[#6f765d]">
+                      Создавайте заявки с AI и получайте отклики в приложении
+                    </span>
+                  </span>
+                </a>
               ) : null}
 
               {tab === 'register' && role === 'specialist' ? (

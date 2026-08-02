@@ -25,7 +25,6 @@ import { useState } from 'react';
 import {
   ArrowLeft,
   MessageCircle,
-  Smartphone,
   Star,
   X,
 } from 'lucide-react';
@@ -212,7 +211,7 @@ const SpecialistPage: NextPageWithLayout<SpecialistPageProps> = ({ specialist, r
                   {reviewItems.length ? reviewItems.map((review) => (
                     <article key={review.id} className="rounded-[20px] bg-[#f8f9fb] p-4">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="font-[400]">{review.customer_name || 'Клиент Treabo'}</span>
+                        <span className="font-[400]">{review.customer_name || 'Заказчик Treabo'}</span>
                         <span className="text-xs text-[#7d849b]">
                           {review.created_at ? new Date(review.created_at).toLocaleDateString('ru-RU') : ''}
                         </span>
@@ -231,14 +230,12 @@ const SpecialistPage: NextPageWithLayout<SpecialistPageProps> = ({ specialist, r
 
             <aside className="space-y-4 lg:sticky lg:top-24">
               <section className="overflow-hidden rounded-[28px] bg-white shadow-sm">
-                <div className="flex h-40 items-center justify-center bg-[#fff0a6]">
-                  <div className="relative flex h-28 w-28 items-center justify-center rounded-[32px] bg-[#232323] text-[#d9f36b] shadow-xl">
-                    <Smartphone className="h-14 w-14" />
-                  </div>
+                <div className="aspect-[4/5] overflow-hidden bg-black">
+                  <img src="/proffi/treabo-client-app-banner.png" alt="Приложение Treabo-client" className="h-full w-full object-cover object-center" />
                 </div>
                 <div className="p-5">
                   <h2 className="text-lg font-[400]">Скачайте приложение</h2>
-                  <p className="mt-2 text-sm leading-6 text-[#7d849b]">Создавайте задачи быстрее, общайтесь в чате и получайте отклики.</p>
+                  <p className="mt-2 text-sm leading-6 text-[#7d849b]">Создавайте заявки с AI, общайтесь с мастерами и получайте отклики.</p>
                   <button type="button" onClick={() => setDownloadOpen(true)} className="mt-4 flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-[#d9f36b] px-4 text-sm font-[400] text-[#232323]">
                     Скачать приложение
                   </button>

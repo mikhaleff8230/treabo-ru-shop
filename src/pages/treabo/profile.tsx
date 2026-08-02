@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
-import { Camera, CheckCircle2, ImagePlus, Pencil, ShieldCheck, Star, Trash2 } from 'lucide-react';
+import { Camera, ImagePlus, KeyRound, Mail, MapPin, Pencil, Phone, ShieldCheck, Smartphone, Star, Trash2 } from 'lucide-react';
 import TreaboAccountShell from '@/components/treabo/TreaboAccountShell';
 import {
   fetchTreaboCategories,
@@ -15,6 +16,7 @@ import {
   type TreaboWork,
 } from '@/data/treabo';
 import { getStoredTreaboToken } from '@/data/treabo-auth';
+import { treaboResetCustomerPassword, treaboSendCustomerPasswordResetCode } from '@/data/treabo-auth';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
 
 type IdentityVerification = {
@@ -90,6 +92,10 @@ export default function TreaboProfilePage() {
   }, [auth.user?.bio, auth.user?.city]);
 
   useEffect(() => {
+    if (!auth.isSpecialist) {
+      setServicesLoading(false);
+      return;
+    }
     Promise.all([fetchTreaboCategories(), fetchTreaboWorks()])
       .then(([categoryItems, workItems]) => {
         const activeWorks = workItems.filter((work) => work.is_active !== false);
@@ -103,7 +109,7 @@ export default function TreaboProfilePage() {
       })
       .catch(() => setError('Не удалось загрузить список категорий и работ'))
       .finally(() => setServicesLoading(false));
-  }, []);
+  }, [auth.isSpecialist]);
 
   useEffect(() => {
     if (servicesLoading) return;
@@ -115,6 +121,7 @@ export default function TreaboProfilePage() {
   }, [auth.user?.services, categories, servicesLoading, works]);
 
   useEffect(() => {
+    if (!auth.isSpecialist) return;
     const token = getStoredTreaboToken();
     if (!token) return;
 
@@ -122,14 +129,14 @@ export default function TreaboProfilePage() {
     treaboApiRequest<IdentityVerification>('/identity-verification', { token })
       .then(setVerification)
       .catch(() => setVerification({ status: 'not_submitted' }));
-  }, []);
+  }, [auth.isSpecialist]);
 
   useEffect(() => {
-    if (!auth.user?.id) return;
+    if (!auth.isSpecialist || !auth.user?.id) return;
     fetchTreaboSpecialistReviews(String(auth.user.id))
       .then((payload) => setReviews(payload?.data || []))
       .catch(() => setReviews([]));
-  }, [auth.user?.id]);
+  }, [auth.isSpecialist, auth.user?.id]);
 
   const filteredCategories = useMemo(() => {
     const query = serviceSearch.trim().toLocaleLowerCase('ru-RU');
@@ -213,6 +220,8 @@ export default function TreaboProfilePage() {
   async function removePortfolioPhoto(url: string) {
     await auth.updateProfile({ portfolio: portfolio.filter((item) => item !== url) });
   }
+
+  if (!auth.isSpecialist) return <TreaboCustomerProfile />;
 
   return (
     <TreaboAccountShell title="Анкета">
@@ -459,7 +468,7 @@ export default function TreaboProfilePage() {
               {reviews.slice(0, 6).map((review) => (
                 <article key={review.id} className="rounded-2xl bg-[#f8f9fb] p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="font-bold">{review.customer_name || 'Клиент Treabo'}</div>
+                    <div className="font-bold">{review.customer_name || 'Заказчик Treabo'}</div>
                     <div className="flex items-center gap-1">{stars(Number(review.rating || 0))}</div>
                   </div>
                   {review.task_title ? <div className="mt-1 text-xs font-semibold text-[#7d849b]">{review.task_title}</div> : null}
@@ -494,6 +503,124 @@ export default function TreaboProfilePage() {
                 <div className="text-sm font-bold text-[#7d849b]">{item.label}</div>
               </div>
             ))}
+          </div>
+        </section>
+      </div>
+    </TreaboAccountShell>
+  );
+}
+
+function TreaboCustomerProfile() {
+  const auth = useTreaboAuth();
+  const [city, setCity] = useState(auth.user?.city || '');
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [resetOpen, setResetOpen] = useState(false);
+  const [resetSending, setResetSending] = useState(false);
+  const [otpId, setOtpId] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const clientAppUrl = process.env.NEXT_PUBLIC_TREABO_CLIENT_APP_APK_URL || '/downloads/treabo-client.apk';
+
+  useEffect(() => setCity(auth.user?.city || ''), [auth.user?.city]);
+
+  async function saveCity() {
+    setSaving(true); setError(''); setNotice('');
+    try {
+      await auth.updateProfile({ city: city.trim() || undefined });
+      setNotice('Данные сохранены');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось сохранить данные'); }
+    finally { setSaving(false); }
+  }
+
+  async function uploadAvatar(file?: File | null) {
+    if (!file) return;
+    const token = getStoredTreaboToken();
+    if (!token) return;
+    setUploading(true); setError('');
+    try {
+      const uploaded = await uploadTreaboFile(file, { token, folder: 'avatars' });
+      if (uploaded.url) await auth.updateProfile({ avatar: uploaded.url });
+    } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось загрузить фотографию'); }
+    finally { setUploading(false); }
+  }
+
+  async function sendResetCode(channel: 'telegram' | 'email') {
+    if (!auth.user?.phone) return;
+    setResetSending(true); setError(''); setNotice('');
+    try {
+      const result = await treaboSendCustomerPasswordResetCode(auth.user.phone, channel);
+      setOtpId(result.otp_id);
+      setNotice(channel === 'email' ? `Код отправлен на ${result.destination || auth.user.email}` : 'Код отправлен через Telegram');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось отправить код'); }
+    finally { setResetSending(false); }
+  }
+
+  async function resetPassword() {
+    if (!auth.user?.phone || !otpId || otpCode.trim().length < 4 || newPassword.length < 6) return;
+    setResetSending(true); setError('');
+    try {
+      await treaboResetCustomerPassword({ phone: auth.user.phone, otp_id: otpId, code: otpCode.trim(), password: newPassword });
+      setResetOpen(false); setOtpId(''); setOtpCode(''); setNewPassword('');
+      setNotice('Пароль успешно изменён');
+      await auth.refresh();
+    } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось изменить пароль'); }
+    finally { setResetSending(false); }
+  }
+
+  return (
+    <TreaboAccountShell title="Профиль заказчика">
+      <div className="space-y-4">
+        {error ? <div className="rounded-2xl bg-red-50 px-4 py-3 text-sm font-bold text-red-700">{error}</div> : null}
+        {notice ? <div className="rounded-2xl bg-[#eefbe4] px-4 py-3 text-sm font-bold text-[#2f6f1f]">{notice}</div> : null}
+
+        <section className="rounded-[26px] bg-white p-5 shadow-sm sm:p-7">
+          <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
+            <div className="relative h-28 w-28 shrink-0 overflow-hidden rounded-full bg-[#d9f36b]">
+              {auth.user?.avatar ? <img src={photoUrl(auth.user.avatar)} alt={auth.user.name} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-4xl font-black">{auth.user?.name?.charAt(0)?.toUpperCase() || 'T'}</div>}
+              <label className="absolute bottom-1 right-1 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-white shadow">
+                <Camera className="h-4 w-4" />
+                <input type="file" accept="image/*" className="hidden" disabled={uploading} onChange={(event) => { uploadAvatar(event.target.files?.[0]); event.currentTarget.value = ''; }} />
+              </label>
+            </div>
+            <div className="min-w-0">
+              <h2 className="text-3xl font-black">{auth.user?.name || 'Заказчик Treabo'}</h2>
+              <div className="mt-1 text-sm font-bold text-[#7d849b]">заказчик</div>
+              <div className="mt-4 flex flex-wrap justify-center gap-2 sm:justify-start">
+                {auth.user?.city ? <span className="flex items-center gap-1 rounded-full bg-[#f5f6f1] px-3 py-1.5 text-sm font-bold"><MapPin className="h-4 w-4" />{auth.user.city}</span> : null}
+                <span className="flex items-center gap-1 rounded-full bg-[#f5f6f1] px-3 py-1.5 text-sm font-bold"><Phone className="h-4 w-4" />{auth.user?.phone || 'Телефон не указан'}</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-[26px] bg-white p-5 shadow-sm sm:p-7">
+          <h2 className="text-xl font-black">Контактные данные</h2>
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <label><span className="text-sm font-bold text-[#7d849b]">Город</span><input value={city} onChange={(event) => setCity(event.target.value)} placeholder="Москва" className="mt-2 w-full rounded-2xl bg-[#f3f5fa] px-4 py-3 outline-none focus:ring-2 focus:ring-[#d9f36b]" /></label>
+            <label><span className="text-sm font-bold text-[#7d849b]">Телефон</span><div className="mt-2 flex min-h-[48px] items-center rounded-2xl bg-[#f3f5fa] px-4 font-bold">{auth.user?.phone || 'Не указан'}</div></label>
+            <label className="sm:col-span-2"><span className="text-sm font-bold text-[#7d849b]">Электронная почта</span><div className="mt-2 flex min-h-[48px] items-center gap-2 rounded-2xl bg-[#f3f5fa] px-4 font-bold"><Mail className="h-4 w-4" />{auth.user?.email || 'Почта не указана'}</div></label>
+          </div>
+          <button onClick={saveCity} disabled={saving} className="mt-5 min-h-[48px] rounded-2xl bg-[#d9f36b] px-6 text-sm font-black disabled:opacity-60">{saving ? 'Сохраняем…' : 'Сохранить'}</button>
+        </section>
+
+        <section className="rounded-[26px] bg-white p-5 shadow-sm sm:p-7">
+          <div className="flex items-center gap-2"><KeyRound className="h-5 w-5" /><h2 className="text-xl font-black">Безопасность</h2></div>
+          <p className="mt-2 text-sm font-semibold text-[#7d849b]">Изменение пароля подтверждается кодом. Номер телефона при этом не меняется.</p>
+          <button onClick={() => setResetOpen((value) => !value)} className="mt-4 rounded-2xl bg-[#f3f5fa] px-5 py-3 text-sm font-black">Сменить или восстановить пароль</button>
+          {resetOpen ? <div className="mt-4 rounded-2xl border border-[#e2e5ec] p-4">
+            {!otpId ? <div className="flex flex-wrap gap-2"><button disabled={resetSending} onClick={() => sendResetCode('telegram')} className="rounded-xl bg-[#24262d] px-4 py-3 text-sm font-black text-white">Получить код в Telegram</button>{auth.user?.email ? <button disabled={resetSending} onClick={() => sendResetCode('email')} className="rounded-xl bg-[#d9f36b] px-4 py-3 text-sm font-black">Получить код на email</button> : null}</div> : <div className="grid gap-3 sm:grid-cols-2"><input value={otpCode} onChange={(event) => setOtpCode(event.target.value.replace(/\D/g, ''))} placeholder="Код подтверждения" className="rounded-xl bg-[#f3f5fa] px-4 py-3 outline-none" /><input type="password" value={newPassword} onChange={(event) => setNewPassword(event.target.value)} placeholder="Новый пароль, минимум 6 символов" className="rounded-xl bg-[#f3f5fa] px-4 py-3 outline-none" /><button disabled={resetSending || otpCode.length < 4 || newPassword.length < 6} onClick={resetPassword} className="rounded-xl bg-[#24262d] px-4 py-3 text-sm font-black text-white disabled:opacity-50 sm:col-span-2">Изменить пароль</button></div>}
+          </div> : null}
+        </section>
+
+        <section className="overflow-hidden rounded-[28px] bg-[#d9f36b] shadow-sm">
+          <div className="grid items-stretch md:grid-cols-[1fr_0.75fr]">
+            <div className="p-6 sm:p-8"><div className="text-xs font-black uppercase tracking-[0.16em] text-[#536217]">Treabo-client</div><h2 className="mt-2 max-w-xl text-3xl font-black leading-tight">Создавайте заявки и общайтесь с мастерами в приложении</h2><p className="mt-3 max-w-xl text-sm font-semibold leading-6 text-[#4e581f]">AI поможет описать задачу, а уведомления о сообщениях и откликах придут прямо на телефон.</p><a href={clientAppUrl} download className="mt-5 inline-flex min-h-[50px] items-center gap-2 rounded-2xl bg-[#24262d] px-6 font-black text-white"><Smartphone className="h-5 w-5" />Скачать приложение заказчика</a></div>
+            <div className="relative min-h-[240px] overflow-hidden bg-[linear-gradient(135deg,#bef264,#84cc16)]">
+              <Image src="/proffi/treabo-client-app-banner.png" alt="Приложение Treabo для заказчика" fill sizes="(max-width: 768px) 100vw, 36vw" className="bg-black object-contain object-center" />
+            </div>
           </div>
         </section>
       </div>

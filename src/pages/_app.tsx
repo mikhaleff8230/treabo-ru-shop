@@ -26,6 +26,7 @@ import '@/assets/css/globals.css';
 import { useRouter } from 'next/router';
 import { getDirection } from '@/lib/constants';
 import dynamic from 'next/dynamic';
+import { trackYandexMetrikaPageView } from '@/lib/yandex-metrika';
 
 const PrivateRoute = dynamic(() => import('@/layouts/_private-route'), {
   ssr: false,
@@ -67,7 +68,8 @@ type AppPropsWithLayout = AppProps & {
 };
 
 function CustomApp({ Component, pageProps }: AppPropsWithLayout) {
-  const { locale } = useRouter();
+  const router = useRouter();
+  const { locale } = router;
   const [queryClient] = useState(() => new QueryClient({
     defaultOptions: {
       queries: {
@@ -87,6 +89,12 @@ function CustomApp({ Component, pageProps }: AppPropsWithLayout) {
   useEffect(() => {
     document.documentElement.dir = dir;
   }, [dir]);
+
+  useEffect(() => {
+    const handleRouteChange = (url: string) => trackYandexMetrikaPageView(url);
+    router.events.on('routeChangeComplete', handleRouteChange);
+    return () => router.events.off('routeChangeComplete', handleRouteChange);
+  }, [router.events]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {

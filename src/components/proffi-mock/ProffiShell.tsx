@@ -148,7 +148,7 @@ export function ProffiHeader() {
                   <div className="translate-y-2 rounded-[24px] border border-zinc-200 bg-white p-2 shadow-2xl transition group-hover:translate-y-0">
                     <Link href="/treabo/profile" className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-[#232323] hover:bg-[#f5f6f1]">
                       <ClipboardList className="h-4 w-4" />
-                      {text.header.questionnaire}
+                      {auth.isSpecialist ? text.header.questionnaire : text.header.profile}
                     </Link>
                     <Link href="/treabo/chats" className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-[#232323] hover:bg-[#f5f6f1]">
                       <MessageCircle className="h-4 w-4" />
@@ -159,10 +159,12 @@ export function ProffiHeader() {
                         </span>
                       ) : null}
                     </Link>
-                    <Link href="/treabo/balance" className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-[#232323] hover:bg-[#f5f6f1]">
-                      <Wallet className="h-4 w-4" />
-                      {text.header.balance}
-                    </Link>
+                    {auth.isSpecialist ? (
+                      <Link href="/treabo/balance" className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-[#232323] hover:bg-[#f5f6f1]">
+                        <Wallet className="h-4 w-4" />
+                        {text.header.balance}
+                      </Link>
+                    ) : null}
                     <Link href="/treabo/support" className="flex items-center gap-3 rounded-2xl px-3 py-3 text-sm font-bold text-[#232323] hover:bg-[#f5f6f1]">
                       <CircleHelp className="h-4 w-4" />
                       {text.header.support}
@@ -307,7 +309,7 @@ export function ProffiFooter() {
             />
           </div>
           <p className="max-w-sm text-xs leading-5 text-[#777D88]">
-            Treabo соединяет клиентов и специалистов: заявки, отклики, чаты и заказы в одном месте.
+            Treabo соединяет заказчиков и специалистов: заявки, отклики, чаты и заказы в одном месте.
           </p>
         </div>
         <div className="grid grid-cols-2 gap-4 text-xs sm:grid-cols-4">

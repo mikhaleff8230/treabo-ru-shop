@@ -9,9 +9,10 @@ import { useTreaboUnreadChats } from '@/hooks/use-treabo-unread-chats';
 type Props = {
   title: string;
   children: React.ReactNode;
+  immersiveMobile?: boolean;
 };
 
-export default function TreaboAccountShell({ title, children }: Props) {
+export default function TreaboAccountShell({ title, children, immersiveMobile = false }: Props) {
   const router = useRouter();
   const auth = useTreaboAuth();
   const { unreadCount } = useTreaboUnreadChats(auth.isAuthenticated);
@@ -32,10 +33,10 @@ export default function TreaboAccountShell({ title, children }: Props) {
       ];
 
   return (
-    <div className="min-h-screen bg-[#f5f6f1] text-[#232323]">
-      <ProffiHeader />
-      <main className="mx-auto grid max-w-7xl gap-6 px-4 py-6 sm:px-6 lg:grid-cols-[280px_minmax(0,1fr)] lg:px-8">
-        <aside className="rounded-[28px] border border-zinc-200 bg-white p-3 shadow-sm lg:sticky lg:top-24 lg:h-fit">
+    <div className={`${immersiveMobile ? 'h-[100dvh] overflow-hidden lg:h-auto lg:min-h-screen lg:overflow-visible' : 'min-h-screen'} bg-[#f5f6f1] text-[#232323]`}>
+      <div className={immersiveMobile ? 'hidden lg:block' : ''}><ProffiHeader /></div>
+      <main className={`mx-auto grid max-w-7xl lg:grid-cols-[280px_minmax(0,1fr)] lg:px-8 ${immersiveMobile ? 'h-full gap-0 p-0 lg:h-auto lg:gap-6 lg:px-8 lg:py-6' : 'gap-6 px-4 py-6 sm:px-6'}`}>
+        <aside className={`${immersiveMobile ? 'hidden lg:block' : ''} rounded-[28px] border border-zinc-200 bg-white p-3 shadow-sm lg:sticky lg:top-24 lg:h-fit`}>
           <div className="mb-3 flex items-center gap-3 px-2 py-3">
             <span className="flex h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-[#d9f36b] text-lg font-black">
               {auth.user?.avatar ? (
@@ -74,8 +75,8 @@ export default function TreaboAccountShell({ title, children }: Props) {
             })}
           </nav>
         </aside>
-        <section className="min-w-0">
-          <h1 className="mb-5 text-3xl font-black leading-tight">{title}</h1>
+        <section className={`min-w-0 ${immersiveMobile ? 'h-full lg:h-auto' : ''}`}>
+          <h1 className={`${immersiveMobile ? 'hidden lg:block' : ''} mb-5 text-3xl font-black leading-tight`}>{title}</h1>
           {children}
         </section>
       </main>

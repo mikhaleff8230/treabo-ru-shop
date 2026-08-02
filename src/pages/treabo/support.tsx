@@ -3,7 +3,7 @@ import TreaboAccountShell from '@/components/treabo/TreaboAccountShell';
 
 const groups = [
   { title: 'Поддержка', items: ['Помощь', 'Справка'] },
-  { title: 'Приложение', items: ['Написать отзыв', 'О приложении', 'Приложение для клиентов'] },
+  { title: 'Приложение', items: ['Написать отзыв', 'О приложении', 'Приложение для заказчиков'] },
   { title: 'Другое', items: ['Treabo 25'] },
 ];
 
