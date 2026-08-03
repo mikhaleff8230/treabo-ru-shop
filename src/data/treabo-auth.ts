@@ -280,6 +280,29 @@ export function isTreaboCustomer(user?: TreaboUser | null) {
   return user?.role === 'customer';
 }
 
+export async function treaboSendChangePhoneOtp(phone: string) {
+  const token = getStoredTreaboToken();
+  if (!token) throw new Error('Необходимо войти в аккаунт');
+  return authFetch<TreaboOtpSentResponse>('/auth/phone/change/send-otp', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ phone: normalizeTreaboPhone(phone) }),
+  });
+}
+
+export async function treaboVerifyChangePhoneOtp(input: { phone: string; otp_id: string; code: string }) {
+  const data = await authFetch<TreaboAuthResponse>('/auth/phone/verify-otp', {
+    method: 'POST',
+    body: JSON.stringify({
+      phone: normalizeTreaboPhone(input.phone),
+      otp_id: input.otp_id,
+      code: input.code,
+    }),
+  });
+  persistTreaboSession(data);
+  return data;
+}
+
 export async function treaboRequestPushLogin(phone: string) {
   return authFetch<{ request_id: string; status: string; expires_in: number }>('/auth/specialist/push-login/request', {
     method: 'POST', body: JSON.stringify({ phone: normalizeTreaboPhone(phone) }),

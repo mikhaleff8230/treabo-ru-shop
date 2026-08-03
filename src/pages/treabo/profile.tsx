@@ -16,7 +16,7 @@ import {
   type TreaboWork,
 } from '@/data/treabo';
 import { getStoredTreaboToken } from '@/data/treabo-auth';
-import { treaboResetCustomerPassword, treaboSendCustomerPasswordResetCode } from '@/data/treabo-auth';
+import { treaboResetCustomerPassword, treaboSendChangePhoneOtp, treaboSendCustomerPasswordResetCode, treaboVerifyChangePhoneOtp } from '@/data/treabo-auth';
 import { useTreaboAuth } from '@/hooks/use-treabo-auth';
 
 type IdentityVerification = {
@@ -522,6 +522,11 @@ function TreaboCustomerProfile() {
   const [otpId, setOtpId] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [newPassword, setNewPassword] = useState('');
+  const [phoneOpen, setPhoneOpen] = useState(false);
+  const [newPhone, setNewPhone] = useState('');
+  const [phoneOtpId, setPhoneOtpId] = useState('');
+  const [phoneOtpCode, setPhoneOtpCode] = useState('');
+  const [phoneSaving, setPhoneSaving] = useState(false);
   const clientAppUrl = process.env.NEXT_PUBLIC_TREABO_CLIENT_APP_APK_URL || '/downloads/treabo-client.apk';
 
   useEffect(() => setCity(auth.user?.city || ''), [auth.user?.city]);
@@ -570,6 +575,29 @@ function TreaboCustomerProfile() {
     finally { setResetSending(false); }
   }
 
+  async function sendPhoneCode() {
+    if (!newPhone.trim()) return;
+    setPhoneSaving(true); setError(''); setNotice('');
+    try {
+      const result = await treaboSendChangePhoneOtp(newPhone);
+      setPhoneOtpId(result.otp_id);
+      setNotice(`Код подтверждения отправлен на ${result.phone}`);
+    } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось отправить код'); }
+    finally { setPhoneSaving(false); }
+  }
+
+  async function confirmPhone() {
+    if (!phoneOtpId || phoneOtpCode.trim().length < 4) return;
+    setPhoneSaving(true); setError(''); setNotice('');
+    try {
+      await treaboVerifyChangePhoneOtp({ phone: newPhone, otp_id: phoneOtpId, code: phoneOtpCode.trim() });
+      await auth.refresh();
+      setPhoneOpen(false); setNewPhone(''); setPhoneOtpId(''); setPhoneOtpCode('');
+      setNotice('Номер телефона изменён');
+    } catch (e) { setError(e instanceof Error ? e.message : 'Не удалось изменить номер'); }
+    finally { setPhoneSaving(false); }
+  }
+
   return (
     <TreaboAccountShell title="Профиль заказчика">
       <div className="space-y-4">
@@ -600,9 +628,14 @@ function TreaboCustomerProfile() {
           <h2 className="text-xl font-black">Контактные данные</h2>
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
             <label><span className="text-sm font-bold text-[#7d849b]">Город</span><input value={city} onChange={(event) => setCity(event.target.value)} placeholder="Москва" className="mt-2 w-full rounded-2xl bg-[#f3f5fa] px-4 py-3 outline-none focus:ring-2 focus:ring-[#d9f36b]" /></label>
-            <label><span className="text-sm font-bold text-[#7d849b]">Телефон</span><div className="mt-2 flex min-h-[48px] items-center rounded-2xl bg-[#f3f5fa] px-4 font-bold">{auth.user?.phone || 'Не указан'}</div></label>
+            <label><span className="text-sm font-bold text-[#7d849b]">Телефон</span><div className="mt-2 flex min-h-[48px] items-center justify-between gap-3 rounded-2xl bg-[#f3f5fa] px-4 font-bold"><span>{auth.user?.phone || 'Не указан'}</span><button type="button" onClick={() => { setPhoneOpen((value) => !value); setPhoneOtpId(''); setPhoneOtpCode(''); }} className="shrink-0 text-sm underline">Сменить</button></div></label>
             <label className="sm:col-span-2"><span className="text-sm font-bold text-[#7d849b]">Электронная почта</span><div className="mt-2 flex min-h-[48px] items-center gap-2 rounded-2xl bg-[#f3f5fa] px-4 font-bold"><Mail className="h-4 w-4" />{auth.user?.email || 'Почта не указана'}</div></label>
           </div>
+          {phoneOpen ? <div className="mt-4 rounded-2xl border border-[#e2e5ec] p-4">
+            <div className="text-sm font-bold">Новый номер телефона</div>
+            {!phoneOtpId ? <div className="mt-3 flex flex-col gap-2 sm:flex-row"><input value={newPhone} onChange={(event) => setNewPhone(event.target.value)} placeholder="+7 900 000-00-00" className="min-h-[48px] flex-1 rounded-xl bg-[#f3f5fa] px-4 outline-none" /><button type="button" disabled={phoneSaving || !newPhone.trim()} onClick={sendPhoneCode} className="rounded-xl bg-[#24262d] px-5 py-3 text-sm font-black text-white disabled:opacity-50">Получить код</button></div> : <div className="mt-3 flex flex-col gap-2 sm:flex-row"><input value={phoneOtpCode} onChange={(event) => setPhoneOtpCode(event.target.value.replace(/\D/g, ''))} placeholder="Код подтверждения" className="min-h-[48px] flex-1 rounded-xl bg-[#f3f5fa] px-4 outline-none" /><button type="button" disabled={phoneSaving || phoneOtpCode.length < 4} onClick={confirmPhone} className="rounded-xl bg-[#d9f36b] px-5 py-3 text-sm font-black disabled:opacity-50">Подтвердить номер</button></div>}
+            <p className="mt-3 text-xs font-semibold text-[#7d849b]">Новый номер станет логином только после подтверждения кодом.</p>
+          </div> : null}
           <button onClick={saveCity} disabled={saving} className="mt-5 min-h-[48px] rounded-2xl bg-[#d9f36b] px-6 text-sm font-black disabled:opacity-60">{saving ? 'Сохраняем…' : 'Сохранить'}</button>
         </section>
 

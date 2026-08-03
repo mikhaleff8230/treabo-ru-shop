@@ -375,8 +375,12 @@ export function getTreaboPublicApiBase(): string {
   return trimSlash(apiCandidates()[0] || 'http://127.0.0.1:8001/api/proffi');
 }
 
-export function normalizeTreaboAssetUrl(value?: string | null): string {
+export function normalizeTreaboAssetUrl(value?: string | { url?: string; original?: string; thumbnail?: string } | null): string {
   if (!value) return '';
+  if (typeof value === 'object') {
+    value = value.url || value.original || value.thumbnail || '';
+  }
+  if (typeof value !== 'string' || !value) return '';
   if (/^https?:\/\//i.test(value)) {
     return value.replace('https://treabo.ru/api/files/', 'https://api.treabo.ru/api/proffi/files/');
   }
