@@ -10,7 +10,6 @@ import { Dialog } from '@/components/ui/dialog';
 import { Transition } from '@/components/ui/transition';
 import { CloseIcon } from '@/components/icons/close-icon';
 import { getDirection } from '@/lib/constants';
-import CreatePlaceModal from '@/components/places/CreatePlaceModal';
 
 const LoginUserForm = dynamic(() => import('@/components/auth/login-form'));
 const ProductPopupDetails = dynamic(
@@ -54,7 +53,6 @@ const GateWayPaymentModal = dynamic(
 
 const DeleteCardModal = dynamic(() => import('@/components/card/delete-view'));
 
-const PlaceModal = dynamic(() => import('@/components/place/place-modal'));
 const UpdatePhoneModal = dynamic(() => import('@/components/profile/update-phone-modal'));
 const PinLoginForm = dynamic(() => import('@/components/auth/pin-login-form'));
 const SetPinModal = dynamic(() => import('@/components/auth/set-pin-modal'));
@@ -87,10 +85,6 @@ function renderModalContent(view: MODAL_VIEWS, data?: any) {
       return <DeleteCardModal />;
     case 'GATEWAY_MODAL':
       return <GateWayPaymentModal />;
-    case 'PLACE_DETAILS':
-      return <PlaceModal />;
-    case 'CREATE_PLACE':
-      return <CreatePlaceModal isOpen={true} onClose={closeModal} />;
     case 'UPDATE_PHONE':
       return <UpdatePhoneModal {...data} />;
     case 'PIN_LOGIN':

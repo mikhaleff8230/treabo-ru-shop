@@ -21,11 +21,8 @@ import Button from '@/components/ui/button';
 import { LayoutGrid } from 'lucide-react';
 import { useTranslation } from 'next-i18next';
 import DropdownCategoriesMenu from '@/components/menu/dropdown-categories-menu';
-import CreatePlaceModal from '@/components/places/CreatePlaceModal';
 import Logo from '@/components/ui/logo';
-import { useState } from 'react';
 import cn from 'classnames';
-import { PlusCircleIcon } from '@/components/icons/plus-circle-icon';
 import ChatButton from '@/components/chat/ChatButton';
 
 const AuthorizedMenuItems = [
@@ -152,7 +149,6 @@ export default function Header({
   
   // Проверяем, находимся ли мы на странице товара
   const isProductPage = asPath?.startsWith('/element/');
-  const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Функция для открытия мобильного меню (сайдбара)
   const handleMobileMenuClick = () => {
@@ -238,14 +234,6 @@ export default function Header({
               {asPath !== routes.checkout && (
                 <CartButton className="hidden sm:flex" />
               )}
-              <button
-                onClick={() => setIsModalOpen(true)}
-                className="hidden lg:flex items-center space-x-2 px-4 py-2 bg-brand hover:bg-brand-dark text-white rounded-lg transition-colors"
-              >
-                <PlusCircleIcon className="h-5 w-5" />
-                <span>{t('text-create')}</span>
-              </button>
-              <CreatePlaceModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
               <LoginMenu />
             </div>
           </div>

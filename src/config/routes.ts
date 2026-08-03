@@ -25,8 +25,6 @@ const routes = {
   terms: '/terms',
   privacy: '/privacy',
   password: '/password',
-  feed: '/feed',
-  placesFeed: '/places',
   wallet: '/wallet',
   followedShop: '/followed-authors',
   orderUrl: (tracking_number: string) =>
@@ -68,7 +66,6 @@ const routes = {
   },
   categoryUrl: (slug: string) => `/categories/${slug}`,
   tagUrl: (slug: string) => `/products/tags/${slug}`,
-  placeHashtagUrl: (slug: string) => `/places/element/${slug}`,
   shopUrl: (slug: string) => `/authors/${slug}`,
   product: (slug: string) => {
     return `/element/${encodeURIComponent(slug)}`;

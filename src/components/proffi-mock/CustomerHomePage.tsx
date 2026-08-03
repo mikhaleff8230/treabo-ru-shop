@@ -9,6 +9,7 @@ import {
   Bath,
   CheckCircle2,
   ChevronRight,
+  Download,
   Drill,
   Fan,
   MapPin,
@@ -19,6 +20,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { normalizeTreaboAssetUrl, type TreaboCategory, type TreaboHomeStats, type TreaboSpecialist } from '@/data/treabo';
+import { useTreaboBrandLogo } from '@/hooks/use-treabo-brand-logo';
 import team1 from '@/assets/images/team/1.png';
 import team2 from '@/assets/images/team/2.png';
 import team3 from '@/assets/images/team/3.png';
@@ -38,6 +40,19 @@ const categoryIcons: Record<string, any> = {
   Zap,
   Grid2X2: Drill,
 };
+
+const clientAppDownloadPath =
+  process.env.NEXT_PUBLIC_TREABO_CLIENT_APP_APK_URL ||
+  '/downloads/treabo-client.apk';
+const publicSiteUrl = (
+  process.env.NEXT_PUBLIC_WEBSITE_URL || 'https://treabo.ru'
+).replace(/\/+$/, '');
+const clientAppDownloadUrl = /^https?:\/\//i.test(clientAppDownloadPath)
+  ? clientAppDownloadPath
+  : `${publicSiteUrl}${clientAppDownloadPath.startsWith('/') ? '' : '/'}${clientAppDownloadPath}`;
+const clientAppQrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=12&data=${encodeURIComponent(
+  clientAppDownloadUrl
+)}`;
 
 function asArray<T>(value: unknown, fallback: T[]): T[] {
   return Array.isArray(value) ? (value as T[]) : fallback;
@@ -65,6 +80,7 @@ function buildCategories(
 export default function CustomerHomePage({ categories = [], topSpecialists = [], homeStats = null }: CustomerHomePageProps) {
   const router = useRouter();
   const { t } = useTranslation('common');
+  const { src: brandLogoSrc, alt: brandLogoAlt } = useTreaboBrandLogo();
   const [prompt, setPrompt] = useState('');
   const fallbackCategories = asArray<{ title: string; count: string }>(t('treabo.home.categories', { returnObjects: true }), []);
   const fallbackSearches = asArray<string>(t('treabo.home.searches', { returnObjects: true }), []);
@@ -292,10 +308,51 @@ export default function CustomerHomePage({ categories = [], topSpecialists = [],
         </section>
 
         <section className="mx-auto max-w-[1160px] px-4 pb-16 sm:px-6 lg:px-8">
-          <div className="grid overflow-hidden rounded-[36px] bg-[#d9f36b] md:grid-cols-[1fr_0.75fr]">
+          <div className="grid overflow-hidden rounded-[36px] bg-[#d9f36b] lg:grid-cols-[1.12fr_0.88fr]">
             <div className="p-7 sm:p-10">
+              <img
+                src={brandLogoSrc}
+                alt={brandLogoAlt}
+                className="mb-7 h-12 w-auto max-w-[190px] object-contain object-left"
+              />
               <h2 className="max-w-2xl text-3xl font-black tracking-tight sm:text-5xl">{t('treabo.home.ctaTitle')}</h2>
               <p className="mt-4 max-w-xl text-base leading-7 text-[#232323]">{t('treabo.home.ctaText')}</p>
+              <div className="mt-7 grid gap-4 sm:grid-cols-[152px_1fr]">
+                <div className="rounded-[26px] bg-white p-3 shadow-sm">
+                  <img
+                    src={clientAppQrUrl}
+                    alt="QR-код для скачивания приложения Treabo"
+                    className="aspect-square w-full rounded-2xl object-contain"
+                  />
+                  <div className="mt-2 text-center text-xs font-black text-[#232323]">
+                    Наведите камеру
+                  </div>
+                </div>
+                <div className="grid content-start gap-3">
+                  <a
+                    href={clientAppDownloadUrl}
+                    download
+                    className="flex min-h-[64px] items-center justify-center gap-3 rounded-[22px] bg-[#232323] px-6 text-base font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-black"
+                  >
+                    <Download className="h-6 w-6" />
+                    Скачать приложение
+                  </a>
+                  <div
+                    aria-disabled="true"
+                    className="flex min-h-[82px] cursor-not-allowed items-center gap-4 rounded-[22px] border border-white/70 bg-white/75 px-5 text-[#232323] shadow-sm"
+                  >
+                    <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(145deg,#28d17c,#06a866)] text-2xl font-black text-white shadow-md">
+                      R
+                    </div>
+                    <div>
+                      <div className="text-xs font-black uppercase tracking-[0.16em] text-[#66704c]">
+                        Скоро
+                      </div>
+                      <div className="text-xl font-black">Скачать в RuStore</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 {asArray<string>(t('treabo.home.checklist', { returnObjects: true }), []).map((item) => (
                   <div key={item} className="flex items-center gap-2 font-bold">
@@ -307,10 +364,10 @@ export default function CustomerHomePage({ categories = [], topSpecialists = [],
             </div>
             <div className="relative min-h-[280px] overflow-hidden bg-[linear-gradient(135deg,#bef264,#84cc16)]">
               <Image
-                src="/proffi/treabo-client-app-banner.png"
+                src="/proffi/34343434.png"
                 alt={t('treabo.home.ctaTitle')}
-                width={1536}
-                height={1920}
+                width={932}
+                height={932}
                 className="absolute inset-0 h-full w-full bg-black object-contain object-center"
                 priority
               />

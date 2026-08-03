@@ -40,7 +40,7 @@ type TreaboAuthModalProps = {
 
 const RESEND_SECONDS = 60;
 const MASTER_APP_DOWNLOAD_URL =
-  process.env.NEXT_PUBLIC_TREABO_APP_APK_URL || '/downloads/treabo-proffi.apk';
+  process.env.NEXT_PUBLIC_TREABO_APP_APK_URL || '/downloads/treabo-specialist.apk';
 const CLIENT_APP_DOWNLOAD_URL =
   process.env.NEXT_PUBLIC_TREABO_CLIENT_APP_APK_URL || '/downloads/treabo-client.apk';
 

@@ -83,7 +83,6 @@ Axios.interceptors.response.use(
       '/tags',
       '/types',
       '/settings',
-      '/places',
       // Auth endpoints
       '/token',
       '/register',
@@ -170,7 +169,7 @@ export class HttpClient {
 
   static async post<T>(url: string, data: unknown, options?: any) {
     // Для загрузки видео увеличиваем таймаут до 5 минут (300 секунд)
-    const isVideoUpload = data instanceof FormData && (data.has('video') || url.includes('/places'));
+    const isVideoUpload = data instanceof FormData && data.has('video');
     const timeout = isVideoUpload ? 300000 : (options?.timeout || Axios.defaults.timeout);
     
     const response = await Axios.post<T>(url, data, {
@@ -182,7 +181,7 @@ export class HttpClient {
 
   static async put<T>(url: string, data: unknown, options?: any) {
     // Для загрузки видео увеличиваем таймаут до 5 минут (300 секунд)
-    const isVideoUpload = data instanceof FormData && (data.has('video') || url.includes('/places'));
+    const isVideoUpload = data instanceof FormData && data.has('video');
     const timeout = isVideoUpload ? 300000 : (options?.timeout || Axios.defaults.timeout);
     
     const response = await Axios.put<T>(url, data, {

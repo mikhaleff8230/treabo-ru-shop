@@ -2,17 +2,18 @@ import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 import type { GetStaticProps } from 'next';
 import { useTranslation } from 'next-i18next';
 import type { NextPageWithLayout } from '@/types';
-import GeneralLayout from '@/layouts/_general-layout';
 import PageHeading from '@/components/ui/page-heading';
 import GeneralContainer from '@/layouts/_general-container';
 import { termsData } from '@/data/static/terms-setting';
 import Seo from '@/layouts/_seo';
 import routes from '@/config/routes';
+import { ProffiFooter, ProffiHeader } from '@/components/proffi-mock/ProffiShell';
 
 const TermsPage: NextPageWithLayout = () => {
   const { t } = useTranslation('common');
   return (
-    <>
+    <div className="min-h-screen bg-[#f6f7f2] text-[#232323]">
+      <ProffiHeader />
       <Seo
         title="Terms & Conditions"
         description="Fastest digital download template built with React, NextJS, TypeScript, React-Query and Tailwind CSS."
@@ -42,12 +43,9 @@ const TermsPage: NextPageWithLayout = () => {
           ))}
         </GeneralContainer>
       </div>
-    </>
+      <ProffiFooter />
+    </div>
   );
-};
-
-TermsPage.getLayout = function getLayout(page) {
-  return <GeneralLayout>{page}</GeneralLayout>;
 };
 
 export const getStaticProps: GetStaticProps = async ({ locale }) => {

@@ -2,16 +2,17 @@ import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 import type { GetStaticProps } from 'next';
 import { useTranslation } from 'next-i18next';
 import type { NextPageWithLayout } from '@/types';
-import GeneralLayout from '@/layouts/_general-layout';
 import PageHeading from '@/components/ui/page-heading';
 import GeneralContainer from '@/layouts/_general-container';
 import { privacyPolicy } from '@/data/static/privacy-setting';
 import Seo from '@/layouts/_seo';
 import routes from '@/config/routes';
+import { ProffiFooter, ProffiHeader } from '@/components/proffi-mock/ProffiShell';
 const PrivacyPage: NextPageWithLayout = () => {
   const { t } = useTranslation('common');
   return (
-    <>
+    <div className="min-h-screen bg-[#f6f7f2] text-[#232323]">
+      <ProffiHeader />
       <Seo
         title="Политика конфиденциальности"
         description="Политика конфиденциальности"
@@ -41,12 +42,9 @@ const PrivacyPage: NextPageWithLayout = () => {
           ))}
         </GeneralContainer>
       </div>
-    </>
+      <ProffiFooter />
+    </div>
   );
-};
-
-PrivacyPage.getLayout = function getLayout(page) {
-  return <GeneralLayout>{page}</GeneralLayout>;
 };
 
 export const getStaticProps: GetStaticProps = async ({ locale }) => {

@@ -3,7 +3,6 @@ import { useRouter } from 'next/router';
 import { useQueryClient } from '@tanstack/react-query';
 import useAuth from '@/components/auth/use-auth';
 import toast from 'react-hot-toast';
-import Layout from '@/layouts/_layout';
 import type { NextPageWithLayout } from '@/types';
 import { API_ENDPOINTS } from '@/data/client/endpoints';
 import { getAuthToken } from '@/data/client/token.utils';
@@ -66,10 +65,6 @@ const AuthSuccessPage: NextPageWithLayout = () => {
       </div>
     </div>
   );
-};
-
-AuthSuccessPage.getLayout = function getLayout(page) {
-  return <Layout>{page}</Layout>;
 };
 
 export default AuthSuccessPage;

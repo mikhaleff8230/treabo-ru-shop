@@ -2,23 +2,24 @@ import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 import type { GetStaticProps } from 'next';
 import { useTranslation } from 'next-i18next';
 import type { NextPageWithLayout } from '@/types';
-import Layout from '@/layouts/_layout';
 import { ErrorIcon } from '@/components/icons/error-icon';
 import { HomeIcon } from '@/components/icons/home-icon';
 import AnchorLink from '@/components/ui/links/anchor-link';
 import routes from '@/config/routes';
 import Seo from '@/layouts/_seo';
+import { ProffiFooter, ProffiHeader } from '@/components/proffi-mock/ProffiShell';
 
 const ErrorPage: NextPageWithLayout = () => {
   const { t } = useTranslation('common');
   return (
-    <>
+    <div className="min-h-screen bg-[#f6f7f2] text-[#232323]">
+      <ProffiHeader />
       <Seo
         title="404 Error"
         description="Fastest digital download template built with React, NextJS, TypeScript, React-Query and Tailwind CSS."
         url="/404"
       />
-      <div className="flex h-full items-center justify-center p-4 md:p-6 xl:p-8">
+      <div className="flex min-h-[65vh] items-center justify-center p-4 md:p-6 xl:p-8">
         <div className="max-w-md text-center xl:max-w-lg">
           <ErrorIcon className="mx-auto h-36 w-36 text-light-900 dark:text-dark-600" />
 
@@ -35,12 +36,9 @@ const ErrorPage: NextPageWithLayout = () => {
           </AnchorLink>
         </div>
       </div>
-    </>
+      <ProffiFooter />
+    </div>
   );
-};
-
-ErrorPage.getLayout = function getLayout(page) {
-  return <Layout>{page}</Layout>;
 };
 
 export const getStaticProps: GetStaticProps = async ({ locale }) => {

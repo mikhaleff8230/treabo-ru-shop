@@ -43,7 +43,7 @@ type TaskDetailProps = {
 const money = new Intl.NumberFormat('ru-RU');
 const DEFAULT_RESPONSE_PRICE_RUB = 15;
 const siteUrl = (process.env.NEXT_PUBLIC_WEBSITE_URL || 'https://treabo.ru').replace(/\/+$/, '');
-const appDownloadPath = process.env.NEXT_PUBLIC_TREABO_APP_APK_URL || '/downloads/treabo-proffi.apk';
+const appDownloadPath = process.env.NEXT_PUBLIC_TREABO_APP_APK_URL || '/downloads/treabo-specialist.apk';
 
 function stripHtml(value?: string | null) {
   return (value || '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
@@ -467,10 +467,10 @@ const TaskDetailPage: NextPageWithLayout<TaskDetailProps> = ({ task }) => {
             <aside className="space-y-4 lg:sticky lg:top-24">
               <section className="overflow-hidden rounded-[28px] bg-white shadow-sm">
                 <div className="aspect-[4/5] overflow-hidden bg-black">
-                  <img src="/proffi/treabo-specialist-app-banner.png" alt="Приложение Treabo-specialist" className="h-full w-full object-cover object-center" />
+                  <img src="/proffi/banner343.png" alt="Приложение Treabo" className="h-full w-full object-cover object-center" />
                 </div>
                 <div className="p-5">
-                  <h2 className="text-lg font-[400]">Скачайте приложение</h2>
+                  <h2 className="text-lg font-[400]">Скачайте приложение Treabo</h2>
                   <p className="mt-2 text-sm leading-6 text-[#7d849b]">Получайте новые задания, управляйте откликами и общайтесь с заказчиками.</p>
                   <button type="button" onClick={() => setDownloadOpen(true)} className="mt-4 flex min-h-[48px] w-full items-center justify-center rounded-2xl bg-[#d9f36b] px-4 text-sm font-[400] text-[#232323]">
                     Установить приложение

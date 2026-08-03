@@ -14,8 +14,6 @@ import Copyright from '@/layouts/_copyright';
 import { UserFollowingIcon } from '@/components/icons/user-following-icon';
 import { useMe } from '@/data/user';
 import { FeedIcon } from '@/components/icons/feed-icon';
-import { LayoutIcon } from '@/components/icons/layout-icon';
-import { CollectionIcon } from '@/components/icons/collection-icon';
 import { ShopIcon } from '@/components/icons/shop-icon';
 import { CartIcon } from '@/components/icons/cart-icon';
 import { useCart } from '@/components/cart/lib/cart.context';
@@ -23,9 +21,6 @@ import { useIsMounted } from '@/lib/hooks/use-is-mounted';
 import { useTranslation } from 'next-i18next';
 import { LocationWithModal } from '@/components/GeoLocation/LocationWithModal';
 import Logo from '@/components/ui/logo';
-import { PlusCircleIcon } from '@/components/icons/plus-circle-icon';
-import CreatePlaceModal from '@/components/places/CreatePlaceModal';
-import { useState } from 'react';
 
 interface NavLinkProps {
   href: string;
@@ -128,18 +123,6 @@ export function Sidebar({
               isCollapse={isCollapse}
               icon={<HomeIcon className="h-[18px] w-[18px] text-current" />}
             />
-          <NavLink
-              title={t('text-places')}
-              href={routes.placesFeed}
-              isCollapse={isCollapse}
-              icon={<LayoutIcon className="h-[18px] w-[18px] text-current" />}
-            />
-            <NavLink
-              title="Коллекция"
-              href={routes.feed}
-              isCollapse={isCollapse}
-              icon={<CollectionIcon className="h-[22px] w-[22px] text-current" />}
-            />
             <NavLink
               title={t('text-top-authors')}
               href={routes.authors}
@@ -229,7 +212,6 @@ export function Sidebar({
 export default function SidebarDrawerView() {
   const { closeDrawer } = useDrawer();
   const { t } = useTranslation('common');
-  const [isModalOpen, setIsModalOpen] = useState(false);
   
   return (
     <>
@@ -238,17 +220,6 @@ export default function SidebarDrawerView() {
           <Logo />
           <div className="ml-3 flex h-7 items-center gap-2">
             {/* Кнопка создания плейса */}
-            <button
-              type="button"
-              onClick={() => {
-                setIsModalOpen(true);
-                closeDrawer();
-              }}
-              className="p-2 text-dark-900 outline-none transition-all hover:text-dark dark:text-dark-800 hover:dark:text-light-200 touch-manipulation"
-              aria-label={t('text-create')}
-            >
-              <PlusCircleIcon className="h-5 w-5" />
-            </button>
             {/* Кнопка закрытия */}
             <button
               type="button"
@@ -264,7 +235,6 @@ export default function SidebarDrawerView() {
           <Sidebar isCollapse={true} className="flex text-13px relative z-50" />
         </div>
       </div>
-      <CreatePlaceModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
     </>
   );
 }

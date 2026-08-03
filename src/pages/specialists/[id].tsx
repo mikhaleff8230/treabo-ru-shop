@@ -36,7 +36,7 @@ type SpecialistPageProps = {
 };
 
 const siteUrl = (process.env.NEXT_PUBLIC_WEBSITE_URL || 'https://treabo.ru').replace(/\/+$/, '');
-const appDownloadPath = process.env.NEXT_PUBLIC_TREABO_APP_APK_URL || '/downloads/treabo-proffi.apk';
+const appDownloadPath = process.env.NEXT_PUBLIC_TREABO_APP_APK_URL || '/downloads/treabo-specialist.apk';
 
 function buildAppDownloadUrl() {
   if (/^https?:\/\//i.test(appDownloadPath)) return appDownloadPath;

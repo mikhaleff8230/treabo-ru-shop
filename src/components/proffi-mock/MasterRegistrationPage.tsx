@@ -58,7 +58,7 @@ const reviewTexts = [
 ];
 
 const TELEGRAM_CHAT_URL = 'https://t.me/+IKp5Qdq27MU3NGIy';
-const APP_DOWNLOAD_URL = process.env.NEXT_PUBLIC_TREABO_APP_APK_URL || 'https://treabo.ru/downloads/treabo-proffi.apk';
+const APP_DOWNLOAD_URL = process.env.NEXT_PUBLIC_TREABO_APP_APK_URL || 'https://treabo.ru/downloads/treabo-specialist.apk';
 const APP_QR_URL = `https://api.qrserver.com/v1/create-qr-code/?size=320x320&margin=12&data=${encodeURIComponent(APP_DOWNLOAD_URL)}`;
 
 const questions = [
@@ -94,10 +94,10 @@ export default function MasterRegistrationPage({ topSpecialists = [] }: MasterRe
           </div>
           <div className="overflow-hidden rounded-[24px] bg-white p-2 shadow-[0_8px_24px_rgba(25,31,42,0.055)]">
             <Image
-              src="/proffi/treabo-specialist-app-banner.png"
+              src="/proffi/banner343.png"
               alt="Приложение Treabo для мастера"
-              width={1536}
-              height={1920}
+              width={932}
+              height={932}
               className="h-72 w-full rounded-[18px] bg-black object-contain object-center"
               priority
             />
@@ -105,7 +105,7 @@ export default function MasterRegistrationPage({ topSpecialists = [] }: MasterRe
         </section>
 
         <section className={`${treaboMinimal.section} pb-9`}>
-          <div className="grid gap-5 rounded-[24px] border border-white/80 bg-white p-5 shadow-[0_8px_24px_rgba(25,31,42,0.05)] sm:p-6 md:grid-cols-[1fr_220px] md:items-center">
+          <div className="grid gap-5 rounded-[24px] border border-white/80 bg-white p-5 shadow-[0_8px_24px_rgba(25,31,42,0.05)] sm:p-6 md:grid-cols-[1fr_330px] md:items-center">
             <div>
               <h2 className="text-[24px] font-[300] leading-tight">Зарегистрируйтесь по номеру телефона</h2>
               <p className={`${treaboMinimal.body} mt-2 max-w-xl`}>
@@ -123,11 +123,16 @@ export default function MasterRegistrationPage({ topSpecialists = [] }: MasterRe
                 </button>
               </div>
             </div>
-            <div className="flex flex-col items-center text-center">
-              <img src={APP_QR_URL} alt="QR-код для скачивания приложения Treabo для мастера" className="h-36 w-36 rounded-2xl bg-white p-2 shadow-sm" />
-              <p className="mt-3 max-w-[220px] text-xs font-medium leading-5 text-[#777D88]">
-                Наведите камеру, чтобы скачать приложение для мастера.
-              </p>
+            <div className="grid grid-cols-[144px_1fr] items-stretch gap-3">
+              <div className="text-center">
+                <img src={APP_QR_URL} alt="QR-код для скачивания приложения Treabo для мастера" className="h-36 w-36 rounded-2xl bg-white p-2 shadow-sm" />
+                <p className="mt-2 text-[11px] font-medium leading-4 text-[#777D88]">Наведите камеру</p>
+              </div>
+              <div aria-disabled="true" className="flex min-h-36 cursor-not-allowed flex-col items-center justify-center rounded-[22px] bg-[#f2f5ed] p-4 text-center">
+                <div className="flex h-16 w-16 items-center justify-center rounded-[20px] bg-[linear-gradient(145deg,#28d17c,#06a866)] text-3xl font-black text-white shadow-md">R</div>
+                <div className="mt-3 text-base font-black text-[#232323]">RuStore</div>
+                <div className="mt-1 text-[10px] font-black uppercase tracking-[0.15em] text-[#6b7455]">Скоро</div>
+              </div>
             </div>
           </div>
         </section>
@@ -173,18 +178,15 @@ export default function MasterRegistrationPage({ topSpecialists = [] }: MasterRe
 
         <section className={`${treaboMinimal.section} py-8`}>
           <div className="grid gap-6 rounded-[24px] bg-white p-6 shadow-[0_8px_24px_rgba(25,31,42,0.05)] md:grid-cols-[220px_1fr_150px] md:items-center">
-            <Image src="/proffi/treabo-specialist-app-banner.png" alt="Приложение Treabo для мастера" width={1536} height={1920} className="mx-auto h-64 w-full rounded-[22px] bg-black object-contain object-center" />
+            <Image src="/proffi/banner343.png" alt="Приложение Treabo для мастера" width={932} height={932} className="mx-auto h-64 w-full rounded-[22px] bg-black object-contain object-center" />
             <div>
               <h2 className={`${treaboMinimal.h2} max-w-xl`}>
                 С приложением «Treabo для мастера» ещё удобнее
               </h2>
               <p className={`${treaboMinimal.body} mt-3`}>Заказы и чаты с заказчиками всегда под рукой.</p>
               <div className="mt-5 flex flex-wrap gap-2">
-                {['Google Play', 'App Store', 'AppGallery'].map((store) => (
-                  <span key={store} className="rounded-[12px] bg-[#232323] px-3.5 py-2 text-xs font-semibold text-white">
-                    {store}
-                  </span>
-                ))}
+                <a href={APP_DOWNLOAD_URL} download className="rounded-[14px] bg-[#232323] px-4 py-3 text-xs font-bold text-white">Скачать APK</a>
+                <span aria-disabled="true" className="cursor-not-allowed rounded-[14px] bg-[#e9f3e7] px-4 py-3 text-xs font-bold text-[#287a4d]">RuStore — скоро</span>
               </div>
             </div>
             <div className="mx-auto text-center">

@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Import Places styles */
-@import '../../styles/places.css';
 @layer base {
   :root {
     /* Promo page colors */

@@ -2,19 +2,11 @@ import type { AppProps } from 'next/app';
 import type { NextPageWithLayout } from '@/types';
 import { useEffect, useState } from 'react';
 import { QueryClient, QueryClientProvider, Hydrate } from '@tanstack/react-query';
-import { AnimatePresence } from 'framer-motion';
 import { Toaster } from 'react-hot-toast';
 import { ThemeProvider } from 'next-themes';
 import { appWithTranslation } from 'next-i18next';
 import { validateEnvironmentVariables } from '@/config/validate-environment-variables';
-import { CartProvider } from '@/components/cart/lib/cart.context';
-import { ModalProvider } from '@/components/modal-views/context';
-import ModalsContainer from '@/components/modal-views/container';
-import DrawersContainer from '@/components/drawer-views/container';
-import SearchView from '@/components/search/search-view';
 import DefaultSeo from '@/layouts/_default-seo';
-import { SearchProvider } from '@/components/search/search.context';
-import { AddressProvider } from '@/context/address-context';
 import MobileThemeSync from '@/components/ui/mobile-theme-sync';
 
 // base css file
@@ -27,10 +19,6 @@ import { useRouter } from 'next/router';
 import { getDirection } from '@/lib/constants';
 import dynamic from 'next/dynamic';
 import { trackYandexMetrikaPageView } from '@/lib/yandex-metrika';
-
-const PrivateRoute = dynamic(() => import('@/layouts/_private-route'), {
-  ssr: false,
-});
 
 const CookieConsent = dynamic(() => import('@/components/common/cookie-consent'), {
   ssr: false,
@@ -116,46 +104,21 @@ function CustomApp({ Component, pageProps }: AppPropsWithLayout) {
     }
   }, []);
   
-  const authenticationRequired = Component.authorization ?? false;
   return (
     <QueryClientProvider client={queryClient}>
       <Hydrate state={pageProps.dehydratedState}>
-        <AddressProvider>
-          <ThemeProvider
-            attribute="class"
-            defaultTheme="system"
-            enableSystem={true}
-            storageKey="theme"
-          >
-            <MobileThemeSync />
-            <SearchProvider>
-              <CartProvider>
-                <ModalProvider>
-                  <AnimatePresence
-                    initial={false}
-                    onExitComplete={() => window.scrollTo(0, 0)}
-                  >
-                    <>
-                      <DefaultSeo />
-                      {authenticationRequired ? (
-                        <PrivateRoute>
-                          {getLayout(<Component {...pageProps} />)}
-                        </PrivateRoute>
-                      ) : (
-                        getLayout(<Component {...pageProps} />)
-                      )}
-                      <SearchView />
-                      <ModalsContainer />
-                      <DrawersContainer />
-                      {!Component.hideCookieConsent && <CookieConsent />}
-                      <Toaster containerClassName="!top-16 sm:!top-3.5 !bottom-16 sm:!bottom-3.5" />
-                    </>
-                  </AnimatePresence>
-                </ModalProvider>
-              </CartProvider>
-            </SearchProvider>
-          </ThemeProvider>
-        </AddressProvider>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem={true}
+          storageKey="theme"
+        >
+          <MobileThemeSync />
+          <DefaultSeo />
+          {getLayout(<Component {...pageProps} />)}
+          {!Component.hideCookieConsent && <CookieConsent />}
+          <Toaster containerClassName="!top-16 sm:!top-3.5 !bottom-16 sm:!bottom-3.5" />
+        </ThemeProvider>
       </Hydrate>
     </QueryClientProvider>
   );

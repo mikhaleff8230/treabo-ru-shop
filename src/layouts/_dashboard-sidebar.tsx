@@ -18,7 +18,6 @@ import { useTranslation } from 'next-i18next';
 import { CreditCardIcon } from '@/components/icons/credit-card-icon';
 import { useMe } from '@/data/user';
 import usePrice from '@/lib/hooks/use-price';
-import { LayoutIcon } from '@/components/icons/layout-icon';
 
 // Мои карты - временно скрыто (в разработке)
 // Плейсы - удалено из меню
@@ -48,12 +47,6 @@ const menuItems = [
     label: 'text-auth-wishlist',
     path: routes.wishlists,
   },
-  // {
-  //   id: 10,
-  //   icon: <LayoutIcon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />,
-  //   label: 'Плейсы',
-  //   path: routes.placesFeed,
-  // },
   {
     id: 5,
     icon: <ReportIcon className="h-[15px] w-[15px] sm:h-4 sm:w-4" />,

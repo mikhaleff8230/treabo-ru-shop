@@ -14,8 +14,6 @@ export type MODAL_VIEWS =
   | 'ADD_NEW_CARD'
   | 'DELETE_CARD_MODAL'
   | 'GATEWAY_MODAL'
-  | 'PLACE_DETAILS'
-  | 'CREATE_PLACE'
   | 'UPDATE_PHONE'
   | 'PIN_LOGIN'
   | 'SET_PIN';
