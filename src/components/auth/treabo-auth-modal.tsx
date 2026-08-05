@@ -33,9 +33,9 @@ type TreaboAuthModalProps = {
     name?: string;
     role: 'customer' | 'specialist';
     email?: string;
-    channel?: 'sms' | 'telegram';
-  }) => Promise<{ status: 'otp_sent'; phone: string; otp_id: string }>;
-  verifyOtp: (input: { phone: string; otp_id: string; code: string; role: 'customer' | 'specialist' }) => Promise<unknown>;
+    channel?: 'wcall' | 'telegram' | 'sms';
+  }) => Promise<{ status: 'otp_sent'; phone: string; otp_id: string; channel?: 'wcall' | 'telegram' | 'sms' | 'email'; call_to?: string | null; destination?: string }>;
+  verifyOtp: (input: { phone: string; otp_id: string; code?: string; role: 'customer' | 'specialist' }) => Promise<unknown>;
 };
 
 const RESEND_SECONDS = 60;
@@ -68,11 +68,13 @@ export default function TreaboAuthModal({
   const [otpPhone, setOtpPhone] = useState('');
   const [otpCode, setOtpCode] = useState('');
   const [otpPurpose, setOtpPurpose] = useState<'login' | 'register'>('login');
+  const [otpChannel, setOtpChannel] = useState<'wcall' | 'telegram' | 'sms'>('wcall');
+  const [callTo, setCallTo] = useState('');
   const [passwordReset, setPasswordReset] = useState(false);
   const [passwordResetChannel, setPasswordResetChannel] = useState<'telegram' | 'email'>('telegram');
   const [passwordResetDestination, setPasswordResetDestination] = useState('');
   const [resendTimer, setResendTimer] = useState(0);
-  const isSpecialistPushLogin = tab === 'login' && role === 'specialist';
+  const isSpecialistPushLogin = false;
 
   useEffect(() => {
     if (open) {
@@ -107,11 +109,13 @@ export default function TreaboAuthModal({
 
   const normalizedPhone = normalizeTreaboPhone(phone);
 
-  function beginOtpStep(payload: { phone: string; otp_id: string }, purpose: 'login' | 'register') {
+  function beginOtpStep(payload: { phone: string; otp_id: string; channel?: 'wcall' | 'telegram' | 'sms' | 'email'; call_to?: string | null }, purpose: 'login' | 'register') {
     setOtpStep(true);
     setOtpId(payload.otp_id);
     setOtpPhone(payload.phone);
     setOtpPurpose(purpose);
+    setOtpChannel(payload.channel === 'telegram' ? 'telegram' : payload.channel === 'sms' ? 'sms' : 'wcall');
+    setCallTo(payload.call_to || '');
     setOtpCode('');
     setError('');
     setResendTimer(RESEND_SECONDS);
@@ -274,9 +278,13 @@ export default function TreaboAuthModal({
 
       setOtpId(payload.otp_id);
       setOtpCode('');
+      if (!passwordReset) {
+        setOtpChannel('telegram');
+        setCallTo('');
+      }
       setResendTimer(RESEND_SECONDS);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'SMS не отправлено');
+      setError(err instanceof Error ? err.message : 'Не удалось отправить код в Telegram');
     } finally {
       setSubmitting(false);
     }
@@ -434,7 +442,7 @@ export default function TreaboAuthModal({
               </button>
               {isSpecialistPushLogin ? (
                 <p className="text-center text-xs leading-5 text-[#7d849b]">
-                  Первый вход и привязка телефона выполняются при регистрации. SMS при обычном входе мастера не отправляется.
+                  Первый вход и привязка телефона выполняются при регистрации.
                 </p>
               ) : null}
 
@@ -480,10 +488,12 @@ export default function TreaboAuthModal({
             <p className="text-sm leading-6 text-[#7d849b]">
               {passwordReset
                 ? `Код для восстановления отправлен ${passwordResetChannel === 'email' ? 'на email ' : 'через Telegram на '}`
+                : otpChannel === 'wcall'
+                  ? 'Позвоните с подтверждаемого телефона на номер '
                 : 'Мы отправили код подтверждения на '}
-              <span className="font-bold text-[#232323]">
-                {passwordReset ? passwordResetDestination : otpPhone}
-              </span>
+              {otpChannel === 'wcall' && !passwordReset ? (
+                <a className="font-bold text-[#232323] underline" href={`tel:${callTo}`}>{callTo}</a>
+              ) : <span className="font-bold text-[#232323]">{passwordReset ? passwordResetDestination : otpPhone}</span>}
             </p>
 
             {passwordReset ? (
@@ -501,13 +511,17 @@ export default function TreaboAuthModal({
               </label>
             ) : null}
 
-            <OtpCodeInput
+            {otpChannel !== 'wcall' ? <OtpCodeInput
               value={otpCode}
               onChange={setOtpCode}
               onComplete={handleVerifyOtp}
               disabled={submitting}
               error={error || undefined}
-            />
+            /> : (
+              <p className="rounded-2xl bg-[#f3f5fa] px-4 py-3 text-sm text-[#5f6678]">
+                Звонок автоматически сбросится. После звонка нажмите кнопку проверки.
+              </p>
+            )}
 
             <div className="flex items-center justify-between gap-3">
               <button
@@ -523,19 +537,17 @@ export default function TreaboAuthModal({
                 disabled={resendTimer > 0 || submitting}
                 className="text-sm font-bold text-[#232323] disabled:text-[#b8bcc8]"
               >
-                {resendTimer > 0
-                  ? `Получить код повторно (${resendTimer}с)`
-                  : `Получить код повторно${passwordResetChannel === 'email' ? ' на email' : ' в Telegram'}`}
+                {resendTimer > 0 ? `Telegram будет доступен через ${resendTimer}с` : 'Получить код в Telegram'}
               </button>
             </div>
 
             <button
               type="button"
-              onClick={() => handleVerifyOtp(otpCode)}
-              disabled={submitting || otpCode.length < 6 || (passwordReset && password.length < 6)}
+              onClick={() => handleVerifyOtp(otpChannel === 'wcall' ? '' : otpCode)}
+              disabled={submitting || (otpChannel !== 'wcall' && otpCode.length < 6) || (passwordReset && password.length < 6)}
               className="w-full rounded-2xl bg-[#d9f36b] px-5 py-3 text-base font-black text-[#232323] transition hover:bg-[#c7e85a] disabled:opacity-60"
             >
-              {submitting ? 'Проверяем…' : 'Подтвердить'}
+              {submitting ? 'Проверяем…' : otpChannel === 'wcall' ? 'Я позвонил — проверить' : 'Подтвердить'}
             </button>
           </div>
         )}

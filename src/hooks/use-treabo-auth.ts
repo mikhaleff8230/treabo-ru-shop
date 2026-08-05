@@ -69,9 +69,9 @@ export function useTreaboAuth() {
       role: 'customer' | 'specialist';
       email?: string;
       city?: string;
-      channel?: 'sms' | 'telegram';
+      channel?: 'wcall' | 'telegram' | 'sms';
     }): Promise<TreaboOtpSentResponse> => treaboSendPhoneOtp(input),
-    verifyOtp: async (input: { phone: string; otp_id: string; code: string; role: 'customer' | 'specialist' }) => {
+    verifyOtp: async (input: { phone: string; otp_id: string; code?: string; role: 'customer' | 'specialist' }) => {
       const data = await treaboVerifyPhoneOtp(input);
       setUser(data.user);
       return data;

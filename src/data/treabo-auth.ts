@@ -24,7 +24,8 @@ export type TreaboOtpSentResponse = {
   status: 'otp_sent';
   phone: string;
   otp_id: string;
-  channel?: 'sms' | 'telegram' | 'email';
+  channel?: 'wcall' | 'telegram' | 'sms' | 'email';
+  call_to?: string | null;
   destination?: string;
 };
 
@@ -82,6 +83,7 @@ async function authFetch<T>(path: string, init?: RequestInit): Promise<T> {
       'Account role does not match this login page': 'Для этого номера выбран другой тип аккаунта',
       'Too Many Attempts.': 'Слишком много попыток. Попробуйте ещё раз через минуту',
       'Too many attempts': 'Слишком много попыток. Попробуйте ещё раз через минуту',
+      'Waiting for customer call': 'Звонок пока не найден. Позвоните на указанный номер и повторите проверку',
       'Recovery email is not configured': 'Для этого аккаунта не указан email. Используйте Telegram или обратитесь в поддержку',
       'Recovery email could not be sent': 'Не удалось отправить письмо. Попробуйте позже или используйте Telegram',
       'Server Error': 'Сервис временно недоступен. Попробуйте ещё раз немного позже',
@@ -155,7 +157,7 @@ export async function treaboSendPhoneOtp(input: {
   role: 'customer' | 'specialist';
   email?: string;
   city?: string;
-  channel?: 'sms' | 'telegram';
+  channel?: 'wcall' | 'telegram' | 'sms';
 }) {
   return authFetch<TreaboOtpSentResponse>(`/auth/${input.role}/phone/send-otp`, {
     method: 'POST',
@@ -166,7 +168,7 @@ export async function treaboSendPhoneOtp(input: {
   });
 }
 
-export async function treaboVerifyPhoneOtp(input: { phone: string; otp_id: string; code: string; role: 'customer' | 'specialist' }) {
+export async function treaboVerifyPhoneOtp(input: { phone: string; otp_id: string; code?: string; role: 'customer' | 'specialist' }) {
   const data = await authFetch<TreaboAuthResponse>(`/auth/${input.role}/phone/verify-otp`, {
     method: 'POST',
     body: JSON.stringify({
@@ -280,17 +282,17 @@ export function isTreaboCustomer(user?: TreaboUser | null) {
   return user?.role === 'customer';
 }
 
-export async function treaboSendChangePhoneOtp(phone: string) {
+export async function treaboSendChangePhoneOtp(phone: string, channel: 'wcall' | 'telegram' = 'wcall') {
   const token = getStoredTreaboToken();
   if (!token) throw new Error('Необходимо войти в аккаунт');
   return authFetch<TreaboOtpSentResponse>('/auth/phone/change/send-otp', {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
-    body: JSON.stringify({ phone: normalizeTreaboPhone(phone) }),
+    body: JSON.stringify({ phone: normalizeTreaboPhone(phone), channel }),
   });
 }
 
-export async function treaboVerifyChangePhoneOtp(input: { phone: string; otp_id: string; code: string }) {
+export async function treaboVerifyChangePhoneOtp(input: { phone: string; otp_id: string; code?: string }) {
   const data = await authFetch<TreaboAuthResponse>('/auth/phone/verify-otp', {
     method: 'POST',
     body: JSON.stringify({

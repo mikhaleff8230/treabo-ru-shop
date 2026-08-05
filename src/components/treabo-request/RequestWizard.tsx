@@ -184,6 +184,8 @@ export default function RequestWizard() {
   const [otpId, setOtpId] = useState<string | null>(null);
   const [otpPhone, setOtpPhone] = useState('');
   const [otpCode, setOtpCode] = useState('');
+  const [otpChannel, setOtpChannel] = useState<'wcall' | 'telegram'>('wcall');
+  const [callTo, setCallTo] = useState('');
   const [otpPurpose, setOtpPurpose] = useState<'login' | 'register'>('login');
   const [resendTimer, setResendTimer] = useState(0);
   const autoCreateAttempted = useRef(false);
@@ -584,6 +586,8 @@ export default function RequestWizard() {
         if (isTreaboOtpSentResponse(result)) {
           setOtpStep(true);
           setOtpId(result.otp_id);
+          setOtpChannel(result.channel === 'telegram' ? 'telegram' : 'wcall');
+          setCallTo(result.call_to || '');
           setOtpPhone(result.phone);
           setOtpPurpose('register');
           setResendTimer(60);
@@ -593,10 +597,12 @@ export default function RequestWizard() {
         return;
       }
 
-      const result = await login({ phone: normalizedPhone, password });
+      const result = await login({ phone: normalizedPhone, password, role: 'customer' });
       if (isTreaboOtpSentResponse(result)) {
         setOtpStep(true);
         setOtpId(result.otp_id);
+        setOtpChannel(result.channel === 'telegram' ? 'telegram' : 'wcall');
+        setCallTo(result.call_to || '');
         setOtpPhone(result.phone);
         setOtpPurpose('login');
         setResendTimer(60);
@@ -615,7 +621,7 @@ export default function RequestWizard() {
     setSubmitError('');
     setSavingTask(true);
     try {
-      const data = await verifyOtp({ phone: otpPhone, otp_id: otpId, code });
+      const data = await verifyOtp({ phone: otpPhone, otp_id: otpId, code, role: 'customer' });
       await finishWithTask(data.token);
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : 'Неверный код');
@@ -642,6 +648,8 @@ export default function RequestWizard() {
             })
           : await sendOtp({ phone: otpPhone, purpose: 'login', password, role: 'customer', channel: 'telegram' });
       setOtpId(payload.otp_id);
+      setOtpChannel('telegram');
+      setCallTo('');
       setOtpCode('');
       setResendTimer(60);
     } catch (error) {
@@ -1406,17 +1414,17 @@ export default function RequestWizard() {
             <div className="mx-auto max-w-3xl">
               <h1 className="text-4xl font-black leading-tight text-[#232323] md:text-5xl">{text.request.otpTitle}</h1>
               <p className="mt-4 text-sm leading-6 text-[#7d849b]">
-                {text.request.otpHint}{' '}
-                <span className="font-bold text-[#232323]">{otpPhone}</span>
+                {otpChannel === 'wcall' ? 'Позвоните с подтверждаемого телефона на ' : 'Код отправлен через Telegram на '}
+                {otpChannel === 'wcall' ? <a className="font-bold text-[#232323] underline" href={`tel:${callTo}`}>{callTo}</a> : <span className="font-bold text-[#232323]">{otpPhone}</span>}
               </p>
               <div className="mt-8">
-                <OtpCodeInput
+                {otpChannel !== 'wcall' ? <OtpCodeInput
                   value={otpCode}
                   onChange={setOtpCode}
                   onComplete={handleVerifyOtp}
                   disabled={savingTask}
                   error={submitError || undefined}
-                />
+                /> : <p className="rounded-2xl bg-[#f3f5fa] px-4 py-3 text-sm text-[#5f6678]">Звонок автоматически сбросится. После звонка нажмите кнопку проверки.</p>}
               </div>
               <div className="mt-4 flex items-center justify-between gap-3">
                 <button type="button" onClick={() => setOtpStep(false)} className="text-sm font-bold text-[#7d849b]">
@@ -1432,11 +1440,11 @@ export default function RequestWizard() {
                 </button>
               </div>
               <button
-                onClick={() => handleVerifyOtp(otpCode)}
-                disabled={savingTask || otpCode.length < 6}
+                onClick={() => handleVerifyOtp(otpChannel === 'wcall' ? '' : otpCode)}
+                disabled={savingTask || (otpChannel !== 'wcall' && otpCode.length < 6)}
                 className="mt-6 w-full rounded-2xl bg-[#d9f36b] px-5 py-4 text-base font-black text-[#232323] disabled:opacity-60"
               >
-                {savingTask ? text.request.creatingTask : text.request.otpVerify}
+                {savingTask ? text.request.creatingTask : otpChannel === 'wcall' ? 'Я позвонил — проверить' : text.request.otpVerify}
               </button>
             </div>
           );
