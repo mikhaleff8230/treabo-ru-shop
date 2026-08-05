@@ -146,6 +146,12 @@ export type TreaboChat = {
   specialist_avatar?: string | null;
   specialist_phone_masked?: string | null;
   specialist_city?: string | null;
+  other_id?: string | null;
+  other_role?: 'customer' | 'specialist';
+  other_name?: string | null;
+  other_avatar?: string | null;
+  other_phone_masked?: string | null;
+  other_city?: string | null;
   last_message?: string | null;
   last_message_at?: string | null;
   unread_count?: number;
